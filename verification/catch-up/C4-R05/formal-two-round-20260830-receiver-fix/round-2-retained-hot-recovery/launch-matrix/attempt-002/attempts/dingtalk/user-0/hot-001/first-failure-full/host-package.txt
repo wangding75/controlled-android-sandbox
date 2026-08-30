@@ -1,0 +1,190 @@
+Activity Resolver Table:
+  Non-Data Actions:
+      android.intent.action.MAIN:
+        c133f08 com.warden.controlledsandbox.debug/com.warden.controlledsandbox.MainActivity filter 99676a1
+          Action: "android.intent.action.MAIN"
+          Category: "android.intent.category.LAUNCHER"
+
+Receiver Resolver Table:
+  Non-Data Actions:
+      com.warden.controlledsandbox.action.RELAY_PENDING_INTENT:
+        ebbc0c6 com.warden.controlledsandbox.debug/com.warden.controlledsandbox.runtime.broker.RuntimePendingIntentRelayReceiver filter 9d19887
+          Action: "com.warden.controlledsandbox.action.RELAY_PENDING_INTENT"
+
+Domain verification status:
+
+Permissions:
+  Permission [com.warden.controlledsandbox.permission.BIND_NATIVE_COMPANION] (5f83445):
+    sourcePackage=com.warden.controlledsandbox.debug
+    uid=10196 gids=[] type=0 prot=signature
+    perm=PermissionInfo{658ea79 com.warden.controlledsandbox.permission.BIND_NATIVE_COMPANION}
+
+Registered ContentProviders:
+  com.warden.controlledsandbox.debug/com.warden.controlledsandbox.runtime.diagnostics.RuntimeInitProvider:
+    Provider{de2e3be com.warden.controlledsandbox.debug/com.warden.controlledsandbox.runtime.diagnostics.RuntimeInitProvider}
+
+ContentProvider Authorities:
+  [com.warden.controlledsandbox.debug.controlledsandbox.runtime]:
+    Provider{de2e3be com.warden.controlledsandbox.debug/com.warden.controlledsandbox.runtime.diagnostics.RuntimeInitProvider}
+      applicationInfo=ApplicationInfo{cf9779a com.warden.controlledsandbox.debug}
+
+Key Set Manager:
+  [com.warden.controlledsandbox.debug]
+      Signing KeySets: 40
+
+Packages:
+  Package [com.warden.controlledsandbox.debug] (a4cc732):
+    userId=10196
+    pkg=Package{d27cb6c com.warden.controlledsandbox.debug}
+    codePath=/data/app/~~8IO2zI3c-Aiol4V-Qys2Bg==/com.warden.controlledsandbox.debug-UbkHopdZUQssA6aAnFHR1g==
+    resourcePath=/data/app/~~8IO2zI3c-Aiol4V-Qys2Bg==/com.warden.controlledsandbox.debug-UbkHopdZUQssA6aAnFHR1g==
+    legacyNativeLibraryDir=/data/app/~~8IO2zI3c-Aiol4V-Qys2Bg==/com.warden.controlledsandbox.debug-UbkHopdZUQssA6aAnFHR1g==/lib
+    extractNativeLibs=true
+    primaryCpuAbi=x86_64
+    secondaryCpuAbi=null
+    cpuAbiOverride=null
+    versionCode=19 minSdk=26 targetSdk=35
+    minExtensionVersions=[]
+    versionName=0.5.19.1-source-debug
+    usesNonSdkApi=false
+    splits=[base]
+    apkSigningVersion=2
+    applicationInfo=PackageImpl{d27cb6c com.warden.controlledsandbox.debug}
+    flags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ]
+    privateFlags=[ PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION ALLOW_AUDIO_PLAYBACK_CAPTURE PRIVATE_FLAG_ALLOW_NATIVE_HEAP_POINTER_TAGGING ]
+    forceQueryable=false
+    dataDir=/data/user/0/com.warden.controlledsandbox.debug
+    supportsScreens=[small, medium, large, xlarge, resizeable, anyDensity]
+    timeStamp=2026-08-31 07:28:00
+    firstInstallTime=2026-08-20 23:25:54
+    lastUpdateTime=2026-08-31 07:28:00
+    signatures=PackageSignatures{ed1de00 version:2, signatures:[cc97f9bd], past signatures:[]}
+    installPermissionsFixed=true
+    pkgFlags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ]
+    declared permissions:
+      com.warden.controlledsandbox.permission.BIND_NATIVE_COMPANION: prot=signature, INSTALLED
+    requested permissions:
+      android.permission.QUERY_ALL_PACKAGES
+      com.warden.controlledsandbox.permission.BIND_NATIVE_COMPANION
+      android.permission.INTERNET
+      android.permission.ACCESS_NETWORK_STATE
+      android.permission.REORDER_TASKS
+      android.permission.CAMERA
+      android.permission.RECORD_AUDIO
+      android.permission.FOREGROUND_SERVICE
+      android.permission.ACCESS_COARSE_LOCATION
+      android.permission.ACCESS_FINE_LOCATION
+      android.permission.POST_NOTIFICATIONS
+      android.permission.SCHEDULE_EXACT_ALARM
+      android.permission.USE_EXACT_ALARM
+      android.permission.READ_MEDIA_IMAGES
+      android.permission.READ_MEDIA_VIDEO
+      android.permission.READ_MEDIA_AUDIO
+      android.permission.READ_EXTERNAL_STORAGE
+      android.permission.BLUETOOTH_SCAN
+      android.permission.BLUETOOTH_CONNECT
+    install permissions:
+      android.permission.FOREGROUND_SERVICE: granted=true
+      android.permission.INTERNET: granted=true
+      android.permission.REORDER_TASKS: granted=true
+      android.permission.ACCESS_NETWORK_STATE: granted=true
+      com.warden.controlledsandbox.permission.BIND_NATIVE_COMPANION: granted=true
+      android.permission.SCHEDULE_EXACT_ALARM: granted=true
+      android.permission.QUERY_ALL_PACKAGES: granted=true
+    User 0: ceDataInode=4589280 installed=true hidden=false suspended=false distractionFlags=0 stopped=false notLaunched=false enabled=0 instant=false virtual=false
+      overlay paths:
+        /data/resource-cache/com.android.systemui-neutral-mnhv.frro
+        /data/resource-cache/com.android.systemui-accent-39PV.frro
+      gids=[3003]
+      runtime permissions:
+        android.permission.ACCESS_FINE_LOCATION: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.BLUETOOTH_CONNECT: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.READ_EXTERNAL_STORAGE: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED|RESTRICTION_INSTALLER_EXEMPT]
+        android.permission.ACCESS_COARSE_LOCATION: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.CAMERA: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.RECORD_AUDIO: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.BLUETOOTH_SCAN: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+
+Queries:
+  system apps queryable: false
+  queries via package name:
+    com.warden.controlledsandbox.debug:
+      com.warden.controlledsandbox.companion32.debug
+      com.warden.controlledsandbox.fixture
+  queries via intent:
+  queryable via interaction:
+    User 0:
+      [com.mumu.store,com.android.settings,com.android.location.fused,com.android.keychain,com.netease.mumu.cloner,android,com.netease.nemu_vapi_android.nemu,com.mumu.shared.sdk,com.sohu.inputmethod.sogou.chuizi,com.android.providers.settings]:
+        com.warden.controlledsandbox.debug
+      com.android.webview:
+        com.warden.controlledsandbox.debug
+      com.warden.controlledsandbox.companion32.debug:
+        com.warden.controlledsandbox.debug
+  queryable via uses-library:
+
+Package Changes:
+  Sequence number=105
+  User 0:
+    seq=8, package=com.quark.browser
+    seq=101, package=com.warden.controlledsandbox.debug
+    seq=102, package=com.warden.controlledsandbox.companion32.debug
+    seq=103, package=com.warden.controlledsandbox.fixture
+    seq=104, package=com.warden.controlledsandbox.fixture32
+
+
+Dexopt state:
+  [com.warden.controlledsandbox.debug]
+    path: /data/app/~~8IO2zI3c-Aiol4V-Qys2Bg==/com.warden.controlledsandbox.debug-UbkHopdZUQssA6aAnFHR1g==/base.apk
+      x86_64: [status=run-from-apk] [reason=unknown]
+      known secondary dex files:
+        /data/user/0/com.warden.controlledsandbox.debug/files/packages/com.quark.browser/revisions/2cb38172da5da4aee03826da0feccb77ff0391ee7356f1562052ddc1fae9ecb3/lib/arm64-v8a/libsgmain.so
+          class loader context: =VariableClassLoaderContext=
+        /data/user/0/com.warden.controlledsandbox.debug/files/packages/com.quark.browser/revisions/2cb38172da5da4aee03826da0feccb77ff0391ee7356f1562052ddc1fae9ecb3/lib/arm64-v8a/libsgsecuritybody.so
+          class loader context: =VariableClassLoaderContext=
+        /data/user/0/com.warden.controlledsandbox.debug/files/packages/com.quark.browser/revisions/2cb38172da5da4aee03826da0feccb77ff0391ee7356f1562052ddc1fae9ecb3/lib/arm64-v8a/libsgmiddletier.so
+          class loader context: =VariableClassLoaderContext=
+
+
+Compiler stats:
+  [com.warden.controlledsandbox.debug]
+     base.apk - 295
+Snapshot statistics
+   Unrecorded-hits: 588  Cork-level: 0
+   Summary stats               TotBlds     TotUsed     TotCork     BigBlds    ShortLvd     TotTime     MaxTime
+          0:43         now           0           0           0           0           0           0           0
+          1:43        0:43           9        1044           0           0           0           1           0
+          2:43        1:43           8         951           0           0           1           1           0
+          3:43        2:43          10        1126           0           0           2           1           0
+          4:43        3:43           7         943           0           0           0           1           0
+          5:43        4:43           7        1062           0           0           0           1           0
+          6:43        5:43          10        1252           0           0           0           2           0
+          7:43        6:43           8         947           0           0           0           2           1
+          8:43        7:43          14        9938           0           0           2          10           2
+          9:43        8:43           0           0           0           0           0           0           0
+    2:13:22:43         now        3262      738256           0           7         165        1146          22
+
+   Build times                  <= 1ms      <= 2ms      <= 5ms     <= 10ms     <= 20ms     <= 50ms    <= 100ms     > 100ms
+          0:43         now           0           0           0           0           0           0           0           0
+          1:43        0:43           9           0           0           0           0           0           0           0
+          2:43        1:43           8           0           0           0           0           0           0           0
+          3:43        2:43          10           0           0           0           0           0           0           0
+          4:43        3:43           7           0           0           0           0           0           0           0
+          5:43        4:43           7           0           0           0           0           0           0           0
+          6:43        5:43          10           0           0           0           0           0           0           0
+          7:43        6:43           8           0           0           0           0           0           0           0
+          8:43        7:43          13           1           0           0           0           0           0           0
+          9:43        8:43           0           0           0           0           0           0           0           0
+    2:13:22:43         now        3198          23          24          10           6           1           0           0
+
+   Use counters                   <= 1        <= 2        <= 5       <= 10       <= 20       <= 50      <= 100       > 100
+          0:43         now           0           0           0           0           0           0           0           0
+          1:43        0:43           0           0           0           0           0           1           3           5
+          2:43        1:43           1           0           0           0           0           0           3           4
+          3:43        2:43           2           0           0           0           0           0           2           6
+          4:43        3:43           0           0           0           0           0           0           2           5
+          5:43        4:43           0           0           0           0           0           0           2           5
+          6:43        5:43           0           0           0           0           1           1           3           5
+          7:43        6:43           0           0           0           0           1           1           2           4
+          8:43        7:43           2           0           0           0           0           3           2           7
+          9:43        8:43           0           0           0           0           0           0           0           0
+    2:13:22:43         now         147           8           9          13          28         269         838        1949

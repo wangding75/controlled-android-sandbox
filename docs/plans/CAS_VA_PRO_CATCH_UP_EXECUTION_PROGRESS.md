@@ -3505,3 +3505,33 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
 - **下一步**：先运行本启动记录对应的续接预检与 formal R05 orchestrator 静态门，确认
   当前 commit clean；然后执行第一轮 clean-install/cold，完成后不在单任务汇报环节停留，
   直接按账本继续第二轮 retained-state/hot/recovery 和其余正式矩阵，直到通过或形成真实阻断。
+
+### C4-R05：readiness terminal publication race 首次失败与修复（2026-08-31）
+
+- **首次失败状态**：本次续接没有重试失败 case。第二轮 retained-state/hot/recovery 的
+  `dingtalk / user0 / hot-001` 首次观察在 `07:37:36 +08:00` fail-closed，request
+  `b4a8ef989fd6459ba15db59aab8a4e5b`、operation
+  `b4a8ef989fd6459ba15db59aab8a4e5b-launch`、attempt=2、`retryBudget=0`、
+  `automaticRetryPerformed=false`，错误为 `LAUNCH_OBSERVATION_NOT_FOUND`。失败时
+  Guest Window/Surface/截图有效，但 correlated terminal result 不可读；因此不能用
+  独立显示证据覆盖 command failure。
+- **证据与根因**：原始失败目录为
+  `verification/catch-up/C4-R05/formal-two-round-20260830-receiver-fix/round-2-retained-hot-recovery/launch-matrix/attempt-002/attempts/dingtalk/user-0/hot-001/`。
+  logcat 按顺序保留 `FIRST_FRAME_DRAWN`、`GUEST_LAUNCH_READINESS=LAUNCH_PASS`、
+  `LAUNCH_OBSERVATION_NOT_FOUND`；根因归类 CAS 通用 readiness terminal-result
+  publication race：异步观察线程先移除 observation aliases，后发布 terminal result，
+  DebugCommand poll 在两者之间读到空窗。不是 SX/UI、商业包黑屏或 RD 丢失。完整分类、
+  VA/NBB 对照和采纳/不采纳理由见
+  `docs/review/C4_R05_READINESS_PUBLICATION_RACE_FIX_20260831.md`。
+- **修复与验证**：实现提交 `d80c9e1538ed60152094d6c4ed4b7bc66d01f1ce` 将
+  `publishLaunchReadiness` 前置到 `removeObservationMappings`，不改变 deadline、
+  retry budget 或 readiness 标准。静态 checker、R04/R05 gate、Gradle debug build、
+  `python tools/static_android_compile.py` 和 `git diff --check` 通过；动态 DingTalk
+  user0 cold/hot 2/2 通过并具备真实 FIRST_FRAME_DRAWN/Window/Surface/non-black 证据。
+- **Known Issues 更新**：新增 `KI-R03-063`，当前 `RECORDED`、
+  `acceptance: NOT_FIXED`、`blocks_current_campaign: true`；只在完整 R05 两轮 clean
+  commit 回归通过后关闭。原 `KI-R03-053/054/057/058/059/061/062` 未被本次定向回归
+  擅自清除。
+- **当前状态/下一步**：`C4-R05` 仍为唯一 `IN_PROGRESS`；本次修复文档和 KI 记录提交
+  后，重新运行续接预检、formal orchestrator，并从新的修复 clean commit 重新开始两轮
+  正式验收。上一轮 102 条输出只作失败证据，不与新的 formal PASS 合并。

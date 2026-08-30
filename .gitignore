@@ -54,6 +54,13 @@ verification/catch-up/C4-R05/formal-dual-user-retest-*/
 verification/catch-up/C4-R05/formal-preflight-device-unavailable-*.json
 verification/catch-up/C4-R05/repro-*/
 
+# Interrupted and targeted C4-R05 lanes retain raw JSON/log bundles locally; curated
+# summaries, first-failure contracts and classification documents are force-added when
+# they form the durable review evidence for a task receipt.
+verification/catch-up/C4-R05/formal-two-round-20260830-receiver-fix/
+verification/catch-up/C4-R05/readiness-publication-fix-20260831/
+verification/catch-up/C4-R05/formal-two-round-20260831-publication-race-fix/
+
 # C4-TEMP-01 dynamic latency runs retain raw device logs, dumpsys, screenshots and
 # copied package state locally; the curated classification and artifact index at the
 # TEMP-01 root are the durable review evidence.

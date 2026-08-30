@@ -1871,3 +1871,41 @@ issues:
       status remains RECORDED and blocking until R05 completes. Evidence is indexed by
       `verification/catch-up/C4-TEMP-01/20260830T181923-benchmark-summary.json` and
       `verification/catch-up/C4-TEMP-01/20260830T181923-first-frame-fix-classification.md`.
+
+  - issue_id: KI-R03-063
+    title: CAS readiness terminal result can be observed as missing after Guest first frame
+    capability: activity_framework
+    classification: CURRENT_DEFECT
+    severity: HIGH
+    status: RECORDED
+    discovered_by: C4-R05 retained hot continuation 2026-08-31
+    evidence:
+      - verification/catch-up/C4-R05/formal-two-round-20260830-receiver-fix/round-2-retained-hot-recovery/launch-matrix/attempt-002/attempts/dingtalk/user-0/hot-001/case.json
+      - verification/catch-up/C4-R05/formal-two-round-20260830-receiver-fix/round-2-retained-hot-recovery/launch-matrix/attempt-002/attempts/dingtalk/user-0/hot-001/first-failure-full
+      - sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeActivityLaunchCoordinator.java
+      - docs/review/C4_R05_READINESS_PUBLICATION_RACE_FIX_20260831.md
+      - scripts/check-c4-r03-readiness-publication.py
+    match_patterns:
+      - LAUNCH_OBSERVATION_NOT_FOUND
+      - OBSERVATION_LOOKUP
+      - GUEST_LAUNCH_READINESS
+      - FIRST_FRAME_DRAWN
+      - publishLaunchReadiness
+    blocks_current_campaign: true
+    follow_up_required: true
+    follow_up_task: C4-R05 full two-round clean-commit regression
+    acceptance: NOT_FIXED
+    fix_policy: C4_R05_PUBLISH_TERMINAL_READINESS_BEFORE_OBSERVATION_UNMAP
+    notes: >
+      The retained-state/hot continuation stopped on DingTalk user0 hot-001 with request
+      b4a8ef989fd6459ba15db59aab8a4e5b and operation
+      b4a8ef989fd6459ba15db59aab8a4e5b-launch. The debug command reported
+      LAUNCH_OBSERVATION_NOT_FOUND even though the same request timeline had already reached
+      GUEST_LAUNCH_READINESS=LAUNCH_PASS and the nested Guest PrivacyPolicyActivity emitted
+      FIRST_FRAME_DRAWN with Window attached/registered. The race was in the CAS generic
+      asynchronous scheduler: observation aliases were removed before the terminal result was
+      published, allowing the poller to see neither state. No retry or deadline extension was
+      used after the first failure. Commit d80c9e1538ed60152094d6c4ed4b7bc66d01f1ce publishes
+      the terminal result before unmapping aliases; static checks, full static Android compile,
+      Gradle build and a dynamic DingTalk cold/hot 2-row regression passed. This KI remains
+      RECORDED and blocking until the full R05 two-round matrix proves the fix.

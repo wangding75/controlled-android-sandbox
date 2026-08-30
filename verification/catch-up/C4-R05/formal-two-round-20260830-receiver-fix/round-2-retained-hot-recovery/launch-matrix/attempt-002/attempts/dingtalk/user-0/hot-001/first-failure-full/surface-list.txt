@@ -1,0 +1,82 @@
+Display 0 name="内置屏幕"#0
+WindowedMagnification:0:31#0
+HideDisplayCutout:0:16#0
+OneHandedBackgroundPanel:0:1#0
+OneHanded:0:1#0
+FullscreenMagnification:0:1#0
+Leaf:0:1#0
+WallpaperWindowToken{8013f23 token=android.os.Binder@435b052}#0
+502485 com.android.systemui.ImageWallpaper#0
+com.android.systemui.ImageWallpaper#0
+Wallpaper BBQ wrapper#0
+OneHanded:2:16#0
+FullscreenMagnification:2:14#0
+colorBackgroundLayer#0
+DefaultTaskDisplayArea#0
+Task=1#0
+Task=2#0
+ActivityRecord{e1144ff u0 app.lawnchair/.LawnchairLauncher#0
+79eea9a app.lawnchair/app.lawnchair.LawnchairLauncher#0
+Task=5#0
+Dim layer#0
+Task=4#0
+Dim layer#0
+splitScreenDividerAnchor#0
+Task=3#0
+Task=2344#0
+ActivityRecord{ebd179c u0 com.warden.controlledsandbox.debug/com.warden.controlledsandbox.runtime.component.activity.StubActivity19#0
+738692b com.alibaba.android.rimet/com.alibaba.android.rimet.PrivacyPolicyActivity#0
+com.alibaba.android.rimet/com.alibaba.android.rimet.PrivacyPolicyActivity#0
+Dim Layer for - Task=2344#0
+7850a91 com.alibaba.android.rimet/com.alibaba.android.rimet.PrivacyPolicyActivity#0
+com.alibaba.android.rimet/com.alibaba.android.rimet.PrivacyPolicyActivity#1
+Leaf:3:14#0
+WindowToken{9df2ea8 android.os.BinderProxy@15fd2b8}#0
+f67ed9a ShellDropTarget#0
+ImePlaceholder:15:16#0
+ImeContainer#0
+WindowToken{289350a android.os.Binder@83c175}#0
+Surface(name=3bd7358 InputMethod)/@0x1a35596 - animation-leash of insets_animation#0
+3bd7358 InputMethod#0
+OneHanded:17:17#0
+FullscreenMagnification:17:17#0
+Leaf:17:17#0
+WindowToken{eb72b89 android.os.BinderProxy@b983d53}#0
+Surface(name=837778e StatusBar)/@0x759e5fe - animation-leash of insets_animation#1
+837778e StatusBar#0
+StatusBar#0
+HideDisplayCutout:18:18#0
+OneHanded:18:18#0
+FullscreenMagnification:18:18#0
+Leaf:18:18#0
+OneHanded:19:19#0
+FullscreenMagnification:19:19#0
+Leaf:19:19#0
+WindowToken{12dc24 android.os.BinderProxy@57f27b6}#0
+ef2e38d NotificationShade#0
+HideDisplayCutout:20:23#0
+OneHanded:20:23#0
+FullscreenMagnification:20:23#0
+Leaf:20:23#0
+Leaf:24:25#0
+HideDisplayCutout:26:31#0
+OneHanded:26:31#0
+FullscreenMagnification:26:27#0
+Leaf:26:27#0
+Leaf:28:28#0
+FullscreenMagnification:29:31#0
+Leaf:29:31#0
+HideDisplayCutout:32:35#0
+OneHanded:32:35#0
+Leaf:32:32#0
+FullscreenMagnification:33:35#0
+Leaf:33:35#0
+Leaf:36:36#0
+Display Overlays#0
+Input Consumer recents_animation_input_consumer#0
+WindowToken{3f61538 android.os.BinderProxy@7806d9b}#0
+b8e4911 ScreenDecorOverlay#0
+ScreenDecorOverlay#0
+WindowToken{9e9547c android.os.BinderProxy@5aa5350}#0
+3fef105 ScreenDecorOverlayBottom#0
+ScreenDecorOverlayBottom#0
