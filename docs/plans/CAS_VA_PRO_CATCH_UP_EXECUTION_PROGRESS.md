@@ -1,11 +1,11 @@
 # CAS 追平 VA PRO 执行进度
 
-账本版本：1.9
-更新时间：2026-08-30 22:08（Asia/Shanghai）
+账本版本：2.0
+更新时间：2026-08-30 22:11（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
-当前阶段：`C4`（IN_PROGRESS，REOPENED，原 C4-T05 证据不足；R05 待正式重验）
+当前阶段：`C4`（IN_PROGRESS，REOPENED，原 C4-T05 证据不足；R05 正式重验中）
 当前任务：`C4-R05`
 下一任务：`C4-R05`
 最后完成任务：`C4-TEMP-01`
@@ -69,7 +69,7 @@
 | C4-R03 | 启动 readiness 与窗口合同 | DONE | C4-R01 | `d8797c89` | §5 C4-R03（用户批准残余风险豁免） |
 | C4-R04 | C4 fail-closed 验收编排 | DONE | C4-R02,C4-R03 | `1d9b83d54c13d2a758752281dbc492859d8bd05d` | §5 C4-R04 |
 | C4-TEMP-01 | CAS 导入/克隆/添加/启动耗时根因与修复 | DONE | C4-R04；完成后解除 C4-R05 临时阻断 | `7c0c819a58513f89e91ec0fb44cdc05a151e2c32` | §5 C4-TEMP-01 修复完成（2026-08-30） |
-| C4-R05 | MuMu RD 正式重验与关门 | PENDING | C4-R04,C4-TEMP-01 | `5ee894f3e32339b951ba7c81f19010f1d13bf392`（历史阻断基线） | - |
+| C4-R05 | MuMu RD 正式重验与关门 | IN_PROGRESS | C4-R04,C4-TEMP-01 | `5ee894f3e32339b951ba7c81f19010f1d13bf392`（历史阻断基线） | §5 C4-R05 正式重验启动（2026-08-30） |
 | C5-T01 | 原始 XH 产品能力契约 | NOT_APPLICABLE | C2,C3 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T02 | XH CAS Host/SDK 集成 | NOT_APPLICABLE | C5-T01,C4-T02 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T03 | 原始 XH/DingTalk 验收 | NOT_APPLICABLE | C5-T02,C4 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
@@ -3462,3 +3462,46 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   `git push origin feature/t57-r03-va-pro-capability-campaign`、`git ls-remote --heads`
   对比和工作区清洁核验；在这些步骤成功后本任务状态才成立。
 - **下一任务**：`C4-R05 / PENDING`。恢复条件已满足 TEMP 的硬门槛，但 C4 阶段仍未关闭。
+
+### C4-R05：正式重验启动记录（2026-08-30 22:11）
+
+- **任务 ID / 当前状态**：`C4-R05 / IN_PROGRESS`。这是在 C4-TEMP-01 完成、实现与
+  回执均推送且最终续接预检识别 `C4-R05` 后启动的正式关门任务；C4-R05 的历史 BLOCKED
+  证据不覆盖，本次只从当前 clean baseline 开始。当前只有本任务处于 `IN_PROGRESS`。
+- **开始时间与基线**：开始时间 `2026-08-30 22:11:35 +08:00`；开始 commit、分支和
+  远端 HEAD 均为 `2cd121711df9a8347dd7e9e897f1eb6cdf60fcbb`、
+  `feature/t57-r03-va-pro-capability-campaign`、
+  `origin/feature/t57-r03-va-pro-capability-campaign`；上一任务 C4-TEMP-01 的实现提交为
+  `7c0c819a58513f89e91ec0fb44cdc05a151e2c32`，正式回执提交为
+  `b2c021c884058491bf8a966eca653906138f84e2`，格式修复提交为
+  `2cd121711df9a8347dd7e9e897f1eb6cdf60fcbb`。
+- **续接预检与 Git 前检**：C4-TEMP-01 收口后运行
+  `python scripts/verify-catch-up-continuation.py`，结果 `PASS`，识别
+  `C4-R05` 为第一依赖就绪任务；分支、上游、local/remote HEAD 和 Git 身份均通过，
+  身份为 `OpenAI <openai@users.noreply.github.com>`。本任务标记后将再次运行预检，
+  并在所有正式验收结束前保持单一 `IN_PROGRESS`。
+- **事实源重读**：开始前重新完整读取任务书、进度账本、
+  `docs/review/C4_RD_RETEST_ROOT_CAUSE_AND_ACCEPTANCE_PLAN_20260824.md`、
+  `docs/review/KNOWN_ISSUES.yaml`、能力活动工作流、提交身份策略、C4-R02/R03/R04/R05
+  专项设计、证据边界、交接、VA/NBB 参考映射及 C4-TEMP-01 最新修复设计；采用任务书
+  当前正式门禁：两轮 `loops=25`，clean-install/cold 与 retained-state/hot/recovery，
+  每 target/user 冷热各 25 次，添加 fixture 25 次和商业样本各 5 次，C1/C2/C4/SX 回归，
+  user0/user1 各 15 分钟且至少 50 周期。未执行 8 小时 soak，亦不以历史结果替代本轮。
+- **RD 测试设备快照**：通过 `python scripts/mumu_instance.py --instance-name "RD测试"`
+  动态解析于 `2026-08-30 22:11:37 +08:00` 得到 MuMu `RD测试`（索引 1，
+  `MuMuPlayer-12.0-1`），runtimeStatus=device，API 32，型号 `22041211A`，ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，Android ID `398eea33120cd887`，
+  boot ID `bd6fc459-0d52-4689-868a-420364ea407c`。resolved serial 仅进入本轮证据快照，
+  不进入源码、runner 或包名分支。
+- **当前 Known Issues**：`KI-R03-053`、`054`、`057`、`058`、`059`、`061`、`062`
+  仍为 `RECORDED` 阻断项，`KI-R03-060` 为已接受但必须回归的开放项；C5-T01 至 C5-T04
+  保持 `NOT_APPLICABLE`。R05 必须在每一轮把这些 issue 的实际结果、首次失败证据和
+  关闭/保留结论写入最终回执，不得因 TEMP 的性能硬门槛通过而自动清除。
+- **执行边界**：本任务不扩大 deadline、不固定 sleep、不静默 launch retry，不以
+  `LAUNCH_PASS`、Activity marker、Guest 进程存在或夸克成功替代当前 package/user/revision
+  的真实 `FIRST_FRAME_DRAWN`；首次失败立即保存 request/operation、attempt/retry decision、
+  logcat、Host/Guest、dumpsys、Window/Surface/ViewRoot/进程、截图、事务/catalog、APK/commit/
+  boot 证据，随后按任务书 fail-closed 停止该轮并决定是否阻断 C4-R05。
+- **下一步**：先运行本启动记录对应的续接预检与 formal R05 orchestrator 静态门，确认
+  当前 commit clean；然后执行第一轮 clean-install/cold，完成后不在单任务汇报环节停留，
+  直接按账本继续第二轮 retained-state/hot/recovery 和其余正式矩阵，直到通过或形成真实阻断。
