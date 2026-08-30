@@ -880,7 +880,107 @@ public final class ActivityFieldBridge {
         // ActivityThread.handleResumeActivity owns the normal first addView.  This is one
         // explicit post-resume observation/repair only; repeated delayed addView attempts made
         // the first failure non-deterministic and could mask a framework black-screen state.
-        handler.post(() -> publishWindowIfMissing(activity));
+        handler.post(() -> {
+            logPostResumeWindowState(activity, "before_publish");
+            publishWindowIfMissing(activity);
+            logPostResumeWindowState(activity, "after_publish");
+        });
+    }
+
+    /**
+     * Captures the single post-resume boundary at which ActivityThread should already have
+     * completed its normal addView/makeVisible path.  This is deliberately an observation only:
+     * it does not change visibility, enqueue another callback, or attempt a second addView.
+     * Keeping the Activity and ActivityClientRecord fields together is important because a
+     * window can be present in WMS while the client-side record still says that the activity is
+     * hidden or being destroyed.
+     */
+    private static void logPostResumeWindowState(Activity activity, String boundary) {
+        try {
+            android.view.Window window = activity.getWindow();
+            android.view.View decor = window == null ? null : window.getDecorView();
+            Object record = findActivityClientRecord(activity);
+            Object thread = currentActivityThread();
+            Object token = optionalObject(activity, "mToken");
+            Object recordWindow = record == null ? null : optionalObject(record, "window");
+            Object state = record == null ? null : optionalObject(record, "state");
+            Object toBeDestroyed = thread == null
+                    ? null : optionalObject(thread, "mActivitiesToBeDestroyed");
+            boolean scheduledForDestroy = containsKey(toBeDestroyed, token);
+            android.view.ViewParent parent = decor == null ? null : decor.getParent();
+            Object root = decor == null ? null : invokeOptional(decor, "getViewRootImpl");
+            String packageName = "";
+            int type = -1;
+            boolean layoutToken = false;
+            if (window != null) {
+                android.view.WindowManager.LayoutParams layout = window.getAttributes();
+                if (layout != null) {
+                    packageName = String.valueOf(layout.packageName);
+                    type = layout.type;
+                    layoutToken = layout.token != null;
+                }
+            }
+            android.util.Log.i("CS_FRAMEWORK_ACTIVITY",
+                    "WINDOW_POST_RESUME_STATE boundary=" + boundary
+                            + " activityClass=" + activity.getClass().getName()
+                            + " activityToken=" + String.valueOf(token)
+                            + " recordWindow=" + (recordWindow != null)
+                            + " recordState=" + String.valueOf(state)
+                            + " preserveWindow=" + optionalBoolean(record, "mPreserveWindow", false)
+                            + " hideForNow=" + optionalBoolean(record, "hideForNow", false)
+                            + " scheduledForDestroy=" + scheduledForDestroy
+                            + " mWindowAdded=" + optionalBoolean(activity, "mWindowAdded", false)
+                            + " mDecor=" + (optionalObject(activity, "mDecor") != null)
+                            + " visibleFromClient=" + optionalBoolean(activity, "mVisibleFromClient", true)
+                            + " visibleFromServer=" + optionalBoolean(activity, "mVisibleFromServer", false)
+                            + " startedActivity=" + optionalBoolean(activity, "mStartedActivity", false)
+                            + " finished=" + activity.isFinishing()
+                            + " decorVisibility=" + (decor == null ? -1 : decor.getVisibility())
+                            + " windowVisibility=" + (decor == null ? -1 : decor.getWindowVisibility())
+                            + " attached=" + (decor != null && decor.isAttachedToWindow())
+                            + " registration=" + windowRegistration(decor).name()
+                            + " parent=" + (parent == null ? "null" : parent.getClass().getName())
+                            + " viewRoot=" + (root == null ? "null" : root.getClass().getName())
+                            + " wmgViews=" + windowManagerViewCount()
+                            + " layoutPackage=" + packageName
+                            + " layoutType=" + type
+                            + " layoutToken=" + layoutToken);
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            android.util.Log.w("CS_FRAMEWORK_ACTIVITY",
+                    "WINDOW_POST_RESUME_STATE unavailable boundary=" + boundary, error);
+        }
+    }
+
+    private static Object currentActivityThread() throws Exception {
+        Class<?> activityThreadType = Class.forName("android.app.ActivityThread");
+        Field currentField = findField(activityThreadType, "sCurrentActivityThread");
+        if (currentField == null) return null;
+        currentField.setAccessible(true);
+        return currentField.get(null);
+    }
+
+    private static boolean containsKey(Object target, Object key) throws Exception {
+        if (target == null || key == null) return false;
+        if (target instanceof Map<?, ?> map) return map.containsKey(key);
+        Method contains = findMethod(target.getClass(), "containsKey", Object.class);
+        if (contains == null) return false;
+        contains.setAccessible(true);
+        Object value = contains.invoke(target, key);
+        return value instanceof Boolean && (Boolean) value;
+    }
+
+    private static Object invokeOptional(Object target, String name) {
+        if (target == null) return null;
+        try {
+            Method method = findMethod(target.getClass(), name);
+            if (method == null) return null;
+            method.setAccessible(true);
+            return method.invoke(target);
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            return null;
+        }
     }
 
     private static void publishWindowIfMissing(Activity activity) {
