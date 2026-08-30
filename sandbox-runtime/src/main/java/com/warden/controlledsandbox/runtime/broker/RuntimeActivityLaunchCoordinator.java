@@ -429,7 +429,6 @@ final class RuntimeActivityLaunchCoordinator {
                 Thread.currentThread().interrupt();
             }
             GuestLaunchEvidence evidence = observation.close();
-            removeObservationMappings(observation);
             String gate = GuestLaunchGate.evaluate(evidence);
             Bundle details = owner.sessionBundle(session, gate);
             details.putAll(transaction);
@@ -449,12 +448,18 @@ final class RuntimeActivityLaunchCoordinator {
                     android.os.SystemClock.elapsedRealtime() - observation.acceptedAtElapsedMs()));
             details.putInt("fatalCount", evidence.fatalCount);
             details.putInt("anrCount", evidence.anrCount);
+            // Publish the terminal result before removing the in-flight mappings.  The debug
+            // evidence collector polls observeLaunch() while the Guest callback is completing;
+            // removing first creates a real, observable gap in which neither the completed
+            // result nor the observation exists and the same request is misclassified as
+            // LAUNCH_OBSERVATION_NOT_FOUND even though FIRST_FRAME_DRAWN was emitted.
             if (GuestLaunchGate.LAUNCH_FAILED.equals(gate)) {
                 details.putString(RuntimeKeys.ERROR_TYPE, "LAUNCH_GATE_FAILED");
                 details.putString(RuntimeKeys.ERROR_MESSAGE, evidence.failure.isEmpty()
                         ? "guest Activity create/resume/window not confirmed" : evidence.failure);
             }
             owner.publishLaunchReadiness(activityToken, details);
+            removeObservationMappings(observation);
             RuntimeEventLog.event("GUEST_LAUNCH_READINESS", details);
         });
     }
