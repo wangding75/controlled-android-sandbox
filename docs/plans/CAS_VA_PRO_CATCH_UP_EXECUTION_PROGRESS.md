@@ -1,7 +1,7 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.8
-更新时间：2026-08-30 11:51（Asia/Shanghai）
+更新时间：2026-08-30 17:16（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
@@ -68,7 +68,7 @@
 | C4-R02 | 添加事务、超时与 UI 状态机 | DONE | C4-R01 | `46eed7be60a83f5b5adfe865a8c4b0d37e0a63a1` | §5 C4-R02 |
 | C4-R03 | 启动 readiness 与窗口合同 | DONE | C4-R01 | `d8797c89` | §5 C4-R03（用户批准残余风险豁免） |
 | C4-R04 | C4 fail-closed 验收编排 | DONE | C4-R02,C4-R03 | `1d9b83d54c13d2a758752281dbc492859d8bd05d` | §5 C4-R04 |
-| C4-TEMP-01 | CAS 导入/克隆/添加/启动耗时根因与修复 | BLOCKED | C4-R04；C4-R05 BLOCKED（临时前置） | `a9add66722cb3ab6da996059bcc4ad32c502778d`（含前置 `cdd69a2d7b31e15cc205c4328ddccd4b42dac103`） | §5 C4-TEMP-01 5 小时窗口最终阻断回执 |
+| C4-TEMP-01 | CAS 导入/克隆/添加/启动耗时根因与修复 | IN_PROGRESS | C4-R04；C4-R05 BLOCKED（临时前置） | `a9add66722cb3ab6da996059bcc4ad32c502778d`（含前置 `cdd69a2d7b31e15cc205c4328ddccd4b42dac103`） | §5 C4-TEMP-01 修复续作（17:14） |
 | C4-R05 | MuMu RD 正式重验与关门 | BLOCKED | C4-R04 | `5ee894f3e32339b951ba7c81f19010f1d13bf392` | §5 C4-R05 formal Quark block receipt |
 | C5-T01 | 原始 XH 产品能力契约 | NOT_APPLICABLE | C2,C3 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T02 | XH CAS Host/SDK 集成 | NOT_APPLICABLE | C5-T01,C4-T02 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
@@ -3314,3 +3314,40 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   `C4-TEMP-01` 为 BLOCKED 应 fail-closed；最终原始输出已记录在
   `verification/catch-up/C4-TEMP-01/20260830T1150-final-continuation-preflight-failure.md`，
   不得识别为 C4-R05。
+
+### C4-TEMP-01：修复续作启动记录（2026-08-30 17:14）
+
+- **任务 ID / 当前状态**：`C4-TEMP-01 / IN_PROGRESS`。这是用户明确要求“开始修复”后
+  对上一轮真实首帧阻断的重新修复尝试；保留历史 BLOCKED 回执及首次失败证据，不将旧失败
+  改写为 PASS。当前只有本任务处于 `IN_PROGRESS`，C4-R05 仍为 BLOCKED。
+- **开始时间与开始基线**：开始时间 `2026-08-30 17:14:45 +08:00`；开始 commit、
+  分支和远端 HEAD 均为 `f4d69bb53d6a8f2cc70469902c40ffad77d2d431`、
+  `feature/t57-r03-va-pro-capability-campaign`、
+  `origin/feature/t57-r03-va-pro-capability-campaign`；上一回执为
+  `38440d5f2df62c6e50cb609444353cb7d0aea29c`，最终 SHA 收尾为
+  `f4d69bb53d6a8f2cc70469902c40ffad77d2d431`。
+- **拉取与预检边界**：已执行 `git fetch origin --prune` 和
+  `git pull --ff-only origin feature/t57-r03-va-pro-capability-campaign`，结果
+  `Already up to date`，本地/远端一致、工作区干净、身份为
+  `OpenAI <openai@users.noreply.github.com>`。由于历史任务为 BLOCKED，直接预检按
+  fail-closed 返回 `ledger next task C4-TEMP-01 is not first dependency-ready PENDING task`；
+  本次明确启动修复后将以唯一 `IN_PROGRESS` 状态重新运行预检并记录结果。
+- **事实源与参考重读**：已重新完整读取任务书、进度账本、C4 RD 重测根因与验收计划、
+  `KNOWN_ISSUES.yaml`、能力活动工作流、提交身份策略、C4-TEMP-01 设计，以及 C4-R01/R02/
+  R03/R04/R05 的专项设计、证据边界、交接和 VA/NBB 参考映射。当前工作从保存的首失败
+  快照开始，不先重跑已知失败。
+- **RD 测试快照**：`python scripts/mumu_instance.py --instance-name "RD测试"` 于
+  `2026-08-30 17:14:52 +08:00` 动态解析 MuMu `RD测试`（索引 1，
+  `MuMuPlayer-12.0-1`），API 32，型号 `22041211A`，ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，Android ID `398eea33120cd887`，
+  boot ID `bd6fc459-0d52-4689-868a-420364ea407c`；resolved serial 只保留在快照，
+  不进入源码、runner 或业务逻辑。
+- **修复目标与约束**：围绕 `KI-R03-062` 的 nested `BrowserActivity` handoff、
+  ActivityThread/WindowSession/IWindow、task/token、Window identity 与真实首帧合同，
+  查明是否存在可最小修复的 CAS owner 边界。禁止固定 sleep、隐藏重试、扩大 deadline、
+  捕获所有异常循环 addView、静态 marker 替代首帧或 package-specific 旁路；首次失败必须
+  保留 request/operation、阶段计时、logcat、Activity/Window/Surface/ViewRoot、事务/catalog、
+  截图、APK 和 boot 证据。
+- **下一步**：先检查 `ActivityFieldBridge`、`GuestActivityThreadInstrumentation`、
+  `RuntimeActivityLaunchCoordinator`、`GuestLaunchObservation/Gate` 及对应测试，形成
+  可验证的最小修复设计后再编译；修复完成前不标记 DONE、不启动 C4-R05。
