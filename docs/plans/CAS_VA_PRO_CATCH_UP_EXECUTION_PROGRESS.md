@@ -1,7 +1,7 @@
 # CAS 追平 VA PRO 执行进度
 
-账本版本：1.7
-更新时间：2026-08-30 11:10（Asia/Shanghai）
+账本版本：1.8
+更新时间：2026-08-30 11:51（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
@@ -68,7 +68,7 @@
 | C4-R02 | 添加事务、超时与 UI 状态机 | DONE | C4-R01 | `46eed7be60a83f5b5adfe865a8c4b0d37e0a63a1` | §5 C4-R02 |
 | C4-R03 | 启动 readiness 与窗口合同 | DONE | C4-R01 | `d8797c89` | §5 C4-R03（用户批准残余风险豁免） |
 | C4-R04 | C4 fail-closed 验收编排 | DONE | C4-R02,C4-R03 | `1d9b83d54c13d2a758752281dbc492859d8bd05d` | §5 C4-R04 |
-| C4-TEMP-01 | CAS 导入/克隆/添加/启动耗时根因与修复 | IN_PROGRESS | C4-R04；C4-R05 BLOCKED（临时前置） | `a9add66722cb3ab6da996059bcc4ad32c502778d`（含前置 `cdd69a2d7b31e15cc205c4328ddccd4b42dac103`） | §5 C4-TEMP-01 5 小时窗口续作 |
+| C4-TEMP-01 | CAS 导入/克隆/添加/启动耗时根因与修复 | BLOCKED | C4-R04；C4-R05 BLOCKED（临时前置） | `a9add66722cb3ab6da996059bcc4ad32c502778d`（含前置 `cdd69a2d7b31e15cc205c4328ddccd4b42dac103`） | §5 C4-TEMP-01 5 小时窗口最终阻断回执 |
 | C4-R05 | MuMu RD 正式重验与关门 | BLOCKED | C4-R04 | `5ee894f3e32339b951ba7c81f19010f1d13bf392` | §5 C4-R05 formal Quark block receipt |
 | C5-T01 | 原始 XH 产品能力契约 | NOT_APPLICABLE | C2,C3 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T02 | XH CAS Host/SDK 集成 | NOT_APPLICABLE | C5-T01,C4-T02 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
@@ -3174,3 +3174,142 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   `RECORDED` 阻断项，`KI-R03-060` 仍为已接受但必须回归的开放项；本轮先针对
   `KI-R03-062` 的 CAS readiness 与 Quark/app-SDK/Guest 延迟边界做新的独立诊断，只有
   形成可归因、最小、具 VA/NBB 对照的修复并通过静态、构建、动态门禁，才允许关闭 TEMP-01。
+
+### C4-TEMP-01：5 小时窗口最终阻断回执（2026-08-30）
+
+- **任务 ID / 最终状态**：`C4-TEMP-01 / BLOCKED`。本窗口已完成有依据的诊断、最小
+  观测改动和一次独立复现，仍未达到动态沙箱 `FIRST_FRAME_DRAWN` 门禁；没有标记 DONE，
+  没有进入 C4-R05。C4 阶段保持 `BLOCKED/REOPENED`，C4-R05 保持 `BLOCKED`，C6-T01
+  仍为 `PENDING`。下一任务仍为 `C4-TEMP-01`，待恢复条件满足后续接。
+- **开始/结束时间与基线**：开始 `2026-08-30 11:09:55 +08:00`，结束
+  `2026-08-30 11:50:27 +08:00`；开始 commit 为
+  `b5efd69d000d40f2383cd7290e9d7482cef06522`，结束实现基线为
+  `ffef74c31edcb4497a51bf18b9e6a869d6593e53`；分支为
+  `feature/t57-r03-va-pro-capability-campaign`，远端为
+  `origin/feature/t57-r03-va-pro-capability-campaign`。上一任务 C4-R04 回执为
+  `1d9b83d54c13d2a758752281dbc492859d8bd05d`，上一轮 TEMP 阻断回执为
+  `c5c7348b0d6f798bdf2325984b7a16bfaaba80e3`。
+- **续接预检与 Git**：重开后 `python scripts/verify-catch-up-continuation.py` 返回
+  `PASS C0-T01 continuation preflight: verification/catch-up/C4-TEMP-01`；分支、
+  本地/远端 HEAD 和身份均正确，身份为 `OpenAI <openai@users.noreply.github.com>`。
+  完成阻断收口后再次运行该预检，原始结果为
+  `FAIL C0-T01 continuation preflight: ledger next task C4-TEMP-01 is not first
+  dependency-ready PENDING task None`，退出码 `1`；该 fail-closed 证据见
+  `verification/catch-up/C4-TEMP-01/20260830T1150-final-continuation-preflight-failure.md`，
+  不得把它解释为可进入 C4-R05 的信号。
+- **事实源、参考实现与纪律**：本窗口重新完整读取任务书、进度账本、C4 RD 重测根因与
+  验收计划、`KNOWN_ISSUES.yaml`、能力活动工作流、提交身份策略、C4-TEMP-01 设计及
+  C4-R01/R02/R03/R04/R05 专项设计/证据/交接/VA-NBB 参考映射。对照
+  `C4_R01_EVIDENCE_REPRO_CLASSIFICATION_AND_REFERENCE_MAPPING_20260824.md`、
+  `C4_R03_LAUNCH_READINESS_WINDOW_DESIGN_20260824.md`、
+  `C4_R05_ACTIVITYTHREAD_LIFECYCLE_ALIGNMENT_20260826.md` 及
+  `C4_R05_FINAL_TWO_ROUND_EVIDENCE_BOUNDARY_DESIGN_20260827.md`，保留正常
+  ActivityThread/framework `addView` 路径和当前 readiness 合同。没有扩大 deadline、
+  固定 sleep、静默 launch retry、捕获所有异常循环重试或 package-specific 分支。
+- **RD 测试快照**：通过 `python scripts/mumu_instance.py --instance-name 'RD测试'`
+  动态解析 MuMu `RD测试`（实例索引 1，`MuMuPlayer-12.0-1`），API 32，型号
+  `22041211A`，ABI `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，Android ID
+  `398eea33120cd887`，boot ID `bd6fc459-0d52-4689-868a-420364ea407c`。resolved
+  serial 只在生成的设备快照中出现，未进入源码、runner 或任务逻辑。
+- **动态商业样本发现**：本窗口动态解析夸克为 package
+  `com.quark.browser`、入口 `com.ucpro.MainActivity`、实际 child Activity
+  `com.ucpro.BrowserActivity`、版本 `10.10.5.1080/code1080`、base 1/split 0、
+  primary ABI `arm64-v8a`；broker revision 为
+  `v1080:sha256:2cb38172da5da4aee03826da0feccb77ff0391ee7356f1562052ddc1fae9ecb3`。
+  本 TEMP 任务只规定夸克性能/首帧分类和 package-neutral fixture 回归，DingTalk、夸克、
+  红果、番茄小说的 C4-R02 商业矩阵及 C4-R05 两轮正式验收未在阻断后伪造为通过。
+- **首次失败证据一（诊断前一轮）**：动态 lane
+  `verification/catch-up/C4-TEMP-01/quark-latency/20260830T111850/` 的 import-only
+  通过；直接冷启动 3/3 通过，耗时 `8762/6929/6106 ms`。沙箱 sample-01 首次失败
+  request `cc25809c3091482c849f7fa231f26230`、operation
+  `cc25809c3091482c849f7fa231f26230-launch`，`attempt=1`、`retryBudget=0`、
+  无自动重试，耗时 `93515 ms`，错误为 `java.lang.IllegalStateException` /
+  `LAUNCH_GATE_FAILED`。fail-fast 前保存完整 logcat、Activity/process、Window/Surface、
+  transaction/catalog、截图和设备快照；截图为纯黑，SHA-256 为
+  `4afb293f262964138b1d2e2a08733ad4d4216150e508b9f62e4610e47e0cb930`。
+- **首次失败链路签名**：上述首失败的唯一 post-resume 观测为
+  `WINDOW_POST_RESUME_STATE boundary=before_publish`，目标为
+  `com.ucpro.BrowserActivity`，`mWindowAdded=true`、`mDecor=true`、
+  `visibleFromClient=true`、`visibleFromServer=true`、`attached=false`、
+  `registration=REGISTERED`、`parent=android.view.ViewRootImpl`、`viewRoot=null`、
+  `wmgViews=1`、`windowVisibility=8`。同一快照的目标 Window 为
+  `mHasSurface=true/isReadyForDisplay=true`，但 `Surface: shown=false`、
+  `mDrawState=DRAW_PENDING`；Activity 为 RESUMED，但 `reportedDrawn=false`、
+  `mNumDrawnWindows=0`、`allDrawn=false`。这证明存在 Window/Surface 但不等于首帧成功。
+- **独立验证一（只读观测提交后）**：lane
+  `verification/catch-up/C4-TEMP-01/quark-latency/20260830T113744/` 的 import-only
+  通过，导入总耗时 `18288 ms`，阶段包括 `HASH=673`、`PACKAGE_INFO=1057`、
+  `EXISTING_REVISION_VERIFY=2386`、`NATIVE_EXTRACT=2017`、
+  `PUBLISHED_REVISION_VERIFY=3298`、`CATALOG_WRITE=3778`；日志确认
+  `CS_REVISION_VERIFY: skipped broker-verified`，没有重复 Guest revision 校验。
+  直接冷启动 3/3 通过，耗时 `7104/6242/5873 ms`，每次均 resumed、hasSurface、
+  readyForDisplay、drawn、surfaceShown 和非黑屏均为 true。沙箱 sample-01 首次失败
+  request `ab1ecc26cc1e4511919dc45482794de6`、operation
+  `ab1ecc26cc1e4511919dc45482794de6-launch`，`attempt=1`、`retryBudget=0`、
+  `automaticRetryPerformed=false`，耗时 `91889 ms`，状态
+  `SANDBOX_FIRST_FRAME_NOT_CONFIRMED`，错误分类 `java.lang.IllegalStateException`。
+  快照截图仍为纯黑且 SHA-256 同上；失败链路输出
+  `GUEST_LAUNCH_READINESS ... LAUNCH_FAILED ... window_not_confirmed`。
+  该 lane 是一次独立的 one-shot validation，不是同一 attempt 的重试；runner 的首次
+  失败策略保持 `NO_RETRY_FIRST_OBSERVATION`。
+- **通用 fixture 回归**：在同一结束基线对 package-neutral fixture 执行
+  `python tools/capability/run_c4_r03_rd.py --loops 1 --users 0 --targets fixture
+  --output verification/catch-up/C4-TEMP-01/fixture-diagnostic-20260830T
+  --instance-name "RD测试"`，结果 `status=PASS`、2 行无阻断。cold-001
+  `readiness=7861 ms`、`FIRST_FRAME_DRAWN=true`、非黑比例 `0.983263`；hot-001
+  `readiness=292 ms`、`FIRST_FRAME_DRAWN=true`、非黑比例 `0.983292`；两轮均有
+  Window/Surface/ViewRoot 正常证据、无 FATAL、无 ANR、无重试。该结果支持通用 CAS
+  framework/addView 路径可工作，不支持把问题归因为所有 CAS Activity 都失败。
+- **根因及分类结论**：导入、revision、native extract、catalog 和通用 fixture 均已
+  通过；夸克 direct path 也通过。失败稳定出现在 sandbox 的 host Stub/guest logical
+  Activity、嵌套 `BrowserActivity` handoff 与首帧门之间。现有证据足以确认
+  `KI-R03-062` 的真实阻断和 app/SDK/Guest 边界候选，但不足以在 CAS 通用、SX adapter/UI、
+  App/SDK 特有、RD 环境、验收脚本之间做唯一根因判定，故保持
+  `NEEDS_REPRODUCTION_AND_CLASSIFICATION`，不得猜测或关闭 KI。当前唯一相关的
+  `CONTENT_PROVIDER_AUTHORITY_NOT_VIRTUALIZED:com.vivo.push.sdk.service.SystemPushConfig`
+  来自另一进程，未提升为本次 gate 根因。
+- **VA/NBB 对照与实现摘要**：对照 VA/NBB 的 ActivityThread、WindowSession/IWindow、
+  token/task 和 Window identity 合同，CAS 当前仍由 broker/guest instrumentation 做包、
+  revision、host Stub 与 logical Activity 映射；正常 framework `addView` 负责创建
+  ViewRoot/Surface 后才允许进入 `FIRST_FRAME_DRAWN`。本窗口仅增加两次可观测性提交：
+  `2bb1f2864bc2b556fa5987bff2c69445be0a0862`
+  （`ActivityFieldBridge` post-resume Window 状态）和
+  `ffef74c31edcb4497a51bf18b9e6a869d6593e53`
+  （`ActivityFieldBridge` ViewRoot 生命周期字段）；均为一次性只读诊断，不改变
+  addView、visibility、deadline、retry 或错误处理语义。没有把 C4-R02/R03 的既定修复
+  偷换成临时行为补丁。
+- **修改文件与验收命令**：源码为
+  `sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/ActivityFieldBridge.java`；
+  本回执新增当前窗口分类/证据索引、Known Issues 更新和 fixture 证据。已通过
+  `./gradlew.bat :sandbox-runtime:compileDebugJavaWithJavac --no-daemon`、
+  `./gradlew.bat :app:assembleDebug :fixture-basic:assembleDebug
+  :sandbox-companion32:assembleDebug :fixture-compat32:assembleDebug --no-daemon`、
+  `python scripts/check-c4-temp-01-latency.py`、`python scripts/check-apk-revision-binding.py`、
+  `python scripts/check-c4-r05-orchestrator.py`、两 runner `py_compile` 和 `git diff --check`。
+- **APK/设备摘要**：本窗口安装文件当前 SHA-256 为 app
+  `14e7511f66311677434bb35c61737e35e7b3643382e978ccf08d875cafba4324`、fixture
+  `8d8f4d776b287ea947358690882a33763c3967578952cc88e57d5188ca8275a5`、companion32
+  `b7304a02c71b0001d3baca31a162cceeb87d3d4113d0f557965f7c04d533ab1d`、fixture-compat32
+  `9193694ee36848992e98d7e1ff7197a833182807784eb5a375f0d32bff5c96e1`；设备 boot ID
+  为 `bd6fc459-0d52-4689-868a-420364ea407c`。夸克 raw device output 按仓库约定保留在
+  本地 ignored run directory，已在 artifact index 中列出关键文件 hash；fixture 证据目录
+  纳入本回执提交。
+- **Known Issues 变化**：更新 `KI-R03-062` 增加本窗口两条独立动态 lane、首失败签名、
+  fixture 对照和恢复边界；该项仍为 `RECORDED`、`acceptance: NOT_FIXED`、
+  `blocks_current_campaign: true`。没有关闭 KI-R03-053 至 KI-R03-062 中任何阻断项，
+  也没有更改 C5-T01 至 C5-T04 的 `NOT_APPLICABLE` 结论。
+- **重试记录与偏离任务书说明**：所有 lane 首次观测均 `attempt=1`、`retryBudget=0`、
+  无自动重试；第二条 lane 为独立 validation，不是失败后的隐藏重试。未执行商业样本
+  10 次矩阵、C4-R05 两轮正式验收或 30 分钟双用户短测，原因是 TEMP-01 的动态夸克首帧
+  门禁真实阻断；继续执行会违反“阻断后停止后续任务”的任务书要求。
+- **遗留风险与恢复条件**：仍需在不降低门槛的前提下，补齐当前 Quark nested
+  `BrowserActivity` 的 CAS readiness 与 App/SDK/Guest owner 边界，并在同一 clean commit
+  通过 dynamic Quark direct/sandbox 首帧门禁、fixture 回归及其余任务要求后，重新打开
+  TEMP-01；在此之前不得恢复 C4-R05，也不得以 late frame、Guest 进程存在、Activity marker
+  或 Quark direct 成功替代真实 `FIRST_FRAME_DRAWN`。
+- **提交、推送与下一任务**：实现提交 `2bb1f2864bc2b556fa5987bff2c69445be0a0862`、
+  `ffef74c31edcb4497a51bf18b9e6a869d6593e53` 已分别推送；本回执/证据提交 SHA 在提交
+  后写回本段。推送后必须再次核验本地与远端 HEAD 一致、工作区干净；最终续接预检因
+  `C4-TEMP-01` 为 BLOCKED 应 fail-closed；最终原始输出已记录在
+  `verification/catch-up/C4-TEMP-01/20260830T1150-final-continuation-preflight-failure.md`，
+  不得识别为 C4-R05。

@@ -1829,4 +1829,32 @@ issues:
       `verification/catch-up/C4-TEMP-01/20260830T035048-first-failure-classification.md` and
       the two run directories. The issue remains `RECORDED`, `blocks_current_campaign: true`,
       and `acceptance: NOT_FIXED`; recovery requires a bounded CAS-versus-App/SDK/Guest
-      classification and a fresh clean-commit regression before C4-R05 can resume.
+      classification and a fresh clean-commit regression before C4-R05 can resume. On 2026-08-30,
+      the five-hour continuation executed two independent one-shot dynamic lanes on MuMu `RD测试`.
+      Lane `20260830T111850` dynamically resolved `com.quark.browser` 10.10.5.1080,
+      passed import-only and direct cold 3/3 at 8762/6929/6106 ms, then failed sandbox sample-01
+      on request `cc25809c3091482c849f7fa231f26230` and operation
+      `cc25809c3091482c849f7fa231f26230-launch`, attempt 1, retry budget 0, no automatic retry,
+      after 93515 ms. The first-failure snapshot recorded the target Activity RESUMED with
+      `reportedDrawn=false`, `mNumDrawnWindows=0`, `allDrawn=false`; the target Window had
+      `mHasSurface=true/isReadyForDisplay=true` but `Surface: shown=false` and
+      `mDrawState=DRAW_PENDING`. The one-time post-resume diagnostic recorded
+      `mWindowAdded=true`, `registration=REGISTERED`, `attached=false`,
+      `parent=android.view.ViewRootImpl`, `viewRoot=null`, `wmgViews=1` and
+      `windowVisibility=8`. Lane `20260830T113744` passed import-only with total 18288 ms and
+      revision/native/catalog stages completed, passed direct cold 3/3 at 7104/6242/5873 ms,
+      then independently failed sandbox sample-01 on request
+      `ab1ecc26cc1e4511919dc45482794de6` and operation
+      `ab1ecc26cc1e4511919dc45482794de6-launch`, attempt 1, retry budget 0,
+      `automaticRetryPerformed=false`, after 91889 ms with
+      `SANDBOX_FIRST_FRAME_NOT_CONFIRMED` and a black screenshot with SHA-256
+      `4afb293f262964138b1d2e2a08733ad4d4216150e508b9f62e4610e47e0cb930`. The same window
+      also passed package-neutral fixture cold/hot first-frame regression at 7861/292 ms,
+      non-black fractions 0.983263/0.983292. These observations strengthen the unresolved
+      nested BrowserActivity CAS-readiness versus Quark/app-SDK/Guest boundary, but do not
+      establish a unique root cause or justify a package-specific production change. The issue
+      remains `RECORDED`, `blocks_current_campaign: true`, and `acceptance: NOT_FIXED`; the raw
+      Quark evidence and current-window artifact index are under
+      `verification/catch-up/C4-TEMP-01/20260830T111850/`,
+      `verification/catch-up/C4-TEMP-01/20260830T113744-artifact-index.md`, and
+      `verification/catch-up/C4-TEMP-01/20260830T113744-first-failure-classification.md`.

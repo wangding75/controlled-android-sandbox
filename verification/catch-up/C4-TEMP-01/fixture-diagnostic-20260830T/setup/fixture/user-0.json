@@ -1,0 +1,264 @@
+{
+  "target": "fixture",
+  "package": "com.warden.controlledsandbox.fixture",
+  "user": 0,
+  "requestId": "ba9bdc32957549a28b8572edb77506bc",
+  "attempt": 1,
+  "retryBudget": 0,
+  "automaticRetryPerformed": false,
+  "command": "import-only",
+  "result": {
+    "status": "PASS",
+    "returncode": 0,
+    "result": {
+      "command": "import-only",
+      "package": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "trustNativeGuest": true,
+      "requestId": "ba9bdc32957549a28b8572edb77506bc",
+      "operationId": "ba9bdc32957549a28b8572edb77506bc-launch",
+      "startedAt": 1788060364699,
+      "packageOperationTrace": {
+        "requestId": "ba9bdc32957549a28b8572edb77506bc",
+        "operationId": "5a31ed0a-bfa8-4909-a0bf-87928d37796d",
+        "operation": "importInstalledApplicationAndEnsure",
+        "packageName": "com.warden.controlledsandbox.fixture",
+        "virtualUserId": 0,
+        "stage": "DONE",
+        "status": "SUCCEEDED",
+        "errorCode": "",
+        "retryable": false,
+        "attempt": 1,
+        "retryBudget": 0,
+        "startedAtMs": 1788060370193,
+        "elapsedMs": 6889,
+        "stageTimingsMs": {
+          "SOURCE_DISCOVERY": 1,
+          "HASH": 9,
+          "COPY": 20,
+          "MANIFEST_PARSE": 11,
+          "PACKAGE_INFO": 39,
+          "EXISTING_REVISION_VERIFY": 39,
+          "STAGED_REVISION_VERIFY": 1,
+          "NATIVE_DETECT": 1,
+          "NATIVE_EXTRACT": 29,
+          "PUBLISHED_REVISION_VERIFY": 33,
+          "PUBLISH": 39,
+          "IMPORT": 213,
+          "ENSURE_INSTANCE": 1,
+          "CATALOG_WRITE": 2848,
+          "CATALOG": 2850
+        },
+        "apkBytesRead": 2331726,
+        "apkBytesWritten": 2331726,
+        "shaBytesRead": 1362714746,
+        "zipEntryCount": 15,
+        "zipStreamOpenCount": 3,
+        "binderCallCount": 0,
+        "binderRetryCount": 0,
+        "fsyncCount": 0,
+        "splitCount": 0,
+        "nativeLibCount": 3,
+        "nativeBytesExtracted": 892456,
+        "catalogPackageCount": 0,
+        "packageUniverseCount": 0,
+        "counters": {
+          "apkBytesRead": 2331726,
+          "apkBytesWritten": 2331726,
+          "shaBytesRead": 1362714746,
+          "zipEntryCount": 15,
+          "zipStreamOpenCount": 3,
+          "binderCallCount": 0,
+          "binderRetryCount": 0,
+          "fsyncCount": 0,
+          "splitCount": 0,
+          "nativeLibCount": 3,
+          "nativeBytesExtracted": 892456,
+          "catalogPackageCount": 0,
+          "packageUniverseCount": 0
+        },
+        "stageEvents": [
+          {
+            "phase": "BEGIN",
+            "stage": "IMPORT",
+            "elapsedMs": 3607
+          },
+          {
+            "phase": "BEGIN",
+            "stage": "SOURCE_DISCOVERY",
+            "elapsedMs": 3612
+          },
+          {
+            "phase": "END",
+            "stage": "SOURCE_DISCOVERY",
+            "elapsedMs": 3614,
+            "durationMs": 1
+          },
+          {
+            "phase": "BEGIN",
+            "stage": "COPY",
+            "elapsedMs": 3615
+          },
+          {
+            "phase": "END",
+            "stage": "COPY",
+            "elapsedMs": 3636,
+            "durationMs": 20
+          },
+          {
+            "phase": "BEGIN",
+            "stage": "MANIFEST_PARSE",
+            "elapsedMs": 3638
+          },
+          {
+            "phase": "END",
+            "stage": "MANIFEST_PARSE",
+            "elapsedMs": 3650,
+            "durationMs": 11
+          },
+          {
+            "phase": "BEGIN",
+            "stage": "PACKAGE_INFO",
+            "elapsedMs": 3651
+          },
+          {
+            "phase": "END",
+            "stage": "PACKAGE_INFO",
+            "elapsedMs": 3690,
+            "durationMs": 39
+          },
+          {
+            "phase": "BEGIN",
+            "stage": "EXISTING_REVISION_VERIFY",
+            "elapsedMs": 3692
+          },
+          {
+            "phase": "END",
+            "stage": "EXISTING_REVISION_VERIFY",
+            "elapsedMs": 3731,
+            "durationMs": 39
+          },
+          {
+            "phase": "BEGIN",
+            "stage": "STAGED_REVISION_VERIFY",
+            "elapsedMs": 3733
+          },
+          {
+            "phase": "END",
+            "stage": "STAGED_REVISION_VERIFY",
+            "elapsedMs": 3734,
+            "durationMs": 1
+          },
+          {
+            "phase": "BEGIN",
+            "stage": "NATIVE_DETECT",
+            "elapsedMs": 3745
+          },
+          {
+            "phase": "END",
+            "stage": "NATIVE_DETECT",
+            "elapsedMs": 3746,
+            "durationMs": 1
+          },
+          {
+            "phase": "BEGIN",
+            "stage": "NATIVE_EXTRACT",
+            "elapsedMs": 3747
+          },
+          {
+            "phase": "END",
+            "stage": "NATIVE_EXTRACT",
+            "elapsedMs": 3777,
+            "durationMs": 29
+          },
+          {
+            "phase": "BEGIN",
+            "stage": "PUBLISH",
+            "elapsedMs": 3779
+          },
+          {
+            "phase": "BEGIN",
+            "stage": "PUBLISHED_REVISION_VERIFY",
+            "elapsedMs": 3780
+          },
+          {
+            "phase": "END",
+            "stage": "PUBLISHED_REVISION_VERIFY",
+            "elapsedMs": 3814,
+            "durationMs": 33
+          },
+          {
+            "phase": "END",
+            "stage": "PUBLISH",
+            "elapsedMs": 3818,
+            "durationMs": 39
+          },
+          {
+            "phase": "END",
+            "stage": "IMPORT",
+            "elapsedMs": 3820,
+            "durationMs": 213
+          },
+          {
+            "phase": "BEGIN",
+            "stage": "ENSURE_INSTANCE",
+            "elapsedMs": 4025
+          },
+          {
+            "phase": "END",
+            "stage": "ENSURE_INSTANCE",
+            "elapsedMs": 4026,
+            "durationMs": 1
+          },
+          {
+            "phase": "BEGIN",
+            "stage": "CATALOG",
+            "elapsedMs": 4027
+          },
+          {
+            "phase": "BEGIN",
+            "stage": "CATALOG_WRITE",
+            "elapsedMs": 4028
+          },
+          {
+            "phase": "END",
+            "stage": "CATALOG_WRITE",
+            "elapsedMs": 6877,
+            "durationMs": 2848
+          },
+          {
+            "phase": "END",
+            "stage": "CATALOG",
+            "elapsedMs": 6878,
+            "durationMs": 2850
+          }
+        ],
+        "stageDeadlinesMs": {
+          "CATALOG": 30000,
+          "PARSE": 60000,
+          "COPY": 120000,
+          "ENSURE_INSTANCE": 10000,
+          "PUBLISH": 30000,
+          "NATIVE_EXTRACT": 180000,
+          "HASH": 30000
+        },
+        "anomalies": []
+      },
+      "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+      "operation": {
+        "status": "IMPORTED"
+      },
+      "status": "PASS"
+    },
+    "start_stdout": "Starting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 774\nWaitTime: 777\nComplete\n",
+    "start_stderr": "",
+    "host_teardown": {
+      "activity_present": false,
+      "window_present": false,
+      "activity_rows": [],
+      "window_rows": [],
+      "activity_returncode": 0,
+      "window_returncode": 0
+    }
+  }
+}
