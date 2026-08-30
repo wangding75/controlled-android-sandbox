@@ -941,6 +941,7 @@ public final class ActivityFieldBridge {
                             + " registration=" + windowRegistration(decor).name()
                             + " parent=" + (parent == null ? "null" : parent.getClass().getName())
                             + " viewRoot=" + (root == null ? "null" : root.getClass().getName())
+                            + " viewRootState=" + viewRootState(parent)
                             + " wmgViews=" + windowManagerViewCount()
                             + " layoutPackage=" + packageName
                             + " layoutType=" + type
@@ -980,6 +981,29 @@ public final class ActivityFieldBridge {
         } catch (Throwable error) {
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             return null;
+        }
+    }
+
+    /**
+     * Captures the platform ViewRoot bookkeeping without treating it as a repair signal.  A
+     * DecorView can remain in WindowManagerGlobal while its parent has already cleared
+     * AttachInfo during an asynchronous remove; that distinction is not visible in WMS's
+     * window list and is needed to classify a post-resume black frame.
+     */
+    private static String viewRootState(Object parent) {
+        if (parent == null) return "null";
+        try {
+            return "added=" + optionalBoolean(parent, "mAdded", false)
+                    + " removed=" + optionalBoolean(parent, "mRemoved", false)
+                    + " dying=" + optionalBoolean(parent, "mDying", false)
+                    + " stopped=" + optionalBoolean(parent, "mStopped", false)
+                    + " attachInfo=" + (optionalObject(parent, "mAttachInfo") != null)
+                    + " view=" + (optionalObject(parent, "mView") != null)
+                    + " window=" + (optionalObject(parent, "mWindow") != null)
+                    + " surface=" + (optionalObject(parent, "mSurface") != null);
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            return "unavailable=" + error.getClass().getSimpleName();
         }
     }
 
