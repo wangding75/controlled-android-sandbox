@@ -1,14 +1,14 @@
 # CAS 追平 VA PRO 执行进度
 
-账本版本：1.8
-更新时间：2026-08-30 17:16（Asia/Shanghai）
+账本版本：1.9
+更新时间：2026-08-30 22:08（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
-当前阶段：`C4`（BLOCKED，REOPENED，原 C4-T05 证据不足）
-当前任务：`C4-TEMP-01`
-下一任务：`C4-TEMP-01`
-最后完成任务：`C4-R04`
+当前阶段：`C4`（IN_PROGRESS，REOPENED，原 C4-T05 证据不足；R05 待正式重验）
+当前任务：`C4-R05`
+下一任务：`C4-R05`
+最后完成任务：`C4-TEMP-01`
 
 ## 1. 使用规则
 
@@ -26,7 +26,7 @@
 | C1 组件/包/进程 | DONE | 双用户、50 轮与任务书规定压力 | §5 C1-GATE |
 | C2 系统服务/F2-F5 | DONE | SX/XH 调用面 L3，P0/P1 无 NOT_PROVEN | §5 C2-T07 |
 | C3 Native/ABI/隔离 | IN_PROGRESS | trusted/hostile 闭环，条件项有决策 | §5 C3-T01 |
-| C4 SX 迁移 | BLOCKED | C4-R01..R05；真实首帧、添加矩阵和 30 分钟双用户压力 | §5 PLAN-20260824-C4-REOPEN |
+| C4 SX 迁移 | IN_PROGRESS | C4-R01..R05；真实首帧、添加矩阵和 30 分钟双用户压力 | §5 PLAN-20260824-C4-REOPEN |
 | C5 XH 支持 | NOT_APPLICABLE | 用户决定跳过，不阻塞 C6/C7 | §5 PLAN-20260824-C4-REOPEN |
 | C6 API/ABI 矩阵 | PENDING | 声明组合均有 Android Matrix 证据 | - |
 | C7 OEM/发布 | PENDING | 商业矩阵与 VA PRO scope 总验收 | - |
@@ -68,8 +68,8 @@
 | C4-R02 | 添加事务、超时与 UI 状态机 | DONE | C4-R01 | `46eed7be60a83f5b5adfe865a8c4b0d37e0a63a1` | §5 C4-R02 |
 | C4-R03 | 启动 readiness 与窗口合同 | DONE | C4-R01 | `d8797c89` | §5 C4-R03（用户批准残余风险豁免） |
 | C4-R04 | C4 fail-closed 验收编排 | DONE | C4-R02,C4-R03 | `1d9b83d54c13d2a758752281dbc492859d8bd05d` | §5 C4-R04 |
-| C4-TEMP-01 | CAS 导入/克隆/添加/启动耗时根因与修复 | IN_PROGRESS | C4-R04；C4-R05 BLOCKED（临时前置） | `a9add66722cb3ab6da996059bcc4ad32c502778d`（含前置 `cdd69a2d7b31e15cc205c4328ddccd4b42dac103`） | §5 C4-TEMP-01 修复续作（17:14） |
-| C4-R05 | MuMu RD 正式重验与关门 | BLOCKED | C4-R04 | `5ee894f3e32339b951ba7c81f19010f1d13bf392` | §5 C4-R05 formal Quark block receipt |
+| C4-TEMP-01 | CAS 导入/克隆/添加/启动耗时根因与修复 | DONE | C4-R04；完成后解除 C4-R05 临时阻断 | `7c0c819a58513f89e91ec0fb44cdc05a151e2c32` | §5 C4-TEMP-01 修复完成（2026-08-30） |
+| C4-R05 | MuMu RD 正式重验与关门 | PENDING | C4-R04,C4-TEMP-01 | `5ee894f3e32339b951ba7c81f19010f1d13bf392`（历史阻断基线） | - |
 | C5-T01 | 原始 XH 产品能力契约 | NOT_APPLICABLE | C2,C3 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T02 | XH CAS Host/SDK 集成 | NOT_APPLICABLE | C5-T01,C4-T02 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T03 | 原始 XH/DingTalk 验收 | NOT_APPLICABLE | C5-T02,C4 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
@@ -3351,3 +3351,111 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
 - **下一步**：先检查 `ActivityFieldBridge`、`GuestActivityThreadInstrumentation`、
   `RuntimeActivityLaunchCoordinator`、`GuestLaunchObservation/Gate` 及对应测试，形成
   可验证的最小修复设计后再编译；修复完成前不标记 DONE、不启动 C4-R05。
+
+### C4-TEMP-01：修复完成回执（2026-08-30）
+
+- **任务 ID / 最终状态**：`C4-TEMP-01 / DONE`。本回执仅关闭临时耗时任务，不把临时
+  3+3 结果写成 C4-R05 或 C4 阶段完成；C4-R05 已恢复为唯一下一依赖就绪任务并置为
+  `PENDING`。历史 BLOCKED 回执和首次失败证据全部保留。
+- **开始/结束时间与开始基线**：开始 `2026-08-30 17:14:45 +08:00`，结束
+  `2026-08-30 22:09:13 +08:00`；开始基线为
+  `f4d69bb53d6a8f2cc70469902c40ffad77d2d431`，启动记录提交为
+  `d2d2d5b1c37d3cad669d2964129d12fadc3ccdf9`；分支为
+  `feature/t57-r03-va-pro-capability-campaign`，远端为
+  `origin/feature/t57-r03-va-pro-capability-campaign`；上一回执为
+  `38440d5f2df62c6e50cb609444353cb7d0aea29c`。
+- **续接、Git 和身份**：任务开始前已执行 `git fetch origin --prune`、
+  `git pull --ff-only origin feature/t57-r03-va-pro-capability-campaign`；
+  结果 Already up to date），并运行 `python scripts/verify-catch-up-continuation.py`，
+  结果 `PASS` 且识别当前 `C4-TEMP-01`。分支和身份检查通过，身份为
+  `OpenAI <openai@users.noreply.github.com>`；代码提交前后未覆盖已有用户修改。
+- **执行环境与 RD 快照**：Windows PowerShell，MuMu `RD测试`（动态解析，索引 1，
+  `MuMuPlayer-12.0-1`），Android API 32，型号 `22041211A`，ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，Android ID `398eea33120cd887`，
+  boot ID `bd6fc459-0d52-4689-868a-420364ea407c`。resolved ADB serial 仅保存在 raw
+  设备快照，没有进入源码、runner 或业务分支。
+- **首次失败证据**：保留了前序 route-fence、diagnostic-stack 和 layout-inflater
+  独立 lane；本次修复前最后一次首失败为 request
+  `c73ef73bc087476789e90baa65b3f6e3` / operation
+  `c73ef73bc087476789e90baa65b3f6e3-launch`，attempt=1、`retryBudget=0`、无自动重试，
+  raw 证据位于 `verification/catch-up/C4-TEMP-01/quark-layout-inflater-20260830/20260830T180827/`。
+  其 Guest 时间线显示后台 Receiver 登记到注销约 15,032 ms，与
+  `GuestMainThreadDispatcher.DEFAULT_TIMEOUT_MS=15_000` 一致；首次失败快照、logcat、
+  Activity/process、Window/Surface/ViewRoot、截图和事务/catalog 均已保留。
+- **根因及责任分类**：已确认是 CAS 通用 `GuestDynamicReceiverTransport` 把调用方 SDK
+  worker 的 Host `registerReceiver`/`unregisterReceiver` 强制同步切到 Guest 主线程，和
+  Quark `BrowserActivity.onCreate` 等待 worker 形成锁反转；不是 SX adapter/UI、不是验收
+  脚本门槛，也没有证据把它归因于 RD 低内存。Quark 自身剩余导入/prepare 成本仍作为
+  App/SDK/环境待观察项，不以扩大 timeout 或包名旁路处理。
+- **VA/NBB 对照**：采纳 Android `Context.registerReceiver(..., Handler, ...)` 的调用线程
+  与回调 Handler 分离合同，以及 VA/NBB 的 Broker receiver registry、permission、lease、
+  death cleanup 与 framework dispatcher 分层边界；不采纳绕过 Broker、把回调交给 Host
+  主线程、静默 retry、固定 sleep 或扩大 deadline。相关设计补充在
+  `docs/review/C4_TEMP_01_CAS_IMPORT_LAUNCH_LATENCY_ROOT_CAUSE_AND_FIX_DESIGN_20260828.md`
+  第 8 节。
+- **实现摘要**：动态 Receiver 的 Host 登记、注销和 close teardown 改为在发起线程直接
+  执行，仍以传入 Handler 投递 Guest callback，保留 Broker lease、身份、异常回滚和清理；
+  Guest/GuestPackage Context 缓存 Context-bound LayoutInflater；物理 Stub route 放行前
+  重新确认 ActivityThread instrumentation，失败留证并 fail-closed；补齐 static Android
+  compiler 的 ViewParent/visibility stub，使诊断字段可被完整静态编译。
+- **修改文件**：
+  `sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestDynamicReceiverTransport.java`、
+  `GuestContext.java`、`GuestPackageContext.java`、`GuestRuntimeEnvironment.java`、
+  `sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/StubActivityBase.java`、
+  `sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/GuestContextBoundarySelfTest.java`、
+  `scripts/check-c4-temp-01-latency.py`、`tools/static_android_compile.py`、
+  `docs/review/C4_TEMP_01_CAS_IMPORT_LAUNCH_LATENCY_ROOT_CAUSE_AND_FIX_DESIGN_20260828.md`、
+  `docs/review/KNOWN_ISSUES.yaml`、`.gitignore` 及本回执引用的机器可读 benchmark/classification。
+- **验收命令与结果**：
+  `python scripts/check-c4-temp-01-latency.py` PASS；
+  `python scripts/check-c4-r04-fail-closed.py` PASS；
+  `python scripts/test_c4_r04_fail_closed.py` PASS（7 tests）；
+  `python scripts/check-c4-r05-orchestrator.py` PASS；
+  `python scripts/check-apk-revision-binding.py` PASS；
+  `python tools/static_android_compile.py` PASS（模块编译及全部 test-harness）；
+  `.\gradlew.bat :app:assembleDebug :fixture-basic:assembleDebug :sandbox-companion32:assembleDebug
+  :fixture-compat32:assembleDebug --no-daemon` BUILD SUCCESSFUL；`git diff --check` PASS。
+- **动态验收**：package-neutral fixture 命令
+  `python tools/capability/run_c4_r03_rd.py --loops 1 --users 0 --targets fixture
+  --output verification/catch-up/C4-TEMP-01/fixture-receiver-thread-20260830` PASS（2 行，
+  cold/hot 均真实 Window/Surface/首帧/非黑屏）。Quark 命令
+  `python tools/capability/run_c4_temp_01_quark_latency.py --samples 3 --instance-name "RD测试"
+  --output verification/catch-up/C4-TEMP-01/quark-receiver-thread-20260830` PASS：直启
+  7534/7042/6114 ms，CAS 63013/41235/39081 ms，比值 8.3638/5.8556/6.3921，最大
+  8.3638，小于 10x 硬门槛但高于 3x 目标。CAS 三次均为真实
+  `LAUNCH_PASS`/`FIRST_FRAME_DRAWN`，readiness 14387/14368/13668 ms，activity
+  created/resumed、Window/Surface、readyForDisplay、drawn、surfaceShown 和非黑截图
+  全部为真；attempt=1、`retryBudget=0`、无自动重试。
+- **商业样本矩阵**：本 TEMP 只要求动态 Quark 3+3 与 package-neutral fixture，已完成；
+  Quark 实际 package `com.quark.browser`、入口 `com.ucpro.MainActivity`、child
+  `com.ucpro.BrowserActivity`、版本 `10.10.5.1080/code1080`、base=1/split=0、
+  primary ABI `arm64-v8a` 已记录。DingTalk、红果、番茄小说的 5 次添加矩阵及 R05 两轮
+  正式验收不在 TEMP 内提前宣称通过，现由 C4-R05 执行。
+- **APK / revision / evidence**：本次构建 APK SHA-256 为 app
+  `F84FE832532C6243DE37EE815C940F85F3FDBC7B79BB873F6918CFFBCB247026`、fixture-basic
+  `8D8F4D776B287EA947358690882A33763C3967578952CC88E57D5188CA8275A5`、companion32
+  `95CA996A9005C7FEA1BAFADA62EEC27C90D53F0BCC84FF99CB7B394FDBFDF529`、fixture-compat32
+  `9193694EE36848992E98D7E1FF7197A833182807784EB5A375F0D32BFF5C96E1`；Quark broker
+  revision 为 `v1080:sha256:2cb38172da5da4aee03826da0feccb77ff0391ee7356f1562052ddc1fae9ecb3`。
+  机器可读摘要为 `verification/catch-up/C4-TEMP-01/20260830T181923-benchmark-summary.json`，
+  分类和证据索引为 `20260830T181923-first-frame-fix-classification.md`，raw run tree
+  保留在对应日期目录。
+- **Known Issues 变化**：`KI-R03-062` 的历史首失败仍保留，状态仍为
+  `RECORDED`/`acceptance: NOT_FIXED`/`blocks_current_campaign: true`，但本次已关闭其
+  可复现的 CAS Receiver 主线程锁反转签名；完整 KI 关闭留待 R05 全量回归。`KI-R03-053`、
+  `054`、`057`、`058`、`059`、`061`、`060` 均未被本 TEMP 错误关闭，C5-T01 至 C5-T04
+  仍为 `NOT_APPLICABLE`。
+- **重试记录**：所有前序失败 lane 和本次 pass lane 均保留 request/operation；失败均
+  attempt=1、`retryBudget=0`、无自动重试。未使用固定 sleep、扩大总 timeout、捕获所有
+  异常循环、marker 或 Guest 进程存在替代真实显示成功。
+- **偏离任务书与遗留风险**：3x 是目标而非硬门槛，本次最大 8.3638x，未把目标写成达成；
+  未执行 R05 的商业添加矩阵、两轮 25 冷/25 热启动、C1/C2/C4/SX 回归和 30 分钟双用户
+  短测，因为这些属于下一任务。残余风险是 Quark 导入/prepare 的非硬阻断成本、现有 KI
+  和低内存环境项，必须由 R05 在同一 clean commit 继续验收。
+- **提交与推送**：实现/设计/测试/证据提交为
+  `7c0c819a58513f89e91ec0fb44cdc05a151e2c32`，主题
+  `fix(c4): [C4-TEMP-01] remove Guest-main-thread receiver hop`；本段为独立进度回执，
+  提交主题 `docs(progress): record [C4-TEMP-01] receipt`。回执提交后按任务书执行
+  `git push origin feature/t57-r03-va-pro-capability-campaign`、`git ls-remote --heads`
+  对比和工作区清洁核验；在这些步骤成功后本任务状态才成立。
+- **下一任务**：`C4-R05 / PENDING`。恢复条件已满足 TEMP 的硬门槛，但 C4 阶段仍未关闭。
