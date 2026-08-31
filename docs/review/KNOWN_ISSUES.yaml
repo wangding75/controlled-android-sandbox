@@ -1909,3 +1909,34 @@ issues:
       the terminal result before unmapping aliases; static checks, full static Android compile,
       Gradle build and a dynamic DingTalk cold/hot 2-row regression passed. This KI remains
       RECORDED and blocking until the full R05 two-round matrix proves the fix.
+
+  - issue_id: KI-R03-064
+    title: Recovery prewarm failure leaves the ordinary session in PREPARING
+    capability: activity_framework
+    classification: CURRENT_DEFECT
+    severity: HIGH
+    status: RECORDED
+    discovered_by: C4-R05 clean-install cold-to-hot continuation 2026-08-31
+    evidence:
+      - verification/catch-up/C4-R05/formal-two-round-20260831-publication-race-fix/round-1-clean-install-cold/launch-matrix/attempt-002/attempts/dingtalk/user-1/hot-007/case.json
+      - verification/catch-up/C4-R05/formal-two-round-20260831-publication-race-fix/round-1-clean-install-cold/launch-matrix/attempt-002/attempts/dingtalk/user-1/hot-007/logcat.txt
+      - sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeGuestLifecycleCoordinator.java
+    match_patterns:
+      - SESSION_BUSY:PREPARING
+      - GUEST_RECOVERY_PREWARM_COMPLETED status=FAILED
+      - PREPARED_SPEC_MISSING
+    blocks_current_campaign: true
+    follow_up_required: true
+    follow_up_task: C4-R05 full two-round clean-commit regression
+    acceptance: NOT_FIXED
+    fix_policy: C4_R05_ROLLBACK_FAILED_ALLOCATED_OR_PREPARING_SESSION
+    notes: >
+      After dingtalk/user1/cold-007 passed, delayed recovery prewarm for the same
+      package/user/process entered generation 2 PREPARING and returned FAILED after a Guest
+      callback observed PREPARED_SPEC_MISSING. The outer prepareGuest failure path returned a
+      failure bundle without terminating the allocated lease or removing prepared state. The
+      next hot-007 therefore failed fail-closed with SESSION_BUSY:PREPARING; attempt=2 is the
+      manual continuation lane, while automaticRetryPerformed=false and retryBudget=0 prove
+      that this was not an automatic retry. A rollback path now terminates ALLOCATED/PREPARING
+      leases, releases the slot, removes prepared state and invalidates component ownership.
+      Full two-round R05 regression is required before closing this issue.

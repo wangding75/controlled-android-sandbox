@@ -71,8 +71,9 @@ final class RuntimeGuestLifecycleCoordinator {
     }
 
     Bundle prepareGuest(Bundle request) {
+        Bundle input = null;
         try {
-            Bundle input = request == null ? new Bundle() : new Bundle(request);
+            input = request == null ? new Bundle() : new Bundle(request);
             long lifecycleStarted = android.os.SystemClock.elapsedRealtime();
             lifecycleStage(input, null, "BEGIN", lifecycleStarted);
             String packageName = input.getString(RuntimeKeys.PACKAGE_NAME, "");
@@ -373,8 +374,52 @@ final class RuntimeGuestLifecycleCoordinator {
             return out;
         } catch (Throwable error) {
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            // Every failure after allocation is terminal for this generation.  In particular,
+            // recovery prewarm can fail from a Guest callback after the inner Guest-call
+            // boundary has returned.  Leaving that lease in PREPARING makes the next explicit
+            // launch observe a permanent SESSION_BUSY instead of starting a clean generation.
+            rollbackAllocatedSession(input, error);
             return RuntimeBrokerService.failure(error);
         }
+    }
+
+    private void rollbackAllocatedSession(Bundle input, Throwable failure) {
+        if (input == null) return;
+        String packageName = input.getString(RuntimeKeys.PACKAGE_NAME, "");
+        int userId = input.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1);
+        if (packageName.isEmpty() || userId < 0) return;
+        String processName = RuntimeBrokerService.processName(input, packageName);
+        GuestSession current = owner.sessions.get(packageName, userId, processName);
+        if (current == null || (current.state() != SessionState.ALLOCATED
+                && current.state() != SessionState.PREPARING)) return;
+        String key = RuntimeBrokerService.processKey(packageName, userId, processName);
+        String reason = "PREPARE_ROLLBACK:" + failure.getClass().getSimpleName();
+        try {
+            owner.sessions.transition(packageName, userId, processName, current.generation(),
+                    SessionState.FAILED, owner.now(), reason);
+        } catch (Throwable transitionFailure) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(
+                    transitionFailure);
+        }
+        owner.brokerState.removePrepared(key);
+        try {
+            owner.systemServiceCoordinator.stop(current);
+        } catch (Throwable cleanupFailure) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(
+                    cleanupFailure);
+        }
+        try {
+            owner.activityRuntime.invalidate(current);
+            owner.serviceCoordinator.stopSession(current);
+            owner.receiverCoordinator.stopSession(current, reason);
+            owner.providerResources.stopSession(current);
+            owner.crossAbiProviderRelay.invalidateCaller(packageName, userId,
+                    current.sessionId(), current.generation());
+        } catch (Throwable cleanupFailure) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(
+                    cleanupFailure);
+        }
+        RuntimeEventLog.event("GUEST_PREPARE_ROLLBACK", owner.sessionBundle(current, reason));
     }
 
     void stopGuest(String packageName, int userId) {

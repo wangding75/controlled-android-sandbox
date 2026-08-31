@@ -3535,3 +3535,27 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
 - **当前状态/下一步**：`C4-R05` 仍为唯一 `IN_PROGRESS`；本次修复文档和 KI 记录提交
   后，重新运行续接预检、formal orchestrator，并从新的修复 clean commit 重新开始两轮
   正式验收。上一轮 102 条输出只作失败证据，不与新的 formal PASS 合并。
+
+### C4-R05：recovery prewarm PREPARING 残留首次失败与修复（2026-08-31）
+
+- **首次失败证据**：formal 首轮 clean-install/cold 已完成并确认 162 个 case；续接
+  `dingtalk/user1/cold-007` PASS 后，紧接的 `dingtalk/user1/hot-007` 首次失败。
+  request=`9746f9500c97412caee29f44eebf9896`，operation=`9746f9500c97412caee29f44eebf9896-launch`，
+  attempt=2（续接 lane），`retryBudget=0`，`automaticRetryPerformed=false`，
+  `retryable=false`，错误 `SESSION_BUSY:PREPARING`。原始证据目录为
+  `verification/catch-up/C4-R05/formal-two-round-20260831-publication-race-fix/round-1-clean-install-cold/launch-matrix/attempt-002/attempts/dingtalk/user-1/hot-007/`，
+  保留 logcat、Activity/Window/Surface、截图、事务/catalog、boot/commit/APK 关联快照。
+- **根因分类**：CAS 通用 Guest lifecycle 回滚缺口，非 SX adapter/UI、商业包黑屏、
+  设备断连或验收编排重试。`cold-007` 后延迟 recovery prewarm 的 Guest 回调产生
+  `PREPARED_SPEC_MISSING`；外层 `prepareGuest` 只返回 FAILED，没有清理已分配的
+  `PREPARING` generation，导致随后显式 hot launch 被正确拒绝。
+- **VA/NBB 对照与修复**：恢复事务在 prepare 失败时终止当前 lease 并回收
+  process/window/component ownership，不让半完成 generation 继续可用。现于
+  `RuntimeGuestLifecycleCoordinator.prepareGuest` 外层失败路径增加统一 rollback：
+  `ALLOCATED/PREPARING -> FAILED`、释放 slot、移除 prepared spec、停止系统服务并
+  失效 Activity/Service/Receiver/Provider/cross-ABI ownership；写入
+  `GUEST_PREPARE_ROLLBACK`。不改变 retry budget、deadline、FIRST_FRAME_DRAWN 门槛。
+- **验证进度**：`python tools/static_android_compile.py`、`:sandbox-domain:test`、
+  `:sandbox-runtime:test`、`git diff --check` 已通过；待构建新 APK 后从该失败坐标
+  继续，重新完成剩余首轮及第二轮正式验收。新增 `KI-R03-064`，当前仍为
+  `RECORDED`/`acceptance: NOT_FIXED`/`blocks_current_campaign: true`。
