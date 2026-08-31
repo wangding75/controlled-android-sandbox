@@ -3576,3 +3576,14 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
 - **验证**：静态 Android 编译、`:sandbox-runtime:compileDebugJavaWithJavac`、
   `git diff --check` 通过；该针对性失败证据已保留，须在新 clean commit 重新构建后
   复测冷→热，随后才能恢复 R05 正式矩阵。
+
+### C4-R05：recovery prewarm rollback 针对性复测通过（2026-08-31）
+
+- 新 clean commit `0e6e0591` 构建并安装后，DingTalk user1 独立 cold→hot 2-row 回归
+  `verification/catch-up/C4-R05/recovery-prewarm-rollback-targeted-20260831-v2/`
+  结果 `PASS`，2/2 均达到真实 `FIRST_FRAME_DRAWN`、Guest Window、Surface 和非黑屏
+  证据，未发生自动重试。
+- 该结果仅证明本次 recovery prewarm PREPARING 残留修复通过针对性回归，不替代 R05
+  两轮正式矩阵；`KI-R03-064` 仍保持 `RECORDED`、`acceptance: NOT_FIXED`、阻断状态。
+- 当前下一步：在该 clean commit 上启动新的 R05 formal 两轮验收；旧 formal 输出不与
+  新 commit 混合，旧输出仅作为首次失败证据保留。
