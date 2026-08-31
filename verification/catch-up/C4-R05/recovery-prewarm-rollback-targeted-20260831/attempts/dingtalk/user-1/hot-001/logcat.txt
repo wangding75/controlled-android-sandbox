@@ -1,0 +1,486 @@
+--------- beginning of main
+08-31 21:14:03.866  5116  5116 I logcat  : type=1400 audit(0.0:7273): avc: denied { write } for name="logd" dev="tmpfs" ino=221 scontext=u:r:adbd:s0 tcontext=u:object_r:logd_socket:s0 tclass=sock_file permissive=1
+08-31 21:14:03.950  5118  5118 I run-as  : type=1400 audit(0.0:7274): avc: denied { search } for name="/" dev="sda6" ino=2 scontext=u:r:runas_app:s0:c196,c256,c512,c768 tcontext=u:object_r:unlabeled:s0 tclass=dir permissive=1 app=com.warden.controlledsandbox.debug
+08-31 21:14:03.953  5118  5118 I run-as  : type=1400 audit(0.0:7275): avc: denied { open } for path="/data/system/etc/mumu-configs/app-device-prop-android12.config" dev="sdc3" ino=4851982 scontext=u:r:runas_app:s0:c196,c256,c512,c768 tcontext=u:object_r:system_data_file:s0 tclass=file permissive=1 app=com.warden.controlledsandbox.debug
+08-31 21:14:03.983  5118  5118 I run-as  : type=1400 audit(0.0:7276): avc: denied { read } for name="rm" dev="sda6" ino=827 scontext=u:r:runas_app:s0:c196,c256,c512,c768 tcontext=u:object_r:unlabeled:s0 tclass=lnk_file permissive=1 app=com.warden.controlledsandbox.debug
+08-31 21:14:03.986  5118  5118 I rm      : type=1400 audit(0.0:7277): avc: denied { read } for name="/" dev="sda6" ino=2 scontext=u:r:runas_app:s0:c196,c256,c512,c768 tcontext=u:object_r:unlabeled:s0 tclass=dir permissive=1 app=com.warden.controlledsandbox.debug
+08-31 21:14:04.048  1297  4924 D SntpClient: request time failed: java.net.SocketTimeoutException: Poll timed out
+08-31 21:14:04.048  1297  4924 D SntpClient: request time failed
+08-31 21:14:04.049  1297  4924 E NtpTimeHelper: requestTime failed
+08-31 21:14:04.166  5124  5124 D ProcessState: Binder ioctl to enable oneway spam detection failed: Invalid argument
+--------- beginning of system
+08-31 21:14:04.169  1297  1681 I ActivityTaskManager: START u0 {flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras)} from uid 2000, pid 5124
+08-31 21:14:04.170  1297  1681 I ActivityTaskManager: [KeepAlive] disabled for com.warden.controlledsandbox.debug
+08-31 21:14:04.171  1146  1210 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-31 21:14:04.193  5029  5029 I CS_FRAMEWORK_ACTIVITY: LIFECYCLE event=PAUSED request=d4d2f12c-746a-4bf0-bcea-2974a446d456 operation=d4d2f12c-746a-4bf0-bcea-2974a446d456-launch session=7a847995-bb2d-4548-8607-bf699712cdf8 activityToken=16573c6f-4a41-475d-8960-b2d151395c70 component=com.alibaba.android.rimet.PrivacyPolicyActivity windowAttached=true windowCreated=true windowRegistered=false pid=5029
+08-31 21:14:04.193  5029  5029 I CS_RUNTIME: GUEST_ACTIVITY_PAUSED session=7a847995-bb2d-4548-8607-bf699712cdf8 traceDomain=GUEST requestId=d4d2f12c-746a-4bf0-bcea-2974a446d456 operationId=d4d2f12c-746a-4bf0-bcea-2974a446d456-launch physicalPid=5029 threadTid=5029 component=com.alibaba.android.rimet.PrivacyPolicyActivity activityToken=16573c6f-4a41-475d-8960-b2d151395c70 windowAttached=true generation=1 slot=-1
+08-31 21:14:04.207  1483  1672 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-31 21:14:04.207  1297  2019 W ActivityTaskManager: Tried to set launchTime (0) < mLastActivityLaunchTime (945581)
+08-31 21:14:04.214  1483  5127 D ndroid.systemu: Features: 0 0 0
+08-31 21:14:04.214  1483  5127 E ndroid.systemu: vulkan version is 4202692
+08-31 21:14:04.215  1483  5127 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-31 21:14:04.215  1483  5127 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-31 21:14:04.218  5029  5029 I CS_INTERACTION_PROXY: ACTUAL_PROXY_INVOCATION service=inputMethod method=removeImeSurfaceFromWindowAsync path=delegate
+08-31 21:14:04.221  5029  5029 I CS_INTERACTION_PROXY: ACTUAL_PROXY_INVOCATION service=inputMethod method=removeImeSurfaceFromWindowAsync path=delegate
+08-31 21:14:04.241  4738  4738 I CS_COMMAND: COMMAND_BEGIN command=launch package=com.alibaba.android.rimet user=1
+08-31 21:14:04.264  4738  5129 I CS_PROCESS_OWNER: RUNTIME_CLIENT_OWNER_READY request=7ddbc8e2e3344d40ac73d3bdccd20b5f operation=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch retry=false
+08-31 21:14:04.264  4738  5129 I CS_COMMAND: PACKAGE_LOOKUP_BEGIN command=launch package=com.alibaba.android.rimet
+08-31 21:14:04.284  4738  4768 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-31 21:14:04.284  5029  5029 I CS_INTERACTION_PROXY: ACTUAL_PROXY_INVOCATION service=inputMethod method=removeImeSurfaceFromWindowAsync path=delegate
+08-31 21:14:04.296  4738  5130 D edsandbox.debu: Features: 0 0 0
+08-31 21:14:04.296  4738  5130 E edsandbox.debu: vulkan version is 4202692
+08-31 21:14:04.298  4738  5130 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-31 21:14:04.298  4738  5130 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-31 21:14:04.312  1297  1314 I ActivityTaskManager: Displayed com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity: +136ms
+08-31 21:14:04.367  1452  1452 D DropboxReceiver: dropbox tag: system_server_wtf
+08-31 21:14:04.367  1452  1452 D DropboxReceiver: dropbox time: 1788182042369
+08-31 21:14:04.367  1452  1452 D DropboxReceiver: dropbox file is not to be trackd
+08-31 21:14:04.368  1452  1452 D DropboxReceiver: dropbox tag: data_app_wtf
+08-31 21:14:04.368  1452  1452 D DropboxReceiver: dropbox time: 1788182042366
+08-31 21:14:04.368  1452  1452 D DropboxReceiver: dropbox file is not to be trackd
+08-31 21:14:04.442  1297  1306 I system_server: NativeAlloc concurrent copying GC freed 124021(5455KB) AllocSpace objects, 16(368KB) LOS objects, 49% free, 13MB/26MB, paused 77us,54us total 102.140ms
+08-31 21:14:04.448  1297  1308 W System  : A resource failed to call close. 
+08-31 21:14:04.449  1297  1308 W System  : A resource failed to call release. 
+08-31 21:14:04.449  1297  1308 W System  : A resource failed to call close. 
+08-31 21:14:04.449  1297  1308 W System  : A resource failed to call release. 
+08-31 21:14:04.455  5029  5029 I CS_INTERACTION_PROXY: ACTUAL_PROXY_INVOCATION service=windowSession method=relayout path=delegate
+08-31 21:14:04.462  5029  5029 I CS_INTERACTION_PROXY: ACTUAL_PROXY_INVOCATION service=inputMethod method=removeImeSurfaceFromWindowAsync path=delegate
+08-31 21:14:04.464  1297  2019 W InputManager-JNI: Input channel object '1c90b0b Splash Screen com.warden.controlledsandbox.debug (client)' was disposed without first being removed with the input manager!
+08-31 21:14:04.465  5029  5029 I CS_INTERACTION_PROXY: ACTUAL_PROXY_INVOCATION service=windowSession method=relayout path=delegate
+08-31 21:14:04.471  5029  5029 I CS_INTERACTION_PROXY: ACTUAL_PROXY_INVOCATION service=inputMethod method=removeImeSurfaceFromWindowAsync path=delegate
+08-31 21:14:04.473  5029  5029 I CS_FRAMEWORK_ACTIVITY: LIFECYCLE event=STOPPED request=d4d2f12c-746a-4bf0-bcea-2974a446d456 operation=d4d2f12c-746a-4bf0-bcea-2974a446d456-launch session=7a847995-bb2d-4548-8607-bf699712cdf8 activityToken=16573c6f-4a41-475d-8960-b2d151395c70 component=com.alibaba.android.rimet.PrivacyPolicyActivity windowAttached=true windowCreated=true windowRegistered=false pid=5029
+08-31 21:14:04.474  5029  5029 I CS_RUNTIME: GUEST_ACTIVITY_STOPPED session=7a847995-bb2d-4548-8607-bf699712cdf8 traceDomain=GUEST requestId=d4d2f12c-746a-4bf0-bcea-2974a446d456 operationId=d4d2f12c-746a-4bf0-bcea-2974a446d456-launch physicalPid=5029 threadTid=5029 component=com.alibaba.android.rimet.PrivacyPolicyActivity activityToken=16573c6f-4a41-475d-8960-b2d151395c70 windowAttached=true generation=1 slot=-1
+08-31 21:14:04.480  5029  5029 I CS_FRAMEWORK_ACTIVITY: LIFECYCLE event=FINISH_RESULT request=d4d2f12c-746a-4bf0-bcea-2974a446d456 operation=d4d2f12c-746a-4bf0-bcea-2974a446d456-launch session=7a847995-bb2d-4548-8607-bf699712cdf8 activityToken=16573c6f-4a41-475d-8960-b2d151395c70 component=com.alibaba.android.rimet.PrivacyPolicyActivity windowAttached=true windowCreated=true windowRegistered=false pid=5029
+08-31 21:14:04.480  5029  5029 I CS_RUNTIME: GUEST_ACTIVITY_FINISH_RESULT session=7a847995-bb2d-4548-8607-bf699712cdf8 traceDomain=GUEST requestId=d4d2f12c-746a-4bf0-bcea-2974a446d456 operationId=d4d2f12c-746a-4bf0-bcea-2974a446d456-launch physicalPid=5029 threadTid=5029 component=com.alibaba.android.rimet.PrivacyPolicyActivity activityToken=16573c6f-4a41-475d-8960-b2d151395c70 windowAttached=true generation=1 slot=-1
+08-31 21:14:04.483  5029  5029 I CS_INTERACTION_PROXY: ACTUAL_PROXY_INVOCATION service=windowSession method=remove path=delegate
+08-31 21:14:04.483  1297  3213 W InputManager-JNI: Input channel object '774e2c5 com.alibaba.android.rimet/com.alibaba.android.rimet.PrivacyPolicyActivity (client)' was disposed without first being removed with the input manager!
+08-31 21:14:04.489  5029  5029 E WindowManager: android.view.WindowLeaked: Activity com.alibaba.android.rimet.PrivacyPolicyActivity has leaked window DecorView@913231[PrivacyPolicyActivity] that was originally added here
+08-31 21:14:04.489  5029  5029 E WindowManager: 	at android.view.ViewRootImpl.<init>(ViewRootImpl.java:812)
+08-31 21:14:04.489  5029  5029 E WindowManager: 	at android.view.ViewRootImpl.<init>(ViewRootImpl.java:796)
+08-31 21:14:04.489  5029  5029 E WindowManager: 	at android.view.WindowManagerGlobal.addView(WindowManagerGlobal.java:390)
+08-31 21:14:04.489  5029  5029 E WindowManager: 	at android.view.WindowManagerImpl.addView(WindowManagerImpl.java:155)
+08-31 21:14:04.489  5029  5029 E WindowManager: 	at android.app.Dialog.show(Dialog.java:351)
+08-31 21:14:04.489  5029  5029 E WindowManager: 	at f96$a.run(SourceFile:35)
+08-31 21:14:04.489  5029  5029 E WindowManager: 	at android.os.Handler.handleCallback(Handler.java:938)
+08-31 21:14:04.489  5029  5029 E WindowManager: 	at android.os.Handler.dispatchMessage(Handler.java:99)
+08-31 21:14:04.489  5029  5029 E WindowManager: 	at android.os.Looper.loopOnce(Looper.java:201)
+08-31 21:14:04.489  5029  5029 E WindowManager: 	at android.os.Looper.loop(Looper.java:288)
+08-31 21:14:04.489  5029  5029 E WindowManager: 	at android.app.ActivityThread.main(ActivityThread.java:8085)
+08-31 21:14:04.489  5029  5029 E WindowManager: 	at java.lang.reflect.Method.invoke(Native Method)
+08-31 21:14:04.489  5029  5029 E WindowManager: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:571)
+08-31 21:14:04.489  5029  5029 E WindowManager: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:1091)
+08-31 21:14:04.490  1297  3213 W InputManager-JNI: Input channel object '12d0735 com.alibaba.android.rimet/com.alibaba.android.rimet.PrivacyPolicyActivity (client)' was disposed without first being removed with the input manager!
+08-31 21:14:04.497  5029  5029 I CS_INTERACTION_PROXY: ACTUAL_PROXY_INVOCATION service=windowSession method=remove path=delegate
+08-31 21:14:04.500  1297  4561 W WindowManager: Failed looking up window session=Session{d5e7b2f 5029:u0a10196} callers=com.android.server.wm.WindowManagerService.windowForClientLocked:5833 com.android.server.wm.WindowManagerService.removeWindow:2055 com.android.server.wm.Session.remove:221 
+08-31 21:14:04.501  5029  5029 I CS_INTERACTION_PROXY: ACTUAL_PROXY_INVOCATION service=display method=registerCallbackWithEventMask path=delegate
+08-31 21:14:04.906  5135  5135 I run-as  : type=1400 audit(0.0:7310): avc: denied { setcurrent } for scontext=u:r:adbd:s0 tcontext=u:r:adbd:s0 tclass=process permissive=1 app=com.warden.controlledsandbox.debug
+08-31 21:14:05.257  1297  1987 E TaskPersister: File error accessing recents directory (directory doesn't exist?).
+08-31 21:14:07.416  2402  2402 I m.android.phone: type=1400 audit(0.0:7311): avc: denied { sendto } for path="/dev/socket/logdw" scontext=u:r:radio:s0 tcontext=u:r:init:s0 tclass=unix_dgram_socket permissive=1
+08-31 21:14:07.416  2402  2402 I m.android.phone: type=1400 audit(0.0:7312): avc: denied { call } for scontext=u:r:radio:s0 tcontext=u:r:init:s0 tclass=binder permissive=1
+08-31 21:14:07.430  1167  1167 I rild    : type=1400 audit(0.0:7313): avc: denied { call } for scontext=u:r:init:s0 tcontext=u:r:radio:s0 tclass=binder permissive=1
+08-31 21:14:07.436  1045  1045 I servicemanager: type=1400 audit(0.0:7314): avc: denied { transfer } for scontext=u:r:init:s0 tcontext=u:r:radio:s0 tclass=binder permissive=1
+08-31 21:14:07.875  1297  3213 D CompatibilityChangeReporter: Compat change id reported: 135634846; UID 10196; state: DISABLED
+08-31 21:14:07.881  1297  1327 D CompatibilityChangeReporter: Compat change id reported: 143937733; UID 10196; state: ENABLED
+08-31 21:14:07.880  1128  1128 I main    : type=1400 audit(0.0:7315): avc: denied { getattr } for path="/apex/com.android.permission/javalib/framework-permission-s.jar" dev="sda6" ino=444 scontext=u:r:zygote:s0 tcontext=u:object_r:unlabeled:s0 tclass=file permissive=1
+08-31 21:14:07.888  1128  1128 D Zygote  : Forked child process 5147
+08-31 21:14:07.886  5147  5147 I main    : type=1400 audit(0.0:7316): avc: denied { search } for name="com.android.permission" dev="sda6" ino=435 scontext=u:r:zygote:s0 tcontext=u:object_r:unlabeled:s0 tclass=dir permissive=1
+08-31 21:14:07.886  5147  5147 I main    : type=1400 audit(0.0:7317): avc: denied { read } for name="framework-permission-s.jar" dev="sda6" ino=444 scontext=u:r:zygote:s0 tcontext=u:object_r:unlabeled:s0 tclass=file permissive=1
+08-31 21:14:07.886  5147  5147 I main    : type=1400 audit(0.0:7318): avc: denied { open } for path="/apex/com.android.permission/javalib/framework-permission-s.jar" dev="sda6" ino=444 scontext=u:r:zygote:s0 tcontext=u:object_r:unlabeled:s0 tclass=file permissive=1
+08-31 21:14:07.890  5147  5147 I Zygote  : fakeProductInfoIfNeed callded! com.warden.controlledsandbox.debug:guest5
+08-31 21:14:07.891  1297  1327 I ActivityManager: Start proc 5147:com.warden.controlledsandbox.debug:guest5/u0a196 for service {com.warden.controlledsandbox.debug/com.warden.controlledsandbox.runtime.guest.GuestProcessService5}
+08-31 21:14:07.892  5147  5147 I Zygote  : fake Product info com.warden.controlledsandbox.debug:guest5 not matched any pattern
+08-31 21:14:07.892  5147  5147 I Zygote  : fakeProductInfoFromProperties callded! com.warden.controlledsandbox.debug:guest5
+08-31 21:14:07.890  5147  5147 I main    : type=1400 audit(0.0:7319): avc: denied { read } for name="u:object_r:serialno_prop:s0" dev="tmpfs" ino=12315 scontext=u:r:zygote:s0 tcontext=u:object_r:serialno_prop:s0 tclass=file permissive=1
+08-31 21:14:07.901  5147  5147 E NemuAppNameUtil: save data success
+08-31 21:14:07.907  5147  5147 E linker  : do_dlopen failed
+08-31 21:14:07.907  5147  5147 E linker  : load selected hp /system/etc/mumu-configs/shared_libs/libhp12_x86_64.so failed
+08-31 21:14:07.907  5147  5147 E linker  : library "/system/etc/mumu-configs/shared_libs/libhp12_x86_64.so" ("/system/etc/mumu-configs/shared_libs/libhp12_x86_64.so") needed or dlopened by "/apex/com.android.art/lib64/libnativebridge.so" is not accessible for the namespace: [name="com_android_art", ld_library_paths="", default_library_paths="/apex/com.android.art/lib64", permitted_paths="/apex/com.android.art/lib64:/system/lib64:/data:/apex/com.android.art/javalib"]
+08-31 21:14:07.908  5147  5147 E linker  : do_dlopen failed
+08-31 21:14:07.908  5147  5147 E linker  : load origin hp /system/etc/mumu-configs/shared_libs/libhp12_x86_64.so failed
+08-31 21:14:07.912  5147  5147 E linker  : hp entrace has not been loaded, ignored
+08-31 21:14:07.918  5147  5147 W nativebridge: LLLog DoRedirectTranslator not is_gte
+08-31 21:14:07.920  5147  5147 W nativebridge: Failed to bind-mount /system/etc/cpuinfo.x86_64.txt as /proc/cpuinfo: No such file or directory
+08-31 21:14:07.920  5147  5147 W nativebridge: Failed to bind-mount /system/lib64/x86_64/cpuinfo as /proc/cpuinfo: No such file or directory
+08-31 21:14:07.920  5147  5147 I Zygote  : seccomp disabled by setenforce 0
+08-31 21:14:07.933  5147  5147 I ox.debug:guest: Late-enabling -Xcheck:jni
+08-31 21:14:07.947  5147  5147 W ox.debug:guest: Unexpected CPU variant for X86 using defaults: x86_64
+08-31 21:14:07.948  5147  5147 V libnb   : enter native_bridge2_initialize /data/user/0/com.warden.controlledsandbox.debug/code_cache arm64
+08-31 21:14:07.948  5147  5147 E libnb   : The translator implementation library has not been set.
+08-31 21:14:07.959  5147  5147 E libnb   : get_callbacks native_handle 0x2b0a4197642cff67: 1 libnb:/system/lib64/libhoudini.so
+08-31 21:14:07.959  5147  5147 I libnb   : Found /system/lib64/libhoudini.so version 6
+08-31 21:14:07.959  5147  5147 D HP      : no libmumuhooker.so
+08-31 21:14:07.962  5147  5147 D houdini : [5147] Intel Bridge Technology for Netease internal evaluation only, Copyright(C) Intel Corp. 2012-2025.
+08-31 21:14:07.962  5147  5147 D houdini : [5147] Use permitted only under a valid evaluation software license agreement - all other rights reserved.
+08-31 21:14:07.962  5147  5147 D houdini : [5147] Initialize library(version: 12.0.1_z.Netease_ev4 RELEASE)... successfully.
+08-31 21:14:07.962  5147  5147 W HP      : x_initialize private_dir:/data/user/0/com.warden.controlledsandbox.debug/code_cache instruction_set:arm64 getMethodShorty:0x79ba3bb3c340 ret:1
+08-31 21:14:07.969  1147  1201 I adbd    : jdwp connection from 5147
+08-31 21:14:07.985  5147  5147 D ProcessState: Binder ioctl to enable oneway spam detection failed: Invalid argument
+08-31 21:14:08.022  5147  5163 E ashmem  : memfd: ro.vndk.version not defined or invalid (), this is mandated since P.
+08-31 21:14:08.037  5147  5147 D CompatibilityChangeReporter: Compat change id reported: 171979766; UID 10196; state: ENABLED
+08-31 21:14:08.186  5147  5147 I Typeface: Preloading /system/fonts/Roboto-Regular.ttf
+08-31 21:14:08.325  5147  5147 V GraphicsEnvironment: ANGLE Developer option for 'com.warden.controlledsandbox.debug' set to: 'default'
+08-31 21:14:08.325  5147  5147 V GraphicsEnvironment: ANGLE GameManagerService for com.warden.controlledsandbox.debug: false
+08-31 21:14:08.325  5147  5147 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+08-31 21:14:08.330  5147  5147 D NetworkSecurityConfig: No Network Security Config specified, using platform default
+08-31 21:14:08.331  5147  5147 D NetworkSecurityConfig: No Network Security Config specified, using platform default
+08-31 21:14:08.364  5147  5162 I CS_GUEST_OPERATION: ENTRY operation=PREPARE_GUEST request=f4431522-2799-416e-bdb3-3afec339b1da package=com.alibaba.android.rimet session=dcbf8b1b-065e-43fe-a024-06c4b998b479 generation=2 pid=5147
+08-31 21:14:08.415  5147  5162 I CS_PROCESS_OWNER: BROKER_OWNER_LEASE_REQUESTED session=dcbf8b1b-065e-43fe-a024-06c4b998b479 generation=2 pid=5147 flags=BIND_AUTO_CREATE|BIND_IMPORTANT|BIND_ABOVE_CLIENT retry=false
+08-31 21:14:08.415  5147  5147 I CS_PROCESS_OWNER: BROKER_OWNER_LEASE_CONNECTED session=dcbf8b1b-065e-43fe-a024-06c4b998b479 generation=2 pid=5147
+08-31 21:14:08.421  5147  5162 I CS_GUEST_PREPARE: phase=ENTRY request=bcbfe5e661054c9381a8c032b13af174 operation=bcbfe5e661054c9381a8c032b13af174-launch package=com.alibaba.android.rimet process=com.alibaba.android.rimet session=dcbf8b1b-065e-43fe-a024-06c4b998b479 generation=2 slot=5 status= elapsedMs=0 pid=5147
+08-31 21:14:08.422  5147  5147 I CS_GUEST_PREPARE: phase=OWNER_BEGIN request=bcbfe5e661054c9381a8c032b13af174 operation=bcbfe5e661054c9381a8c032b13af174-launch package=com.alibaba.android.rimet process=com.alibaba.android.rimet session=dcbf8b1b-065e-43fe-a024-06c4b998b479 generation=2 slot=5 status= elapsedMs=0 pid=5147
+08-31 21:14:08.422  5147  5147 I CS_GUEST_PREPARE: phase=CURRENT_THREAD_BEGIN request=bcbfe5e661054c9381a8c032b13af174 operation=bcbfe5e661054c9381a8c032b13af174-launch package=com.alibaba.android.rimet process=com.alibaba.android.rimet session=dcbf8b1b-065e-43fe-a024-06c4b998b479 generation=2 slot=5 status= elapsedMs=0 pid=5147
+08-31 21:14:08.423  5147  5147 I CS_RUNTIME: PERF_TRACE_STAGE package=com.alibaba.android.rimet traceDomain=FRAMEWORK requestId=bcbfe5e661054c9381a8c032b13af174 operationId=bcbfe5e661054c9381a8c032b13af174-launch perfPhase=BEGIN perfStage=SYSTEM_SERVICE perfEvent=SYSTEM_SERVICE_BEGIN perfElapsedMs=0 perfDurationMs=0 physicalPid=5147 threadTid=5147 generation=0 slot=-1
+08-31 21:14:08.427  5147  5147 I CS_RUNTIME: PERF_TRACE_STAGE package=com.alibaba.android.rimet traceDomain=FRAMEWORK requestId=bcbfe5e661054c9381a8c032b13af174 operationId=bcbfe5e661054c9381a8c032b13af174-launch perfPhase=END perfStage=SYSTEM_SERVICE perfEvent=SYSTEM_SERVICE_END perfElapsedMs=5 perfDurationMs=5 physicalPid=5147 threadTid=5147 generation=0 slot=-1
+08-31 21:14:08.429  5147  5147 I CS_RUNTIME: PERF_TRACE_STAGE package=com.alibaba.android.rimet traceDomain=FRAMEWORK requestId=bcbfe5e661054c9381a8c032b13af174 operationId=bcbfe5e661054c9381a8c032b13af174-launch perfPhase=BEGIN perfStage=NATIVE_BOOTSTRAP perfEvent=NATIVE_BOOTSTRAP_BEGIN perfElapsedMs=6 perfDurationMs=0 physicalPid=5147 threadTid=5147 generation=0 slot=-1
+08-31 21:14:08.430  5147  5147 I CS_REVISION_VERIFY: skipped broker-verified revision=v1178:sha256:2a1e50c004d97530cdad65d65bca87e06f8aa031072ec29574e5de7971d320bb
+08-31 21:14:08.446  5147  5147 I CS_RUNTIME: PERF_TRACE_STAGE package=com.alibaba.android.rimet traceDomain=FRAMEWORK requestId=bcbfe5e661054c9381a8c032b13af174 operationId=bcbfe5e661054c9381a8c032b13af174-launch perfPhase=END perfStage=NATIVE_BOOTSTRAP perfEvent=NATIVE_BOOTSTRAP_END perfElapsedMs=23 perfDurationMs=17 physicalPid=5147 threadTid=5147 generation=0 slot=-1
+08-31 21:14:08.449  5147  5147 I CS_NATIVE_RUNTIME: projection=false runtimeDir=/data/user/0/com.warden.controlledsandbox.debug/files/packages/com.alibaba.android.rimet/revisions/2a1e50c004d97530cdad65d65bca87e06f8aa031072ec29574e5de7971d320bb/lib/arm64-v8a packagedDir=/data/user/0/com.warden.controlledsandbox.debug/files/packages/com.alibaba.android.rimet/revisions/2a1e50c004d97530cdad65d65bca87e06f8aa031072ec29574e5de7971d320bb/lib/arm64-v8a dexPathProjected=false coreDexMode=apk
+08-31 21:14:08.470  5147  5147 I CS_HIDDEN_API_NATIVE: VMRuntime.setHiddenApiExemptions success=true
+08-31 21:14:08.472  5147  5147 I CS_JNI_EX: PROBE installed=false translatedAbi=true guestAbi=arm64-v8a hostAbi=x86_64
+08-31 21:14:08.473  5147  5147 I CS_RUNTIME: PERF_TRACE_STAGE package=com.alibaba.android.rimet traceDomain=FRAMEWORK requestId=bcbfe5e661054c9381a8c032b13af174 operationId=bcbfe5e661054c9381a8c032b13af174-launch perfPhase=BEGIN perfStage=CLASSLOADER perfEvent=CLASSLOADER_BEGIN perfElapsedMs=50 perfDurationMs=0 physicalPid=5147 threadTid=5147 generation=0 slot=-1
+08-31 21:14:09.226  1127  1127 I netd    : type=1400 audit(0.0:7383): avc: denied { create } for scontext=u:r:init:s0 tcontext=u:r:init:s0 tclass=netlink_tcpdiag_socket permissive=1
+08-31 21:14:09.226  1127  1127 I netd    : type=1400 audit(0.0:7384): avc: denied { connect } for scontext=u:r:init:s0 tcontext=u:r:init:s0 tclass=netlink_tcpdiag_socket permissive=1
+08-31 21:14:09.226  1127  1127 I netd    : type=1400 audit(0.0:7385): avc: denied { write } for path="socket:[48615]" dev="sockfs" ino=48615 scontext=u:r:init:s0 tcontext=u:r:init:s0 tclass=netlink_tcpdiag_socket permissive=1
+08-31 21:14:09.226  1127  1127 I netd    : type=1400 audit(0.0:7386): avc: denied { nlmsg_read } for scontext=u:r:init:s0 tcontext=u:r:init:s0 tclass=netlink_tcpdiag_socket permissive=1
+08-31 21:14:09.226  1127  1127 I netd    : type=1400 audit(0.0:7387): avc: denied { read } for scontext=u:r:init:s0 tcontext=u:r:init:s0 tclass=netlink_tcpdiag_socket permissive=1
+08-31 21:14:09.269  1173  1173 D opengl-gc: Check pid 4954: running 0
+08-31 21:14:09.714  4772  5068 I CS_RUNTIME: GUEST_RECOVERY_PREWARM_COMPLETED status=FAILED package=com.alibaba.android.rimet session=dcbf8b1b-065e-43fe-a024-06c4b998b479 traceDomain=GUEST processName=com.alibaba.android.rimet virtualUserId=1 physicalPid=4772 threadTid=5068 generation=2 slot=5
+08-31 21:14:10.340  5147  5147 I CS_RUNTIME: PERF_TRACE_STAGE package=com.alibaba.android.rimet traceDomain=FRAMEWORK requestId=bcbfe5e661054c9381a8c032b13af174 operationId=bcbfe5e661054c9381a8c032b13af174-launch perfPhase=END perfStage=CLASSLOADER perfEvent=CLASSLOADER_END perfElapsedMs=1918 perfDurationMs=1867 physicalPid=5147 threadTid=5147 generation=0 slot=-1
+08-31 21:14:10.342  5147  5147 I CS_NATIVE_BIND: PROBE uncaughtLinkHandler=installed
+08-31 21:14:10.342  5147  5147 I CS_NATIVE_BIND: LOADER site=guest.base loader=com.warden.controlledsandbox.runtime.guest.GuestClassLoader@fdc5367 guestLoader=true parents=dalvik.system.PathClassLoader@c06eb13>java.lang.BootClassLoader@ae31514
+08-31 21:14:10.342  5147  5147 W ox.debug:guest: Accessing hidden field Ldalvik/system/BaseDexClassLoader;->pathList:Ldalvik/system/DexPathList; (unsupported, reflection, allowed)
+08-31 21:14:10.342  5147  5147 W ox.debug:guest: Accessing hidden field Ldalvik/system/DexPathList;->nativeLibraryDirectories:Ljava/util/List; (unsupported, reflection, allowed)
+08-31 21:14:10.342  5147  5147 I CS_NATIVE_BIND: LOADER site=guest.dex loader=dalvik.system.PathClassLoader@49441bd guestLoader=false parents=dalvik.system.PathClassLoader@c06eb13>java.lang.BootClassLoader@ae31514 nativeDirs=[/data/user/0/com.warden.controlledsandbox.debug/files/packages/com.alibaba.android.rimet/revisions/2a1e50c004d97530cdad65d65bca87e06f8aa031072ec29574e5de7971d320bb/lib/arm64-v8a]
+08-31 21:14:10.342  5147  5147 I CS_RUNTIME: PERF_TRACE_STAGE package=com.alibaba.android.rimet traceDomain=FRAMEWORK requestId=bcbfe5e661054c9381a8c032b13af174 operationId=bcbfe5e661054c9381a8c032b13af174-launch perfPhase=BEGIN perfStage=RESOURCES perfEvent=RESOURCES_BEGIN perfElapsedMs=1920 perfDurationMs=0 physicalPid=5147 threadTid=5147 generation=0 slot=-1
+08-31 21:14:10.382  5147  5147 I CS_GUEST_METADATA: applicationMetaData=230
+08-31 21:14:10.383  5147  5147 I CS_RUNTIME: PERF_TRACE_STAGE package=com.alibaba.android.rimet traceDomain=FRAMEWORK requestId=bcbfe5e661054c9381a8c032b13af174 operationId=bcbfe5e661054c9381a8c032b13af174-launch perfPhase=END perfStage=RESOURCES perfEvent=RESOURCES_END perfElapsedMs=1961 perfDurationMs=40 physicalPid=5147 threadTid=5147 generation=0 slot=-1
+08-31 21:14:10.387  5147  5147 I CS_GUEST_STORAGE: bootstrap isolated=false dataFd=-1 dataRoot=/data/data/com.warden.controlledsandbox.debug/files/instances/u1/com.alibaba.android.rimet
+08-31 21:14:10.394  5147  5147 I CS_GUEST_LIFETIME: Runtime.nativeExit hook installed=1
+08-31 21:14:10.459  5147  5147 I CS_NATIVE_BIND: PROBE nativeLoadDiagnostic=false nativeLoadRedirect=false translatedAbi=true processLifetimeHooks=true boundaryMode=translated-platform-loader+host-lifetime
+08-31 21:14:10.461  5147  5147 W ox.debug:guest: Accessing hidden method Landroid/ddm/DdmHandleAppName;->setAppName(Ljava/lang/String;I)V (unsupported, reflection, allowed)
+08-31 21:14:10.466  5147  5147 I CS_GUEST_PROCESS_IDENTITY: installed package=com.alibaba.android.rimet process=com.alibaba.android.rimet frameworkProcess=com.alibaba.android.rimet osProcess=com.alibaba.android.rimet argv0Published=true
+08-31 21:14:10.526  5147  5147 I CS_FGS_PROJECTION: GUEST_METADATA service=com.amap.api.location.APSService declaredType=8
+08-31 21:14:10.526  5147  5147 I CS_FGS_PROJECTION: GUEST_METADATA service=com.alibaba.android.teleconf.mozi.service.TeleMoziAudioForegroundService declaredType=128
+08-31 21:14:10.526  5147  5147 I CS_FGS_PROJECTION: GUEST_METADATA service=com.alibaba.android.teleconf.service.incoming.TeleBackgroundIncomingServiceV2 declaredType=2
+08-31 21:14:10.526  5147  5147 I CS_FGS_PROJECTION: GUEST_METADATA service=com.alibaba.android.dingtalk.live.anchor.component.LiveAnchorForegroundService declaredType=192
+08-31 21:14:10.526  5147  5147 I CS_FGS_PROJECTION: GUEST_METADATA service=com.alibaba.android.dingtalk.live.player.notification.LivePlayForegroundServiceV2 declaredType=2
+08-31 21:14:10.526  5147  5147 I CS_FGS_PROJECTION: GUEST_METADATA service=com.alibaba.android.teleconf.mozi.service.TeleMoziForegroundService declaredType=192
+08-31 21:14:10.526  5147  5147 I CS_FGS_PROJECTION: GUEST_METADATA service=com.alibaba.lightapp.runtime.service.ScreenRecorderService declaredType=32
+08-31 21:14:10.526  5147  5147 I CS_FGS_PROJECTION: GUEST_METADATA service=com.alibaba.android.mozisdk.mozi.client.screencast.ScreenCastAppService declaredType=32
+08-31 21:14:10.526  5147  5147 I CS_FGS_PROJECTION: GUEST_METADATA service=com.alibaba.android.projection.manager.FocusNotificationServiceV2 declaredType=32
+08-31 21:14:10.526  5147  5147 I CS_FGS_PROJECTION: GUEST_METADATA service=com.alibaba.android.projection.service.CaptureService declaredType=32
+08-31 21:14:10.527  5147  5147 I CS_FGS_PROJECTION: GUEST_METADATA service=com.alibaba.dingtalk.flashminutes.offline.service.FlashMinutesRecordForegroundServiceV2 declaredType=128
+08-31 21:14:10.527  5147  5147 I CS_FGS_PROJECTION: GUEST_METADATA service=com.alisports.ai.common.recorder.RecorderForegroundService declaredType=32
+08-31 21:14:10.538  5147  5147 I CS_CAMERA1_NATIVE: RESET contexts=0
+08-31 21:14:10.540  5147  5147 E CS_RUNTIME: GUEST_PREPARE_FAILED_STACK
+08-31 21:14:10.540  5147  5147 E CS_RUNTIME: java.lang.SecurityException: VIRTUAL_SYSTEM_SERVICE_CAPABILITY_DENIED
+08-31 21:14:10.540  5147  5147 E CS_RUNTIME:   at android.os.Parcel.createExceptionOrNull(Parcel.java:2425)
+08-31 21:14:10.540  5147  5147 E CS_RUNTIME:   at android.os.Parcel.createException(Parcel.java:2409)
+08-31 21:14:10.540  5147  5147 E CS_RUNTIME:   at android.os.Parcel.readException(Parcel.java:2392)
+08-31 21:14:10.540  5147  5147 E CS_RUNTIME:   at android.os.Parcel.readException(Parcel.java:2334)
+08-31 21:14:10.540  5147  5147 E CS_RUNTIME:   at com.warden.controlledsandbox.contract.IVirtualSystemServiceSession$Stub$Proxy.registerObserver(IVirtualSystemServiceSession.java:1096)
+08-31 21:14:10.540  5147  5147 E CS_RUNTIME:   at com.warden.controlledsandbox.runtime.systemservice.RemoteVirtualSystemServiceAuthority.lambda$new$3(RemoteVirtualSystemServiceAuthority.java:143)
+08-31 21:14:10.540  5147  5147 E CS_RUNTIME:   at com.warden.controlledsandbox.runtime.systemservice.RemoteVirtualSystemServiceAuthority.$r8$lambda$u6kuMca8Q1zJTHLBZgUM879GoF8(Unknown Source:0)
+08-31 21:14:10.540  5147  5147 E CS_RUNTIME:   at com.warden.controlledsandbox.runtime.systemservice.RemoteVirtualSystemServiceAuthority$$ExternalSyntheticLambda70.run(D8$$SyntheticClass:0)
+08-31 21:14:10.540  5147  5147 E CS_RUNTIME:   at com.warden.controlledsandbox.runtime.systemservice.RemoteVirtualSystemServiceAuthority.call(RemoteVirtualSystemServiceAuthority.java:587)
+08-31 21:14:10.540  5147  5147 E CS_RUNTIME:   at com.warden.controlledsandbox.runtime.systemservice.RemoteVirtualSystemServiceAuthority.<init>(RemoteVirtualSystemServiceAuthority.java:143)
+08-31 21:14:10.540  5147  5147 E CS_RUNTIME:   at com.warden.controlledsandbox.runtime.guest.GuestRuntimeEnvironment.prepareOnCurrentThread(GuestRuntimeEnvironment.java:496)
+08-31 21:14:10.540  5147  5147 E CS_RUNTIME:   at com.warden.controlledsandbox.runtime.guest.GuestRuntimeEnvironment.completePreparation(GuestRuntimeEnvironment.java:193)
+08-31 21:14:10.540  5147  5147 E CS_RUNTIME:   at com.warden.controlledsandbox.runtime.guest.GuestRuntimeEnvironment.lambda$prepare$0(GuestRuntimeEnvironment.java:162)
+08-31 21:14:10.540  5147  5147 E CS_RUNTIME:   at com.warden.controlledsandbox.runtime.guest.GuestRuntimeEnvironment$$ExternalSyntheticLambda0.run(D8$$SyntheticClass:0)
+08-31 21:14:10.540  5147  5147 E CS_RUNTIME:   at android.os.Handler.handleCallback(Handler.java:938)
+08-31 21:14:10.540  5147  5147 E CS_RUNTIME:   at android.os.Handler.dispatchMessage(Handler.java:99)
+08-31 21:14:10.540  5147  5147 E CS_RUNTIME:   at android.os.Looper.loopOnce(Looper.java:201)
+08-31 21:14:10.540  5147  5147 E CS_RUNTIME:   at android.os.Looper.loop(Looper.java:288)
+08-31 21:14:10.540  5147  5147 E CS_RUNTIME:   at android.app.ActivityThread.main(ActivityThread.java:8085)
+08-31 21:14:10.540  5147  5147 E CS_RUNTIME:   at java.lang.reflect.Method.invoke(Native Method)
+08-31 21:14:10.540  5147  5147 E CS_RUNTIME:   at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:571)
+08-31 21:14:10.540  5147  5147 E CS_RUNTIME:   at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:1091)
+08-31 21:14:10.540  5147  5147 I CS_RUNTIME: GUEST_PREPARE_FAILED status=FAILED traceDomain=GUEST physicalPid=5147 threadTid=5147 error=java.lang.SecurityException message=VIRTUAL_SYSTEM_SERVICE_CAPABILITY_DENIED generation=0 slot=-1
+08-31 21:14:10.547  5147  5147 E CS_GUEST_PREPARE: phase=CURRENT_THREAD_FAIL request=bcbfe5e661054c9381a8c032b13af174 operation=bcbfe5e661054c9381a8c032b13af174-launch package=com.alibaba.android.rimet process=com.alibaba.android.rimet session=dcbf8b1b-065e-43fe-a024-06c4b998b479 generation=2 slot=5 status=java.lang.SecurityException elapsedMs=2124 pid=5147 error=java.lang.SecurityException message=VIRTUAL_SYSTEM_SERVICE_CAPABILITY_DENIED
+08-31 21:14:10.547  5147  5147 E CS_GUEST_PREPARE: java.lang.SecurityException: VIRTUAL_SYSTEM_SERVICE_CAPABILITY_DENIED
+08-31 21:14:10.547  5147  5147 E CS_GUEST_PREPARE: 	at android.os.Parcel.createExceptionOrNull(Parcel.java:2425)
+08-31 21:14:10.547  5147  5147 E CS_GUEST_PREPARE: 	at android.os.Parcel.createException(Parcel.java:2409)
+08-31 21:14:10.547  5147  5147 E CS_GUEST_PREPARE: 	at android.os.Parcel.readException(Parcel.java:2392)
+08-31 21:14:10.547  5147  5147 E CS_GUEST_PREPARE: 	at android.os.Parcel.readException(Parcel.java:2334)
+08-31 21:14:10.547  5147  5147 E CS_GUEST_PREPARE: 	at com.warden.controlledsandbox.contract.IVirtualSystemServiceSession$Stub$Proxy.registerObserver(IVirtualSystemServiceSession.java:1096)
+08-31 21:14:10.547  5147  5147 E CS_GUEST_PREPARE: 	at com.warden.controlledsandbox.runtime.systemservice.RemoteVirtualSystemServiceAuthority.lambda$new$3(RemoteVirtualSystemServiceAuthority.java:143)
+08-31 21:14:10.547  5147  5147 E CS_GUEST_PREPARE: 	at com.warden.controlledsandbox.runtime.systemservice.RemoteVirtualSystemServiceAuthority.$r8$lambda$u6kuMca8Q1zJTHLBZgUM879GoF8(Unknown Source:0)
+08-31 21:14:10.547  5147  5147 E CS_GUEST_PREPARE: 	at com.warden.controlledsandbox.runtime.systemservice.RemoteVirtualSystemServiceAuthority$$ExternalSyntheticLambda70.run(D8$$SyntheticClass:0)
+08-31 21:14:10.547  5147  5147 E CS_GUEST_PREPARE: 	at com.warden.controlledsandbox.runtime.systemservice.RemoteVirtualSystemServiceAuthority.call(RemoteVirtualSystemServiceAuthority.java:587)
+08-31 21:14:10.547  5147  5147 E CS_GUEST_PREPARE: 	at com.warden.controlledsandbox.runtime.systemservice.RemoteVirtualSystemServiceAuthority.<init>(RemoteVirtualSystemServiceAuthority.java:143)
+08-31 21:14:10.547  5147  5147 E CS_GUEST_PREPARE: 	at com.warden.controlledsandbox.runtime.guest.GuestRuntimeEnvironment.prepareOnCurrentThread(GuestRuntimeEnvironment.java:496)
+08-31 21:14:10.547  5147  5147 E CS_GUEST_PREPARE: 	at com.warden.controlledsandbox.runtime.guest.GuestRuntimeEnvironment.completePreparation(GuestRuntimeEnvironment.java:193)
+08-31 21:14:10.547  5147  5147 E CS_GUEST_PREPARE: 	at com.warden.controlledsandbox.runtime.guest.GuestRuntimeEnvironment.lambda$prepare$0(GuestRuntimeEnvironment.java:162)
+08-31 21:14:10.547  5147  5147 E CS_GUEST_PREPARE: 	at com.warden.controlledsandbox.runtime.guest.GuestRuntimeEnvironment$$ExternalSyntheticLambda0.run(D8$$SyntheticClass:0)
+08-31 21:14:10.547  5147  5147 E CS_GUEST_PREPARE: 	at android.os.Handler.handleCallback(Handler.java:938)
+08-31 21:14:10.547  5147  5147 E CS_GUEST_PREPARE: 	at android.os.Handler.dispatchMessage(Handler.java:99)
+08-31 21:14:10.547  5147  5147 E CS_GUEST_PREPARE: 	at android.os.Looper.loopOnce(Looper.java:201)
+08-31 21:14:10.547  5147  5147 E CS_GUEST_PREPARE: 	at android.os.Looper.loop(Looper.java:288)
+08-31 21:14:10.547  5147  5147 E CS_GUEST_PREPARE: 	at android.app.ActivityThread.main(ActivityThread.java:8085)
+08-31 21:14:10.547  5147  5147 E CS_GUEST_PREPARE: 	at java.lang.reflect.Method.invoke(Native Method)
+08-31 21:14:10.547  5147  5147 E CS_GUEST_PREPARE: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:571)
+08-31 21:14:10.547  5147  5147 E CS_GUEST_PREPARE: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:1091)
+08-31 21:14:10.550  5147  5147 I CS_RUNTIME: PERF_TRACE_COMPLETE package=com.alibaba.android.rimet traceDomain=FRAMEWORK requestId=bcbfe5e661054c9381a8c032b13af174 operationId=bcbfe5e661054c9381a8c032b13af174-launch perfPhase=COMPLETE perfEvent=_COMPLETE perfElapsedMs=2125 physicalPid=5147 threadTid=5147 generation=0 slot=-1
+08-31 21:14:10.555  5147  5162 I CS_GUEST_PREPARE: phase=RETURN_OWNER request=bcbfe5e661054c9381a8c032b13af174 operation=bcbfe5e661054c9381a8c032b13af174-launch package=com.alibaba.android.rimet process=com.alibaba.android.rimet session=dcbf8b1b-065e-43fe-a024-06c4b998b479 generation=2 slot=5 status=FAILED elapsedMs=2134 pid=5147
+08-31 21:14:10.555  5147  5162 I CS_GUEST_OPERATION: RETURN operation=PREPARE_GUEST request=f4431522-2799-416e-bdb3-3afec339b1da status=FAILED pid=5147
+08-31 21:14:10.556  5147  5147 I CS_GUEST_PREPARE: phase=OWNER_RETURN request=bcbfe5e661054c9381a8c032b13af174 operation=bcbfe5e661054c9381a8c032b13af174-launch package=com.alibaba.android.rimet process=com.alibaba.android.rimet session=dcbf8b1b-065e-43fe-a024-06c4b998b479 generation=2 slot=5 status=FAILED elapsedMs=2133 pid=5147
+08-31 21:14:10.560  5147  5147 I CS_PROCESS_OWNER: BROKER_OWNER_LEASE_RELEASED pid=5147
+08-31 21:14:10.560  5147  5147 I Process : Sending signal. PID: 5147 SIG: 9
+08-31 21:14:10.581  1297  1681 I ActivityManager: Process com.warden.controlledsandbox.debug:guest5 (pid 5147) has died: vis SVC 
+08-31 21:14:10.582  1128  1128 I Zygote  : Process 5147 exited due to signal 9 (Killed)
+08-31 21:14:10.582  1297  1328 I libprocessgroup: Successfully killed process cgroup uid 10196 pid 5147 in 0ms
+08-31 21:14:10.580  1128  1128 I main    : type=1400 audit(0.0:7397): avc: denied { sendto } for path="/dev/socket/logdw" scontext=u:r:zygote:s0 tcontext=u:r:init:s0 tclass=unix_dgram_socket permissive=1
+08-31 21:14:10.580  1045  1045 I servicemanager: type=1400 audit(0.0:7398): avc: denied { transfer } for scontext=u:r:init:s0 tcontext=u:r:system_server:s0 tclass=binder permissive=1
+08-31 21:14:12.020  4738  5129 I CS_COMMAND: PACKAGE_LOOKUP_RETURN command=launch package=com.alibaba.android.rimet
+08-31 21:14:13.651  4801  4814 I CS_RUNTIME: PACKAGE_PERF_STAGE package=com.alibaba.android.rimet traceDomain=FRAMEWORK requestId=8d86d166-af37-4ce4-b02d-6e50d2659c3a operationId=8c5a6bfe-d8c3-4c8b-85c6-e67fa4da83ef perfPhase=BEGIN perfStage=ENSURE_INSTANCE perfElapsedMs=0 physicalPid=4801 threadTid=4814 generation=0 slot=-1
+08-31 21:14:17.184  4801  4814 I CS_RUNTIME: PACKAGE_PERF_STAGE package=com.alibaba.android.rimet traceDomain=FRAMEWORK requestId=8d86d166-af37-4ce4-b02d-6e50d2659c3a operationId=8c5a6bfe-d8c3-4c8b-85c6-e67fa4da83ef perfPhase=END perfStage=ENSURE_INSTANCE perfElapsedMs=3528 perfDurationMs=3526 physicalPid=4801 threadTid=4814 generation=0 slot=-1
+08-31 21:14:17.199  4738  5129 I CS_COMMAND: INSTANCE_READY command=launch package=com.alibaba.android.rimet user=1
+08-31 21:14:17.205  4738  5129 I CS_RUNTIME: PERF_TRACE_STAGE package=com.alibaba.android.rimet traceDomain=FRAMEWORK requestId=7ddbc8e2e3344d40ac73d3bdccd20b5f operationId=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch perfPhase=BEGIN perfStage=PACKAGE_STATE perfEvent=PACKAGE_STATE_BEGIN perfElapsedMs=3 perfDurationMs=0 physicalPid=4738 threadTid=5129 generation=0 slot=-1
+08-31 21:14:17.211  4738  5129 I CS_RUNTIME: PERF_TRACE_STAGE package=com.alibaba.android.rimet traceDomain=FRAMEWORK requestId=7ddbc8e2e3344d40ac73d3bdccd20b5f operationId=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch perfPhase=BEGIN perfStage=PACKAGE_STATE perfEvent=PACKAGE_STATE_BEGIN perfElapsedMs=12 perfDurationMs=0 physicalPid=4738 threadTid=5129 generation=0 slot=-1
+08-31 21:14:21.200  4801  4814 I CS_FGS_PROJECTION: PACKAGE_STATE service=com.amap.api.location.APSService declaredType=8
+08-31 21:14:21.200  4801  4814 I CS_FGS_PROJECTION: PACKAGE_STATE service=com.alibaba.android.teleconf.mozi.service.TeleMoziAudioForegroundService declaredType=128
+08-31 21:14:21.200  4801  4814 I CS_FGS_PROJECTION: PACKAGE_STATE service=com.alibaba.android.teleconf.service.incoming.TeleBackgroundIncomingServiceV2 declaredType=2
+08-31 21:14:21.200  4801  4814 I CS_FGS_PROJECTION: PACKAGE_STATE service=com.alibaba.android.dingtalk.live.anchor.component.LiveAnchorForegroundService declaredType=192
+08-31 21:14:21.200  4801  4814 I CS_FGS_PROJECTION: PACKAGE_STATE service=com.alibaba.android.dingtalk.live.player.notification.LivePlayForegroundServiceV2 declaredType=2
+08-31 21:14:21.200  4801  4814 I CS_FGS_PROJECTION: PACKAGE_STATE service=com.alibaba.android.teleconf.mozi.service.TeleMoziForegroundService declaredType=192
+08-31 21:14:21.201  4801  4814 I CS_FGS_PROJECTION: PACKAGE_STATE service=com.alibaba.lightapp.runtime.service.ScreenRecorderService declaredType=32
+08-31 21:14:21.202  4801  4814 I CS_FGS_PROJECTION: PACKAGE_STATE service=com.alibaba.android.mozisdk.mozi.client.screencast.ScreenCastAppService declaredType=32
+08-31 21:14:21.202  4801  4814 I CS_FGS_PROJECTION: PACKAGE_STATE service=com.alibaba.android.projection.manager.FocusNotificationServiceV2 declaredType=32
+08-31 21:14:21.202  4801  4814 I CS_FGS_PROJECTION: PACKAGE_STATE service=com.alibaba.android.projection.service.CaptureService declaredType=32
+08-31 21:14:21.202  4801  4814 I CS_FGS_PROJECTION: PACKAGE_STATE service=com.alibaba.dingtalk.flashminutes.offline.service.FlashMinutesRecordForegroundServiceV2 declaredType=128
+08-31 21:14:21.202  4801  4814 I CS_FGS_PROJECTION: PACKAGE_STATE service=com.alisports.ai.common.recorder.RecorderForegroundService declaredType=32
+08-31 21:14:21.243  4801  4814 W sandbox_packag: Accessing hidden field Landroid/content/pm/ApplicationInfo;->networkSecurityConfigRes:I (max-target-o, reflection, denied)
+08-31 21:14:21.288  4801  4814 W PackageParsing: Ignoring duplicate uses-permissions/uses-permissions-sdk-m: android.permission.QUERY_ALL_PACKAGES in package: com.alibaba.android.rimet at: Binary XML file line #272
+08-31 21:14:22.928  4738  5129 I CS_RUNTIME: PERF_TRACE_STAGE package=com.alibaba.android.rimet traceDomain=FRAMEWORK requestId=7ddbc8e2e3344d40ac73d3bdccd20b5f operationId=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch perfPhase=END perfStage=PACKAGE_STATE perfEvent=PACKAGE_STATE_END perfElapsedMs=5727 perfDurationMs=5716 physicalPid=4738 threadTid=5129 generation=0 slot=-1
+08-31 21:14:22.930  4738  5129 I CS_RUNTIME: PERF_TRACE_STAGE package=com.alibaba.android.rimet traceDomain=FRAMEWORK requestId=7ddbc8e2e3344d40ac73d3bdccd20b5f operationId=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch perfPhase=BEGIN perfStage=PACKAGE_UNIVERSE perfEvent=PACKAGE_UNIVERSE_BEGIN perfElapsedMs=5731 perfDurationMs=0 physicalPid=4738 threadTid=5129 generation=0 slot=-1
+08-31 21:14:26.411  4801  4814 I CS_FGS_PROJECTION: PACKAGE_STATE service=com.amap.api.location.APSService declaredType=8
+08-31 21:14:26.412  4801  4814 I CS_FGS_PROJECTION: PACKAGE_STATE service=com.alibaba.android.teleconf.mozi.service.TeleMoziAudioForegroundService declaredType=128
+08-31 21:14:26.412  4801  4814 I CS_FGS_PROJECTION: PACKAGE_STATE service=com.alibaba.android.teleconf.service.incoming.TeleBackgroundIncomingServiceV2 declaredType=2
+08-31 21:14:26.412  4801  4814 I CS_FGS_PROJECTION: PACKAGE_STATE service=com.alibaba.android.dingtalk.live.anchor.component.LiveAnchorForegroundService declaredType=192
+08-31 21:14:26.412  4801  4814 I CS_FGS_PROJECTION: PACKAGE_STATE service=com.alibaba.android.dingtalk.live.player.notification.LivePlayForegroundServiceV2 declaredType=2
+08-31 21:14:26.412  4801  4814 I CS_FGS_PROJECTION: PACKAGE_STATE service=com.alibaba.android.teleconf.mozi.service.TeleMoziForegroundService declaredType=192
+08-31 21:14:26.412  4801  4814 I CS_FGS_PROJECTION: PACKAGE_STATE service=com.alibaba.lightapp.runtime.service.ScreenRecorderService declaredType=32
+08-31 21:14:26.412  4801  4814 I CS_FGS_PROJECTION: PACKAGE_STATE service=com.alibaba.android.mozisdk.mozi.client.screencast.ScreenCastAppService declaredType=32
+08-31 21:14:26.412  4801  4814 I CS_FGS_PROJECTION: PACKAGE_STATE service=com.alibaba.android.projection.manager.FocusNotificationServiceV2 declaredType=32
+08-31 21:14:26.412  4801  4814 I CS_FGS_PROJECTION: PACKAGE_STATE service=com.alibaba.android.projection.service.CaptureService declaredType=32
+08-31 21:14:26.412  4801  4814 I CS_FGS_PROJECTION: PACKAGE_STATE service=com.alibaba.dingtalk.flashminutes.offline.service.FlashMinutesRecordForegroundServiceV2 declaredType=128
+08-31 21:14:26.412  4801  4814 I CS_FGS_PROJECTION: PACKAGE_STATE service=com.alisports.ai.common.recorder.RecorderForegroundService declaredType=32
+08-31 21:14:26.445  4801  4814 W sandbox_packag: Accessing hidden field Landroid/content/pm/ApplicationInfo;->networkSecurityConfigRes:I (max-target-o, reflection, denied)
+08-31 21:14:26.480  4801  4814 W PackageParsing: Ignoring duplicate uses-permissions/uses-permissions-sdk-m: android.permission.QUERY_ALL_PACKAGES in package: com.alibaba.android.rimet at: Binary XML file line #272
+08-31 21:14:27.483  2402  2402 I m.android.phone: type=1400 audit(0.0:7399): avc: denied { sendto } for path="/dev/socket/logdw" scontext=u:r:radio:s0 tcontext=u:r:init:s0 tclass=unix_dgram_socket permissive=1
+08-31 21:14:27.490  2402  2402 I m.android.phone: type=1400 audit(0.0:7400): avc: denied { call } for scontext=u:r:radio:s0 tcontext=u:r:init:s0 tclass=binder permissive=1
+08-31 21:14:27.500  1167  1167 I rild    : type=1400 audit(0.0:7401): avc: denied { call } for scontext=u:r:init:s0 tcontext=u:r:radio:s0 tclass=binder permissive=1
+08-31 21:14:27.516  1045  1045 I servicemanager: type=1400 audit(0.0:7402): avc: denied { transfer } for scontext=u:r:init:s0 tcontext=u:r:radio:s0 tclass=binder permissive=1
+08-31 21:14:28.102  4801  4814 I CS_FGS_PROJECTION: PACKAGE_STATE service=com.warden.controlledsandbox.fixture.FixtureService declaredType=1
+08-31 21:14:28.105  4801  4814 W sandbox_packag: Accessing hidden field Landroid/content/pm/ApplicationInfo;->networkSecurityConfigRes:I (max-target-o, reflection, denied)
+08-31 21:14:28.173  4738  5129 I CS_RUNTIME: PERF_TRACE_STAGE package=com.alibaba.android.rimet traceDomain=FRAMEWORK requestId=7ddbc8e2e3344d40ac73d3bdccd20b5f operationId=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch perfPhase=END perfStage=PACKAGE_UNIVERSE perfEvent=PACKAGE_UNIVERSE_END perfElapsedMs=10974 perfDurationMs=5243 physicalPid=4738 threadTid=5129 generation=0 slot=-1
+08-31 21:14:28.176  4738  5129 I CS_RUNTIME: PERF_TRACE_STAGE package=com.alibaba.android.rimet traceDomain=FRAMEWORK requestId=7ddbc8e2e3344d40ac73d3bdccd20b5f operationId=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch perfPhase=END perfStage=PACKAGE_STATE perfEvent=PACKAGE_STATE_END perfElapsedMs=10976 perfDurationMs=10976 physicalPid=4738 threadTid=5129 generation=0 slot=-1
+08-31 21:14:28.177  4738  5129 I CS_RUNTIME: PERF_TRACE_STAGE package=com.alibaba.android.rimet traceDomain=FRAMEWORK requestId=7ddbc8e2e3344d40ac73d3bdccd20b5f operationId=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch perfPhase=BEGIN perfStage=BROKER_CONNECT perfEvent=BROKER_CONNECT_BEGIN perfElapsedMs=10977 perfDurationMs=0 physicalPid=4738 threadTid=5129 generation=0 slot=-1
+08-31 21:14:28.243  4772  4788 I CS_BROKER_LAUNCH: ENTRY request=7ddbc8e2e3344d40ac73d3bdccd20b5f operation=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch package=com.alibaba.android.rimet user=1 process=com.alibaba.android.rimet awaitReadiness=false pid=4772
+08-31 21:14:28.243  4772  4788 I CS_RUNTIME: PERF_TRACE_STAGE package=com.alibaba.android.rimet traceDomain=FRAMEWORK requestId=7ddbc8e2e3344d40ac73d3bdccd20b5f operationId=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch perfPhase=BEGIN perfStage=CLIENT_LAUNCH_BEGIN perfEvent=CLIENT_LAUNCH_BEGIN_BEGIN perfElapsedMs=0 perfDurationMs=0 physicalPid=4772 threadTid=4788 generation=0 slot=-1
+08-31 21:14:28.245  4772  4788 I CS_RUNTIME: PERF_TRACE_STAGE package=com.alibaba.android.rimet traceDomain=FRAMEWORK requestId=7ddbc8e2e3344d40ac73d3bdccd20b5f operationId=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch perfPhase=END perfStage=CLIENT_LAUNCH_BEGIN perfEvent=CLIENT_LAUNCH_BEGIN_END perfElapsedMs=1 perfDurationMs=1 physicalPid=4772 threadTid=4788 generation=0 slot=-1
+08-31 21:14:28.246  4772  4788 I CS_RUNTIME: GUEST_LAUNCH_STAGE package=com.alibaba.android.rimet traceDomain=GUEST requestId=7ddbc8e2e3344d40ac73d3bdccd20b5f operationId=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch launchStage=REQUEST_ACCEPTED launchStageAtElapsedMs=0 processName=com.alibaba.android.rimet virtualUserId=1 physicalPid=4772 threadTid=4788 component=com.alibaba.android.rimet.biz.LaunchHomeActivity generation=0 slot=-1
+08-31 21:14:28.247  4772  4788 I CS_RUNTIME: GUEST_LAUNCH_STAGE package=com.alibaba.android.rimet traceDomain=GUEST requestId=7ddbc8e2e3344d40ac73d3bdccd20b5f operationId=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch launchStage=PREPARE_BEGIN launchStageAtElapsedMs=1 processName=com.alibaba.android.rimet virtualUserId=1 physicalPid=4772 threadTid=4788 component=com.alibaba.android.rimet.biz.LaunchHomeActivity generation=0 slot=-1
+08-31 21:14:28.248  4772  4788 I CS_RUNTIME: PERF_TRACE_STAGE package=com.alibaba.android.rimet traceDomain=FRAMEWORK requestId=7ddbc8e2e3344d40ac73d3bdccd20b5f operationId=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch perfPhase=BEGIN perfStage=GUEST_PREPARE perfEvent=GUEST_PREPARE_BEGIN perfElapsedMs=5 perfDurationMs=0 physicalPid=4772 threadTid=4788 generation=0 slot=-1
+08-31 21:14:28.249  4772  4788 I CS_RUNTIME: GUEST_LIFECYCLE_STAGE package=com.alibaba.android.rimet traceDomain=BROKER requestId=7ddbc8e2e3344d40ac73d3bdccd20b5f operationId=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch launchStage=BEGIN launchStageAtElapsedMs=0 processName=com.alibaba.android.rimet virtualUserId=1 physicalPid=4772 threadTid=4788 component=com.alibaba.android.rimet.biz.LaunchHomeActivity generation=0 slot=-1
+08-31 21:14:28.284  4772  4784 W System  : A resource failed to call close. 
+08-31 21:14:28.292  4772  4788 I CS_RUNTIME: GUEST_LIFECYCLE_STAGE package=com.alibaba.android.rimet traceDomain=BROKER requestId=7ddbc8e2e3344d40ac73d3bdccd20b5f operationId=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch launchStage=INPUT_VALIDATE_SKIPPED_CACHED_ARTIFACT launchStageAtElapsedMs=43 processName=com.alibaba.android.rimet virtualUserId=1 physicalPid=4772 threadTid=4788 component=com.alibaba.android.rimet.biz.LaunchHomeActivity generation=0 slot=-1
+08-31 21:14:28.293  4772  4788 I CS_RUNTIME: GUEST_LIFECYCLE_STAGE package=com.alibaba.android.rimet traceDomain=BROKER requestId=7ddbc8e2e3344d40ac73d3bdccd20b5f operationId=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch launchStage=PROCESS_VALIDATE_SKIPPED_CACHED_ARTIFACT launchStageAtElapsedMs=45 processName=com.alibaba.android.rimet virtualUserId=1 physicalPid=4772 threadTid=4788 component=com.alibaba.android.rimet.biz.LaunchHomeActivity generation=0 slot=-1
+08-31 21:14:28.294  4772  4788 I CS_RUNTIME: GUEST_LIFECYCLE_STAGE package=com.alibaba.android.rimet traceDomain=BROKER requestId=7ddbc8e2e3344d40ac73d3bdccd20b5f operationId=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch launchStage=REVISION_READ_RETURN launchStageAtElapsedMs=46 processName=com.alibaba.android.rimet virtualUserId=1 physicalPid=4772 threadTid=4788 component=com.alibaba.android.rimet.biz.LaunchHomeActivity generation=0 slot=-1
+08-31 21:14:28.295  4772  4788 I CS_RUNTIME: GUEST_LIFECYCLE_STAGE package=com.alibaba.android.rimet session=dcbf8b1b-065e-43fe-a024-06c4b998b479 traceDomain=BROKER requestId=7ddbc8e2e3344d40ac73d3bdccd20b5f operationId=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch launchStage=REVISION_CLEANUP_RETURN launchStageAtElapsedMs=47 processName=com.alibaba.android.rimet virtualUserId=1 physicalPid=4772 threadTid=4788 component=com.alibaba.android.rimet.biz.LaunchHomeActivity generation=2 slot=5
+08-31 21:14:28.296  4772  4788 I CS_RUNTIME: GUEST_LIFECYCLE_STAGE package=com.alibaba.android.rimet traceDomain=BROKER requestId=7ddbc8e2e3344d40ac73d3bdccd20b5f operationId=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch launchStage=INDEX_BEGIN launchStageAtElapsedMs=47 processName=com.alibaba.android.rimet virtualUserId=1 physicalPid=4772 threadTid=4788 component=com.alibaba.android.rimet.biz.LaunchHomeActivity generation=0 slot=-1
+08-31 21:14:28.348  4772  4788 I CS_RUNTIME: GUEST_LIFECYCLE_STAGE package=com.alibaba.android.rimet traceDomain=BROKER requestId=7ddbc8e2e3344d40ac73d3bdccd20b5f operationId=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch launchStage=INDEX_RETURN launchStageAtElapsedMs=99 processName=com.alibaba.android.rimet virtualUserId=1 physicalPid=4772 threadTid=4788 component=com.alibaba.android.rimet.biz.LaunchHomeActivity generation=0 slot=-1
+08-31 21:14:28.349  4772  4788 I CS_RUNTIME: GUEST_LIFECYCLE_STAGE package=com.alibaba.android.rimet traceDomain=BROKER requestId=7ddbc8e2e3344d40ac73d3bdccd20b5f operationId=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch launchStage=SLOT_PAD_RETURN launchStageAtElapsedMs=101 processName=com.alibaba.android.rimet virtualUserId=1 physicalPid=4772 threadTid=4788 component=com.alibaba.android.rimet.biz.LaunchHomeActivity generation=0 slot=-1
+08-31 21:14:28.350  4772  4788 I CS_RUNTIME: GUEST_LIFECYCLE_STAGE package=com.alibaba.android.rimet session=dcbf8b1b-065e-43fe-a024-06c4b998b479 traceDomain=BROKER requestId=7ddbc8e2e3344d40ac73d3bdccd20b5f operationId=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch launchStage=SESSION_ALLOCATE_RETURN launchStageAtElapsedMs=102 processName=com.alibaba.android.rimet virtualUserId=1 physicalPid=4772 threadTid=4788 component=com.alibaba.android.rimet.biz.LaunchHomeActivity generation=2 slot=5
+08-31 21:14:28.351  4772  4788 I CS_RUNTIME: PERF_TRACE_STAGE package=com.alibaba.android.rimet traceDomain=FRAMEWORK requestId=7ddbc8e2e3344d40ac73d3bdccd20b5f operationId=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch perfPhase=END perfStage=GUEST_PREPARE perfEvent=GUEST_PREPARE_END perfElapsedMs=108 perfDurationMs=103 physicalPid=4772 threadTid=4788 generation=0 slot=-1
+08-31 21:14:28.352  4772  4788 I CS_RUNTIME: GUEST_LAUNCH_STAGE status=FAILED traceDomain=GUEST requestId=7ddbc8e2e3344d40ac73d3bdccd20b5f operationId=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch launchStage=PREPARE_RETURN launchStageAtElapsedMs=107 physicalPid=4772 threadTid=4788 error=java.lang.IllegalStateException message=SESSION_BUSY:PREPARING generation=0 slot=-1
+08-31 21:14:28.353  4772  4788 I CS_BROKER_LAUNCH: PREPARE_RETURN request=7ddbc8e2e3344d40ac73d3bdccd20b5f operation=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch status=FAILED session= generation=0 pid=4772
+08-31 21:14:28.359  4738  5129 I CS_RUNTIME: PERF_TRACE_STAGE package=com.alibaba.android.rimet traceDomain=FRAMEWORK requestId=7ddbc8e2e3344d40ac73d3bdccd20b5f operationId=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch perfPhase=END perfStage=BROKER_CONNECT perfEvent=BROKER_CONNECT_END perfElapsedMs=11160 perfDurationMs=183 physicalPid=4738 threadTid=5129 generation=0 slot=-1
+08-31 21:14:28.362  4738  5129 I CS_RUNTIME: PERF_TRACE_COMPLETE package=com.alibaba.android.rimet traceDomain=FRAMEWORK requestId=7ddbc8e2e3344d40ac73d3bdccd20b5f operationId=7ddbc8e2e3344d40ac73d3bdccd20b5f-launch perfPhase=COMPLETE perfEvent=_COMPLETE perfElapsedMs=11162 physicalPid=4738 threadTid=5129 generation=0 slot=-1
+08-31 21:14:28.365  4738  5129 E CS_COMMAND: FAIL launch com.alibaba.android.rimet
+08-31 21:14:28.365  4738  5129 E CS_COMMAND: java.lang.IllegalStateException: launch failed: status=FAILED, errorType=java.lang.IllegalStateException, errorMessage=SESSION_BUSY:PREPARING
+08-31 21:14:28.365  4738  5129 E CS_COMMAND: 	at com.warden.controlledsandbox.DebugCommandActivity.requireStatus(DebugCommandActivity.java:1326)
+08-31 21:14:28.365  4738  5129 E CS_COMMAND: 	at com.warden.controlledsandbox.DebugCommandActivity.execute(DebugCommandActivity.java:428)
+08-31 21:14:28.365  4738  5129 E CS_COMMAND: 	at com.warden.controlledsandbox.DebugCommandActivity.lambda$executeIntent$0(DebugCommandActivity.java:79)
+08-31 21:14:28.365  4738  5129 E CS_COMMAND: 	at com.warden.controlledsandbox.DebugCommandActivity.$r8$lambda$xK_GDHzJHkHoe9Eag6e_Llj7sHQ(Unknown Source:0)
+08-31 21:14:28.365  4738  5129 E CS_COMMAND: 	at com.warden.controlledsandbox.DebugCommandActivity$$ExternalSyntheticLambda6.run(D8$$SyntheticClass:0)
+08-31 21:14:28.365  4738  5129 E CS_COMMAND: 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1167)
+08-31 21:14:28.365  4738  5129 E CS_COMMAND: 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:641)
+08-31 21:14:28.365  4738  5129 E CS_COMMAND: 	at java.lang.Thread.run(Thread.java:920)
+08-31 21:14:28.373  1044  1044 I lmkd    : type=1400 audit(0.0:7403): avc: denied { write } for name="oom_score_adj" dev="proc" ino=39763 scontext=u:r:init:s0 tcontext=u:r:untrusted_app:s0:c187,c256,c512,c768 tclass=file permissive=1
+08-31 21:14:28.383  5029  5029 I d.rimet:preload: type=1400 audit(0.0:7404): avc: denied { read } for scontext=u:r:untrusted_app:s0:c196,c256,c512,c768 tcontext=u:r:init:s0 tclass=unix_stream_socket permissive=1
+08-31 21:14:28.383  5029  5029 I d.rimet:preload: type=1400 audit(0.0:7405): avc: denied { call } for scontext=u:r:untrusted_app:s0:c196,c256,c512,c768 tcontext=u:r:init:s0 tclass=binder permissive=1
+08-31 21:14:28.468  1297  1681 D RecentTaskMonitor: onTaskFocusChanged [FALSE] 2794
+08-31 21:14:28.468  1297  1681 D RecentTaskMonitor: onTaskFocusChanged [TRUE] 2 ignoreTFC false
+08-31 21:14:28.460  1143  1143 I wifi@1.0-servic: type=1400 audit(0.0:7406): avc: denied { write } for scontext=u:r:init:s0 tcontext=u:r:init:s0 tclass=netlink_route_socket permissive=1
+08-31 21:14:28.490  1146  1210 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-31 21:14:28.501  1297  3213 D system_server: Features: 0 0 0
+08-31 21:14:28.501  1297  3213 E system_server: vulkan version is 4202692
+08-31 21:14:28.533  1297  1297 I android.anim: type=1400 audit(0.0:7414): avc: denied { read } for scontext=u:r:system_server:s0 tcontext=u:r:init:s0 tclass=unix_stream_socket permissive=1
+08-31 21:14:28.616  1613  1613 I app.lawnchair: type=1400 audit(0.0:7415): avc: denied { read } for scontext=u:r:platform_app:s0:c512,c768 tcontext=u:r:init:s0 tclass=unix_stream_socket permissive=1
+08-31 21:14:28.656  1613  1613 I RenderThread: type=1400 audit(0.0:7416): avc: denied { ioctl } for path="/dev/vaddress" dev="tmpfs" ino=277 ioctlcmd=0x4c19 scontext=u:r:platform_app:s0:c512,c768 tcontext=u:object_r:device:s0 tclass=chr_file permissive=1
+08-31 21:14:28.670  1613  1613 I app.lawnchair: type=1400 audit(0.0:7417): avc: denied { sendto } for path="/dev/socket/logdw" scontext=u:r:platform_app:s0:c512,c768 tcontext=u:r:init:s0 tclass=unix_dgram_socket permissive=1
+08-31 21:14:28.688  1297  1317 D RecentTaskMonitor: task null or not sub display in notifyDisplayOpened
+08-31 21:14:28.688  1297  1317 D RecentTaskMonitor: VAddressShellNotifier#notifyOpenTab :{"uri":"player\/tab","need_response":false,"params":{"id":"task:2","displayId":0,"userId":0,"name":"Lawnchair","originName":"Lawnchair","packageName":"app.lawnchair","launcher":true,"newTask":false,"icon":"iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAAXNSR0IArs4c6QAAAARzQklUCAgICHwIZIgAAAQ2SURBVEiJdZVbiFVVGMd\/397rnOOcM47HZrIks7yggTe8gDCoYIVKVogaPUQ9DNRDT0VFEArdiRIf6sGKIvDNIOhiJiqDCMrQICWlMto9s8lx4jiXc\/Y5e+\/19bD32XvPHluw9l5867v9v++\/1pJNn+gKV\/ka9E4FVAEg\/kXrjEwzG+1lb88RnlryMgtnnqfW6ubk8A4ODL16Y8zv6pPNH+kIaM8UhzlHaOrMZoIKsGd5H1vnHspaJsb39\/8zYVTpJp\/1\/zjPilFY1jXAfd2fgZ\/fFUB5dvHzFUOoQm5oxmN7d1pprLK04ywmCPPmSbCN1a\/EqL3ZVpqF2FiWCSCAWmV5ZSDO\/iZDoIsaDhawoPEkmYqGeVmsG8vPDG+GQCEgCtT++0AL\/h6byzQEbRiPrYPuCrx\/Gjw\/hy7u5cXaKrxmiRmuNx0m8OHQMymCqRkqFcdj1yph75bUIZaoKQqiwm\/1Zew+eRjbcqZm78OpPzfwxXAfsmm\/jWJru+qganHDOi9ucdi2qszRC\/DWMQhCUiXA2pCg6bGgOMiK8mnunXOCH2orOTe+joHxBzDFmcjGt63igGiKUlHCwCdoNtjzUIGH11b45ryy\/wTUm2mZFMVaSxg0CYIAtRZEcBwXxxRx3QImKYskdoDgOAVMEV770sP3x9m5vhMbwptHpuoJLsbtwHEsqKKRNYiACkbb9c2chojzgiMFjIF3j3vMrjTYvrKMcZQ3DkNg4e4eeKIXJprCvqNuhgESJQ0YwjgbyQXKBLm9Cr1Li9SCBluXdzDZVDx\/kh1rDEW3SP95Hw0LsbGk5gomIVbmQIlCWGrx78YzyLwR+u\/YRckRHv\/5c17p6mXn2ru40RC+Hf2Vp7\/\/jtLgFophFRw3IYBIVAlD2G4YePOvUF9yGW\/eVcJyHYDjs3dTclwmgibv3baNicYkp65fYlPPEoa9gMl7rlNbeQjXlin9MY+Oy4so\/7IguTCNWsWb\/ztj6wfxe0aTPnSq4WD1QZaaWwAou0XOBX\/x+rUT\/GhH2We38uitq5lRKvLC+EnqWqex6BKNRUOM1ap0Dayn9NNCZPHFgxpUa+THS50beLJzNQCXJ6+x\/cIHeBWDFAzqCtpssb97G4\/MWcOn9Qs8d+N4ShIiCjsTnZiwaxSxme7H97lfn6S\/eZEDI2c461\/FzjI4RQMmpqAY9oweox42wbiI9dG4we02a7mGLLzyTnrja9wda7H1FvghFNx4th3HqlZRPwTPR11BOorgZBhEdCaM2Nx9G8dySgJFAy4RrQhRleRhEACjaNmNjcKYiYrElYgCaDA1e1UQQRydcnumR0TTb6SalFWTIrXdgxG1GqWWZp9wOSNK1xkEbfU4WlYfFBHUYP0xgVm5I5yCIj+yZJiOLDc8Q+D34crHolRvppG6VRwkgp5\/PuO6awpdBW1Z1b3\/AdZnMg6ggu5uAAAAAElFTkSuQmCC","canChangeAppOrientation":false,"canReceiveFile":false,"pid":1613,"uid":10042,"action":"open"}}
+08-31 21:14:28.703  1061  1074 D nemuinit: start name: vapi, operation: {"uri":"/tools/cmd","method":"POST","params":{"action":"switch_fps_mode","packageName":""}}, id: 227
+08-31 21:14:28.700  1061  1061 I nemuinit: type=1400 audit(0.0:7418): avc: denied { call } for scontext=u:r:init:s0 tcontext=u:r:system_app:s0 tclass=binder permissive=1
+08-31 21:14:28.705  1061  5250 D nemuinit: Proxy: use callback: 1951, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/cmd","method":"POST","params":{"action":"switch_fps_mode","packageName":""}}, res: 
+08-31 21:14:28.705  1061  5250 D nemuinit: Proxy: not handleNemuInitMessage, use next callback
+08-31 21:14:28.709  1297  1681 D RecentTaskMonitor: handleTabMessage name=vapi params={"uri":"/tools/cmd","method":"POST","params":{"action":"switch_fps_mode","packageName":""}}
+08-31 21:14:28.711  1061  5250 D nemuinit: Proxy: use callback: 1297, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/cmd","method":"POST","params":{"action":"switch_fps_mode","packageName":""}}, res: 
+08-31 21:14:28.711  1061  5250 D nemuinit: Proxy: not handleNemuInitMessage, use next callback
+08-31 21:14:28.727  1613  1613 I FEED    : 1
+08-31 21:14:28.727  1613  1613 I FEED    : 2
+08-31 21:14:28.741  1297  1681 W ActivityManager: Unable to start service Intent { act=com.android.launcher3.WINDOW_OVERLAY dat=app://app.lawnchair:10042?v=7&cv=9 pkg=com.google.android.googlequicksearchbox } U=0: not found
+08-31 21:14:28.747  1061  5250 D nemuinit: Proxy: use callback: 1452, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/cmd","method":"POST","params":{"action":"switch_fps_mode","packageName":""}}, res: {"errcode":0,"message":"OK"}
+08-31 21:14:28.747  1061  5250 D nemuinit: Proxy: finish handleNemuInitMessage
+08-31 21:14:28.763  1061  1074 D nemuinit: start name: vapi, operation: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}, id: 228
+08-31 21:14:28.764  1061  1074 D nemuinit: start name: vapi, operation: {"uri":"/tools/cmd","method":"POST","params":{"action":"switch_fps_mode","packageName":""}}, id: 229
+08-31 21:14:28.764  1061  5252 D nemuinit: Proxy: use callback: 1951, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/cmd","method":"POST","params":{"action":"switch_fps_mode","packageName":""}}, res: 
+08-31 21:14:28.764  1061  5252 D nemuinit: Proxy: not handleNemuInitMessage, use next callback
+08-31 21:14:28.764  1297  1681 D RecentTaskMonitor: handleTabMessage name=vapi params={"uri":"/tools/cmd","method":"POST","params":{"action":"switch_fps_mode","packageName":""}}
+08-31 21:14:28.765  1061  1074 D nemuinit: start name: vapi, operation: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}, id: 230
+08-31 21:14:28.765  1061  5252 D nemuinit: Proxy: use callback: 1297, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/cmd","method":"POST","params":{"action":"switch_fps_mode","packageName":""}}, res: 
+08-31 21:14:28.765  1061  5252 D nemuinit: Proxy: not handleNemuInitMessage, use next callback
+08-31 21:14:28.766  1061  5252 D nemuinit: Proxy: use callback: 1452, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/cmd","method":"POST","params":{"action":"switch_fps_mode","packageName":""}}, res: {"errcode":0,"message":"OK"}
+08-31 21:14:28.766  1061  5252 D nemuinit: Proxy: finish handleNemuInitMessage
+08-31 21:14:28.766  1061  5251 D nemuinit: Proxy: use callback: 1951, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}, res: 
+08-31 21:14:28.766  1061  5251 D nemuinit: Proxy: not handleNemuInitMessage, use next callback
+08-31 21:14:28.767  1061  5253 D nemuinit: Proxy: use callback: 1951, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}, res: 
+08-31 21:14:28.767  1061  5253 D nemuinit: Proxy: not handleNemuInitMessage, use next callback
+08-31 21:14:28.767  1297  3213 D RecentTaskMonitor: handleTabMessage name=vapi params={"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}
+08-31 21:14:28.767  1061  1074 D nemuinit: start name: vapi, operation: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}, id: 231
+08-31 21:14:28.767  1061  5253 D nemuinit: Proxy: use callback: 1297, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}, res: 
+08-31 21:14:28.767  1061  5253 D nemuinit: Proxy: not handleNemuInitMessage, use next callback
+08-31 21:14:28.767  1297  1681 D RecentTaskMonitor: handleTabMessage name=vapi params={"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}
+08-31 21:14:28.767  1061  1074 D nemuinit: start name: vapi, operation: {"uri":"/tools/cmd","method":"POST","params":{"action":"switch_fps_mode","packageName":""}}, id: 232
+08-31 21:14:28.768  1061  5251 D nemuinit: Proxy: use callback: 1297, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}, res: 
+08-31 21:14:28.768  1061  5251 D nemuinit: Proxy: not handleNemuInitMessage, use next callback
+08-31 21:14:28.768  1061  5254 D nemuinit: Proxy: use callback: 1951, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}, res: 
+08-31 21:14:28.768  1061  5254 D nemuinit: Proxy: not handleNemuInitMessage, use next callback
+08-31 21:14:28.768  1297  1681 D RecentTaskMonitor: handleTabMessage name=vapi params={"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}
+08-31 21:14:28.768  1061  5254 D nemuinit: Proxy: use callback: 1297, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}, res: 
+08-31 21:14:28.768  1061  5254 D nemuinit: Proxy: not handleNemuInitMessage, use next callback
+08-31 21:14:28.769  1061  5253 D nemuinit: Proxy: use callback: 1452, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}, res: {"errcode":0,"message":"OK"}
+08-31 21:14:28.769  1061  5254 D nemuinit: Proxy: use callback: 1452, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}, res: {"errcode":0,"message":"OK"}
+08-31 21:14:28.769  1061  5254 D nemuinit: Proxy: finish handleNemuInitMessage
+08-31 21:14:28.769  1061  5253 D nemuinit: Proxy: finish handleNemuInitMessage
+08-31 21:14:28.769  1061  5251 D nemuinit: Proxy: use callback: 1452, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}, res: {"errcode":0,"message":"OK"}
+08-31 21:14:28.769  1061  5251 D nemuinit: Proxy: finish handleNemuInitMessage
+08-31 21:14:28.770  1061  1074 D nemuinit: start name: vapi, operation: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}, id: 233
+08-31 21:14:28.770  1061  5255 D nemuinit: Proxy: use callback: 1951, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/cmd","method":"POST","params":{"action":"switch_fps_mode","packageName":""}}, res: 
+08-31 21:14:28.770  1061  5255 D nemuinit: Proxy: not handleNemuInitMessage, use next callback
+08-31 21:14:28.770  1061  5256 D nemuinit: Proxy: use callback: 1951, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}, res: 
+08-31 21:14:28.770  1061  5256 D nemuinit: Proxy: not handleNemuInitMessage, use next callback
+08-31 21:14:28.770  1297  1354 D RecentTaskMonitor: handleTabMessage name=vapi params={"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}
+08-31 21:14:28.770  1061  1074 D nemuinit: start name: vapi, operation: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_gamepad_guid","guid":"off","name":"off","type":"off"}}, id: 234
+08-31 21:14:28.770  1297  4561 D RecentTaskMonitor: handleTabMessage name=vapi params={"uri":"/tools/cmd","method":"POST","params":{"action":"switch_fps_mode","packageName":""}}
+08-31 21:14:28.770  1061  1074 D nemuinit: start name: vapi, operation: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}, id: 235
+08-31 21:14:28.770  1061  5255 D nemuinit: Proxy: use callback: 1297, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/cmd","method":"POST","params":{"action":"switch_fps_mode","packageName":""}}, res: 
+08-31 21:14:28.770  1061  5255 D nemuinit: Proxy: not handleNemuInitMessage, use next callback
+08-31 21:14:28.771  1061  1074 D nemuinit: start name: vapi, operation: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_gamepad_guid","guid":"off","name":"off","type":"off"}}, id: 236
+08-31 21:14:28.771  1061  1074 D nemuinit: start name: vapi, operation: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}, id: 237
+08-31 21:14:28.771  1061  5256 D nemuinit: Proxy: use callback: 1297, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}, res: 
+08-31 21:14:28.771  1061  5256 D nemuinit: Proxy: not handleNemuInitMessage, use next callback
+08-31 21:14:28.771  1061  5255 D nemuinit: Proxy: use callback: 1452, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/cmd","method":"POST","params":{"action":"switch_fps_mode","packageName":""}}, res: {"errcode":0,"message":"OK"}
+08-31 21:14:28.771  1061  5255 D nemuinit: Proxy: finish handleNemuInitMessage
+08-31 21:14:28.771  1061  5259 D nemuinit: Proxy: use callback: 1951, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_gamepad_guid","guid":"off","name":"off","type":"off"}}, res: 
+08-31 21:14:28.771  1061  5259 D nemuinit: Proxy: not handleNemuInitMessage, use next callback
+08-31 21:14:28.771  1061  5258 D nemuinit: Proxy: use callback: 1951, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}, res: 
+08-31 21:14:28.771  1061  5258 D nemuinit: Proxy: not handleNemuInitMessage, use next callback
+08-31 21:14:28.771  1297  1354 D RecentTaskMonitor: handleTabMessage name=vapi params={"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}
+08-31 21:14:28.771  1061  5258 D nemuinit: Proxy: use callback: 1297, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}, res: 
+08-31 21:14:28.771  1061  5256 D nemuinit: Proxy: use callback: 1452, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}, res: {"errcode":0,"message":"OK"}
+08-31 21:14:28.771  1061  5256 D nemuinit: Proxy: finish handleNemuInitMessage
+08-31 21:14:28.771  1061  5258 D nemuinit: Proxy: not handleNemuInitMessage, use next callback
+08-31 21:14:28.771  1297  2019 D RecentTaskMonitor: handleTabMessage name=vapi params={"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_gamepad_guid","guid":"off","name":"off","type":"off"}}
+08-31 21:14:28.772  1061  5260 D nemuinit: Proxy: use callback: 1951, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}, res: 
+08-31 21:14:28.772  1061  5260 D nemuinit: Proxy: not handleNemuInitMessage, use next callback
+08-31 21:14:28.772  1297  1354 D RecentTaskMonitor: handleTabMessage name=vapi params={"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}
+08-31 21:14:28.772  1061  5259 D nemuinit: Proxy: use callback: 1297, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_gamepad_guid","guid":"off","name":"off","type":"off"}}, res: 
+08-31 21:14:28.772  1061  5259 D nemuinit: Proxy: not handleNemuInitMessage, use next callback
+08-31 21:14:28.772  1061  5258 D nemuinit: Proxy: use callback: 1452, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}, res: {"errcode":0,"message":"OK"}
+08-31 21:14:28.773  1061  5258 D nemuinit: Proxy: finish handleNemuInitMessage
+08-31 21:14:28.773  1061  5260 D nemuinit: Proxy: use callback: 1297, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}, res: 
+08-31 21:14:28.773  1061  5260 D nemuinit: Proxy: not handleNemuInitMessage, use next callback
+08-31 21:14:28.773  1061  5257 D nemuinit: Proxy: use callback: 1951, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_gamepad_guid","guid":"off","name":"off","type":"off"}}, res: 
+08-31 21:14:28.773  1061  5257 D nemuinit: Proxy: not handleNemuInitMessage, use next callback
+08-31 21:14:28.773  1061  5259 D nemuinit: Proxy: use callback: 1452, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_gamepad_guid","guid":"off","name":"off","type":"off"}}, res: {"errcode":0,"message":"OK"}
+08-31 21:14:28.774  1061  5259 D nemuinit: Proxy: finish handleNemuInitMessage
+08-31 21:14:28.774  1061  5260 D nemuinit: Proxy: use callback: 1452, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_input_device_list","device":8,"packageName":"app.lawnchair","pid":1613,"uid":10042}}, res: {"errcode":0,"message":"OK"}
+08-31 21:14:28.774  1061  5260 D nemuinit: Proxy: finish handleNemuInitMessage
+08-31 21:14:28.774  1297  1681 D RecentTaskMonitor: handleTabMessage name=vapi params={"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_gamepad_guid","guid":"off","name":"off","type":"off"}}
+08-31 21:14:28.775  1061  5257 D nemuinit: Proxy: use callback: 1297, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_gamepad_guid","guid":"off","name":"off","type":"off"}}, res: 
+08-31 21:14:28.775  1061  5257 D nemuinit: Proxy: not handleNemuInitMessage, use next callback
+08-31 21:14:28.775  1061  5257 D nemuinit: Proxy: use callback: 1452, handleNemuInitMessage, name: vapi, params: {"uri":"/tools/inputdevice","method":"POST","params":{"action":"set_gamepad_guid","guid":"off","name":"off","type":"off"}}, res: {"errcode":0,"message":"OK"}
+08-31 21:14:28.775  1061  5257 D nemuinit: Proxy: finish handleNemuInitMessage
+08-31 21:14:28.794  1951  1951 W WidgetOperateReceiver: onReceive: intent = Intent { act=com.mumu.LAUNCHER_LIFECYCLE flg=0x10 pkg=com.mumu.store cmp=com.mumu.store/.widget.receiver.WidgetOperateReceiver (has extras) } action = com.mumu.LAUNCHER_LIFECYCLE
+08-31 21:14:28.794  1951  1951 W WidgetOperateReceiver: onLauncherLifecycle: launcherLifecycle = ON_RESUME
+08-31 21:14:28.794  1951  1951 W WidgetManager: updateLauncherLifecycle: launcherLifecycleName = ON_RESUME
+08-31 21:14:28.797  1613  1771 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-31 21:14:28.804  1613  5261 D app.lawnchair: Features: 0 0 0
+08-31 21:14:28.804  1613  5261 E app.lawnchair: vulkan version is 4202692
+08-31 21:14:28.807  1613  5261 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-31 21:14:28.807  1613  5261 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-31 21:14:28.819  1951  1951 W AdBannerWidgetManager: onHoverAdBannerFlipper: appWidgetId = 2, isHovered = false, updatePreSwitchHovered = false, updateNextSwitchHovered = false
+08-31 21:14:28.863  1613  1613 D b/223498680: BaseRecentsViewStateController setStateWithAnimation state=Normal, config.skipOverview=true
+08-31 21:14:28.928  1613  1628 W System  : A resource failed to call release. 
+08-31 21:14:28.928  1613  1628 W System  : A resource failed to call release. 
+08-31 21:14:28.929  1613  1628 W System  : A resource failed to call release. 
+08-31 21:14:28.929  1613  1628 W System  : A resource failed to call release. 
+08-31 21:14:28.929  1613  1628 W System  : A resource failed to call release. 
+08-31 21:14:28.929  1613  1628 W System  : A resource failed to call release. 
+08-31 21:14:28.929  1613  1628 W System  : A resource failed to call release. 
+08-31 21:14:29.021  1951  2291 W AdBannerWidgetManager: onHoverAdBannerFlipper: newIsHovered = false
+08-31 21:14:29.021  1951  2291 W AdBannerWidgetManager: prepareAdBannerFlipperHover: isHovered = false  false  false
+08-31 21:14:29.084  1297  1681 W InputManager-JNI: Input channel object 'ec3cb30 com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (client)' was disposed without first being removed with the input manager!
+08-31 21:14:29.095  1297  1317 D RecentTaskMonitor: VAddressShellNotifier#notifyCloseTab :{"uri":"player\/tab","need_response":false,"params":{"id":"task:2794","action":"close"}}
+08-31 21:14:29.097  1297  1317 I RecentTaskMonitor: broadcast tab closed in android as it's closed task taskId: 2794, elapseTime: 35239
+08-31 21:14:29.097  1297  1318 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=2794 attached=false
+08-31 21:14:29.097  1297  1318 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=2794 attached=false
+08-31 21:14:29.099  1061  1074 D nemuinit: start name: vapi, operation: {"uri":"/apps","method":"GET","params":{}}, id: 238
+08-31 21:14:29.100  1061  5270 D nemuinit: Proxy: use callback: 1951, handleNemuInitMessage, name: vapi, params: {"uri":"/apps","method":"GET","params":{}}, res: 
+08-31 21:14:29.100  1061  5270 D nemuinit: Proxy: not handleNemuInitMessage, use next callback
+08-31 21:14:29.103  1297  1681 D RecentTaskMonitor: handleTabMessage name=vapi params={"uri":"/apps","method":"GET","params":{}}
+08-31 21:14:29.104  1061  5270 D nemuinit: Proxy: use callback: 1297, handleNemuInitMessage, name: vapi, params: {"uri":"/apps","method":"GET","params":{}}, res: 
+08-31 21:14:29.104  1061  5270 D nemuinit: Proxy: not handleNemuInitMessage, use next callback
+08-31 21:14:29.106  1146  1146 W SurfaceFlinger: couldn't log to binary event log: overflow.
+08-31 21:14:29.107  1452  1452 D Watchdog: ignore events AppExit: {"app_name":"闪现2","app_package":"com.warden.controlledsandbox.debug","event_duration":0,"failure_reason":"","status_code":0}
+08-31 21:14:29.113  1452  1452 D Watchdog: CrashBehavior: call notifyClosing: error is java.lang.NoSuchMethodException: android.app.ActivityManager.getCrashBehaviorDataAndClean [class java.lang.String]
+08-31 21:14:29.115  1061  5270 D nemuinit: Proxy: use callback: 1452, handleNemuInitMessage, name: vapi, params: {"uri":"/apps","method":"GET","params":{}}, res: {"errcode":0,"message":"OK","return":{"active":"app.lawnchair","installed":[{"appName":"夸克","packageName":"com.quark.browser","version":"10.10.5.1080","versionCode":1080},{"appName":"红果免费短剧","packageName":"com.phoenix.read","version":"7.0.5.33","versionCode":70533},{"appName":"CAS Activity Scale Fixture","packageName":"com.warden.controlledsandbox.fixture.scale","version":"1.0-activity-scale","versionCode":1},{"appName":"CAS Split Fixture","packageName":"com.warden.controlledsandbox.fixture.split","version":"1.0-split","versionCode":1},{"appName":"iCost记账","packageName":"com.gostraight.smallAccountBook.fltandroid","version":"1.0.10","versionCode":260807001},{"appName":"CAS Lifecycle Fixture","packageName":"com.warden.controlledsandbox.fixture.lifecycle","version":"1.0-lifecycle","versionCode":1},{"appName":"番茄免费小说","packageName":"com.dragon.read","version":"7.
+08-31 21:14:29.115  1061  5270 D nemuinit: Proxy: finish handleNemuInitMessage
+08-31 21:14:29.124  1452  2430 D Watchdog: upload event: {"architecture":"x86_64","channel":"nochannel-mumu12","country":"zh-CN","engine":"NEMUX","fchannel":"nochannel-mumu12","language":"zh-Hans","mpid":"1","package":"mumu","product":"MuMu6.0","product_version":"6.5.5.0","usage":"0","uuid":"d2810392-fbc0-4986-b371-9503ddb84ab1","version":"12.5.5.5101","x":{"app_elapse":35,"app_name":"闪现2","app_package":"com.warden.controlledsandbox.debug","error":{"code":0,"msg":"ok"},"extra":{"amp_name":"闪现2","ampid":0,"is_remote_control":0},"token":"ff27c329-2be4-46cf-83d4-1a5413592d2e"}}	type: ExitAPP	sign: k3RvLazHgbzfGKYqpTW1yfpmSYA=	uid: 1000	json:{"app_elapse":35,"app_name":"闪现2","app_package":"com.warden.controlledsandbox.debug","error":{"code":0,"msg":"ok"},"extra":{"amp_name":"闪现2","ampid":0,"is_remote_control":0},"token":"ff27c329-2be4-46cf-83d4-1a5413592d2e"}
+08-31 21:14:29.145  2000  2000 W AccMsgReceiver: AccMsgReceiver: onReceive action = uu.intent.action.STOP_ACCELERATE
+08-31 21:14:29.171  1297  1681 W ActivityManager: Foreground service started from background can not have location/camera/microphone access: service com.mumu.acc/.AccService
+08-31 21:14:29.173  2000  2755 W AccServiceManager: onAppClose: packageName = com.warden.controlledsandbox.debug
+08-31 21:14:29.179  1452  2430 D Watchdog: upload server response: {"errcode": 100, "errmsg": "ok"}
+08-31 21:14:29.179  1452  2430 D Watchdog: upload result: true
+08-31 21:14:29.429  5269  5269 D ProcessState: Binder ioctl to enable oneway spam detection failed: Invalid argument
+08-31 21:14:29.430  1146  1211 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-31 21:14:29.436  5269  5271 D hw-ProcessState: Binder ioctl to enable oneway spam detection failed: Invalid argument
+08-31 21:14:29.438  1046  1046 I hwservicemanager: getTransport: Cannot find entry android.hardware.graphics.mapper@4.0::IMapper/default in either framework or device VINTF manifest.
+08-31 21:14:29.438  5269  5271 E HidlServiceManagement: getService: Potential race detected, descriptor: android.hardware.graphics.mapper@4.0::IMapper instance: default
+08-31 21:14:29.438  1046  1046 I hwservicemanager: Since android.hardware.graphics.mapper@4.0::IMapper/default is not registered, trying to start it as a lazy HAL.
+08-31 21:14:29.439  5269  5271 I Gralloc4: mapper 4.x is not supported
+08-31 21:14:29.439  1046  1046 I hwservicemanager: getTransport: Cannot find entry android.hardware.graphics.mapper@3.0::IMapper/default in either framework or device VINTF manifest.
+08-31 21:14:29.439  5269  5271 E HidlServiceManagement: getService: Potential race detected, descriptor: android.hardware.graphics.mapper@3.0::IMapper instance: default
+08-31 21:14:29.439  1046  1046 I hwservicemanager: Since android.hardware.graphics.mapper@3.0::IMapper/default is not registered, trying to start it as a lazy HAL.
+08-31 21:14:29.440  5269  5271 W Gralloc3: mapper 3.x is not supported
+08-31 21:14:29.440  5269  5271 E HidlServiceManagement: getService: Potential race detected, descriptor: android.hardware.graphics.mapper@2.0::IMapper instance: default
+08-31 21:14:29.445  1046  5272 W libc    : Unable to set property "ctl.interface_start" to "android.hardware.graphics.mapper@4.0::IMapper/default": error code: 0x20
+08-31 21:14:29.445  1046  5272 I hwservicemanager: Tried to start android.hardware.graphics.mapper@4.0::IMapper/default as a lazy service, but was unable to. Usually this happens when a service is not installed, but if the service is intended to be used as a lazy service, then it may be configured incorrectly.
+08-31 21:14:29.449  1046  5273 W libc    : Unable to set property "ctl.interface_start" to "android.hardware.graphics.mapper@3.0::IMapper/default": error code: 0x20
+08-31 21:14:29.449  1046  5273 I hwservicemanager: Tried to start android.hardware.graphics.mapper@3.0::IMapper/default as a lazy service, but was unable to. Usually this happens when a service is not installed, but if the service is intended to be used as a lazy service, then it may be configured incorrectly.
+08-31 21:14:29.461  5269  5271 D screencap: Features: 0 0 0
+08-31 21:14:29.461  5269  5271 E screencap: vulkan version is 4202692
+08-31 21:14:29.470  5269  5269 D screencap: Features: 0 0 0
+08-31 21:14:29.470  5269  5269 E screencap: vulkan version is 4202692
+08-31 21:14:30.473  5274  5274 D ProcessState: Binder ioctl to enable oneway spam detection failed: Invalid argument
+08-31 21:14:30.473  5274  5274 I dumpsys : type=1400 audit(0.0:7464): avc: denied { call } for scontext=u:r:adbd:s0 tcontext=u:r:system_server:s0 tclass=binder permissive=1
+08-31 21:14:30.473  5274  5274 I dumpsys : type=1400 audit(0.0:7465): avc: denied { write } for path="pipe:[47090]" dev="pipefs" ino=47090 scontext=u:r:system_server:s0 tcontext=u:r:adbd:s0 tclass=fifo_file permissive=1
+08-31 21:14:30.537  5277  5277 D ProcessState: Binder ioctl to enable oneway spam detection failed: Invalid argument
+08-31 21:14:30.608  5280  5280 D ProcessState: Binder ioctl to enable oneway spam detection failed: Invalid argument
+08-31 21:14:30.606  5280  5280 I dumpsys : type=1400 audit(0.0:7466): avc: denied { use } for path="pipe:[50030]" dev="pipefs" ino=50030 scontext=u:r:init:s0 tcontext=u:r:adbd:s0 tclass=fd permissive=1
+08-31 21:14:30.606  5280  5280 I dumpsys : type=1400 audit(0.0:7467): avc: denied { write } for path="pipe:[50030]" dev="pipefs" ino=50030 scontext=u:r:init:s0 tcontext=u:r:adbd:s0 tclass=fifo_file permissive=1
+08-31 21:14:30.666  5283  5283 I logcat  : type=1400 audit(0.0:7468): avc: denied { write } for name="logdr" dev="tmpfs" ino=223 scontext=u:r:adbd:s0 tcontext=u:object_r:logdr_socket:s0 tclass=sock_file permissive=1

@@ -43,7 +43,9 @@ R02 single-flight/BUSY semantics and R03 FIRST_FRAME_DRAWN gate remain unchanged
 ## Regression and acceptance
 
 Static Android compilation, `:sandbox-domain:test`, `:sandbox-runtime:test`, and
-`git diff --check` pass after the change. The formal R05 matrix remains `IN_PROGRESS` and must
-resume from the recorded failure coordinate on a newly built clean commit. KI-R03-064 remains
-open and blocking until both formal rounds, the regressions, commercial add gate, and dual-user
-short test pass.
+`git diff --check` pass after the first rollback change. A targeted cold-to-hot run then showed
+that Guest prepare can return a structured `FAILED` Bundle rather than throw; the prewarm
+coordinator now closes `ALLOCATED/PREPARING` in that path too and removes the prepared spec.
+The formal R05 matrix remains `IN_PROGRESS` and must resume from the recorded failure coordinate
+on a newly built clean commit. KI-R03-064 remains open and blocking until both formal rounds,
+the regressions, commercial add gate, and dual-user short test pass.

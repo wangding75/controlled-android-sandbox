@@ -79,10 +79,18 @@ final class GuestRecoveryPrewarmCoordinator implements AutoCloseable {
             Bundle prepared = preparer.prepare(request);
             GuestSession recovered = sessions.get(affected.packageName(), affected.virtualUserId(),
                     affected.processName());
+            String prewarmStatus = prepared.getString(RuntimeKeys.STATUS, "");
+            if ("FAILED".equals(prewarmStatus)) {
+                // prepare() may report a structured Guest failure instead of throwing.  That
+                // result still owns the recovery generation and must close its PREPARING lease;
+                // otherwise the next explicit launch is permanently rejected as SESSION_BUSY.
+                rollbackFailedPreparation(recovered == null ? current : recovered, key,
+                        prepared.getString(RuntimeKeys.ERROR_TYPE, "GUEST_PREPARE_FAILED"));
+            }
             Bundle event = events.event(recovered == null ? current : recovered,
-                    prepared.getString(RuntimeKeys.STATUS, ""));
+                    prewarmStatus);
             event.putString("reason", reason == null ? "" : reason);
-            event.putString("prewarmStatus", prepared.getString(RuntimeKeys.STATUS, ""));
+            event.putString("prewarmStatus", prewarmStatus);
             RuntimeEventLog.event("GUEST_RECOVERY_PREWARM_COMPLETED", event);
         } catch (Throwable error) {
             FatalErrorPolicy.rethrowIfFatal(error);
@@ -96,6 +104,19 @@ final class GuestRecoveryPrewarmCoordinator implements AutoCloseable {
         } finally {
             pending.remove(key);
         }
+    }
+
+    private void rollbackFailedPreparation(GuestSession current, String key, String failure) {
+        if (current == null || (current.state() != SessionState.ALLOCATED
+                && current.state() != SessionState.PREPARING)) return;
+        try {
+            sessions.transition(current.packageName(), current.virtualUserId(), current.processName(),
+                    current.generation(), SessionState.FAILED, System.currentTimeMillis(),
+                    "PREWARM_ROLLBACK:" + failure);
+        } finally {
+            brokerState.removePrepared(key);
+        }
+        RuntimeEventLog.event("GUEST_RECOVERY_PREWARM_ROLLBACK", events.event(current, "FAILED"));
     }
 
     @Override public void close() {

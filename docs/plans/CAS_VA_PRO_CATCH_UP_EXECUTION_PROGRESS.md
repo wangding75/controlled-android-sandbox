@@ -3559,3 +3559,20 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   `:sandbox-runtime:test`、`git diff --check` 已通过；待构建新 APK 后从该失败坐标
   继续，重新完成剩余首轮及第二轮正式验收。新增 `KI-R03-064`，当前仍为
   `RECORDED`/`acceptance: NOT_FIXED`/`blocks_current_campaign: true`。
+
+### C4-R05：结构化 FAILED Bundle 未回收 PREPARING 的补充修复（2026-08-31）
+
+- **补充证据**：新 APK 的独立 DingTalk user1 冷/热 2-row 回归中，cold-001 PASS；
+  hot-001 首次失败为 `SESSION_BUSY:PREPARING`，request=`7ddbc8e2e3344d40ac73d3bdccd20b5f`，
+  operation=`7ddbc8e2e3344d40ac73d3bdccd20b5f-launch`，attempt=1，retry budget 0，
+  无自动重试。其 logcat 显示 recovery prewarm 收到结构化 `FAILED` 结果，Guest
+  `VIRTUAL_SYSTEM_SERVICE_CAPABILITY_DENIED`，随后会话仍为 generation 2 PREPARING。
+- **补充根因**：预热的 `prepare()` 对 Guest `FAILED` Bundle 不抛异常，原协调器只记录
+  `GUEST_RECOVERY_PREWARM_COMPLETED status=FAILED`，没有执行终态回收；因此仅补外层
+  Throwable catch 不足。
+- **补充修复**：`GuestRecoveryPrewarmCoordinator` 现在识别 `status=FAILED`，将当前
+  `ALLOCATED/PREPARING` generation 转为 `FAILED`，移除 prepared spec 并写入
+  `GUEST_RECOVERY_PREWARM_ROLLBACK`；仍不引入重试、sleep 或门槛降低。
+- **验证**：静态 Android 编译、`:sandbox-runtime:compileDebugJavaWithJavac`、
+  `git diff --check` 通过；该针对性失败证据已保留，须在新 clean commit 重新构建后
+  复测冷→热，随后才能恢复 R05 正式矩阵。
