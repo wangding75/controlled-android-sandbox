@@ -64,6 +64,8 @@ verification/catch-up/C4-R05/recovery-prewarm-rollback-targeted-20260831/
 verification/catch-up/C4-R05/recovery-prewarm-rollback-targeted-20260831-v2/
 verification/catch-up/C4-R05/formal-two-round-20260831-prewarm-rollback-v2/
 verification/catch-up/C4-R05/formal-two-round-20260901-hot-barrier/
+verification/catch-up/C4-R05/rebootstrap-regression-20260901/
+verification/catch-up/C4-R05/formal-two-round-20260901-rebootstrap-*/
 
 # C4-TEMP-01 dynamic latency runs retain raw device logs, dumpsys, screenshots and
 # copied package state locally; the curated classification and artifact index at the
