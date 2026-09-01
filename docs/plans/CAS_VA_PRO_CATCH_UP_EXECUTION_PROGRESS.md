@@ -3719,3 +3719,54 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   不前移。
 - **下一步**：先实现并单测该有界 rebootstrap，编译和定向回归通过后，用新的 clean commit
   执行完整 R05 两轮；只有完整矩阵、回归和双用户短测全通过才可追加 DONE 回执。
+
+### C4-R05：host phase boundary durable-lane continuation 修复（2026-09-01）
+
+- **状态**：`IN_PROGRESS`。上一轮 formal 在 R03 launch matrix 的 host 编排边界停止，
+  不是 C4-R05 验收通过；原始 LOW_MEMORY、动态重启、Guest rebootstrap 和后续 host timeout
+  证据全部保留，C4 仍为 `IN_PROGRESS`，不得进入 C6-T01。
+- **首次失败与证据**：`formal-two-round-20260901-rebootstrap-v1` 的
+  `round-1-clean-install-cold/launch-matrix` 在 Quark `user1/cold-006` 记录了
+  request=`4f1ccc2faa094958a0f2b376839b5281`、operation=`4f1ccc2faa094958a0f2b376839b5281-launch`、
+  attempt=1、`retryBudget=0`、`automaticRetryPerformed=false`，命令错误为
+  `RD_ENVIRONMENT_RESOLUTION_BLOCKED: debug-command-result timeout`。完整首失败 bundle
+  的 `application-exit-info.txt` 明确记录 Host `com.warden.controlledsandbox.debug`
+  `reason=3 (LOW_MEMORY)`；Window/Surface/截图等快照仍按原始失败保存，不能覆盖 command
+  错误。随后一次动态 MuMu restart 和独立 Guest rebootstrap PASS，rebootstrap 证据位于
+  `attempt-002/post-restart-rebootstrap/quark/user-1/post-restart-rebootstrap.json`。
+- **真实阻断边界**：attempt-002 已落盘到 `fanqie/user1/hot-015`；R03 期望 500 个终态
+  coordinate，当前 durable selector 识别 480 个唯一完成坐标，下一坐标为
+  `fanqie/user1/cold-016`。外层 `run_command` 在 14,400 秒 host phase envelope 到期，
+  返回 124 且 `summaryStatus=MISSING`；这不是 PASS，也不是新的 App/UI/Guest 首帧根因。
+  证据索引为 `summary.json`、`commands/004-round-1-clean-install-cold-c4-r03-launch-matrix.json`、
+  Quark cold-006 `case.json` 及其 `first-failure-full`。
+- **根因分类与 VA/NBB 对照**：分类为验收编排的 host phase session boundary，叠加已确认
+  的 Host LOW_MEMORY 环境事件；未推断为 Quark SDK、SX adapter、黑屏或真实 readiness
+  通过。VA 对照为 `VActivityManagerService` process start/death、`ActivityStack` process
+  start/death、`VirtualRuntime.crash`；NBB 对照为 `BProcessManagerService.startProcessLocked`、
+  `ActivityStack.startActivityProcess`、`BActivityThread.bindApplication`。共同边界均是
+  process owner/death/rebind，故继续必须保留原始 request/operation/boot/Window/Surface/
+  process/screenshot/transaction evidence。
+- **实现与设计**：新增
+  `docs/review/C4_R05_HOST_PHASE_BOUNDARY_CONTINUATION_DESIGN_20260901.md`；
+  `run_c4_r05_rd.py` 记录 `timedOut`/timeout 秒数，识别 host-scoped LOW_MEMORY 的严格
+  证据，并只允许一次 `HOST_PHASE_BOUNDARY_INTERRUPTION` continuation；
+  `run_c4_r03_low_memory_continuation.py` 增加完整 durable lane seed，跨所有
+  `attempt-*` 保留首失败与恢复观察，最终按最新 coordinate 聚合，不删除历史。未改变
+  cold 30 秒、hot 10 秒 FIRST_FRAME_DRAWN deadline、retry budget、固定 sleep 或商业包
+  特例。
+- **验证**：`python -m py_compile tools/capability/run_c4_r03_low_memory_continuation.py
+  tools/capability/run_c4_r05_rd.py scripts/test_c4_r05_orchestrator.py`、
+  `python scripts/test_c4_r03_rebootstrap.py`（3/3）、
+  `python scripts/test_c4_r05_orchestrator.py`（7/7）、
+  `python scripts/check-c4-r05-orchestrator.py`、`git diff --check` 均通过。针对旧 raw
+  lane 的纯读取验证确认 481 条观测（含 1 条历史 LOW_MEMORY 首失败）和 480 个唯一终态，
+  没有把它误报为 PASS。
+- **Known Issues**：新增 `KI-R03-067`，状态 `RECORDED`、`acceptance: NOT_FIXED`、
+  `blocks_current_campaign: true`；`KI-R03-066` 仍保持 `RECORDED/NOT_FIXED`。当前
+  修复提交后必须在同一 clean commit 上续接/完成两轮正式 R05、C1/C2/C4/SX 回归和
+  user0/user1 各 15 分钟且至少 50 周期短测，方可关闭相关 KI 和 C4-R05。
+- **下一步**：提交并推送该编排修复及本回执；在同一 clean commit 上从上述 durable lane
+  的精确 `fanqie/user1/cold-016` 续接第一轮，随后自动执行 retained-state/hot/recovery
+  第二轮及后续回归、短测。若出现第二次 host boundary 或任一非 LOW_MEMORY terminal
+  failure，立即保留证据并 fail-closed；未达到全部门槛不得标记 DONE。
