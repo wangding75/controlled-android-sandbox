@@ -3770,3 +3770,42 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   的精确 `fanqie/user1/cold-016` 续接第一轮，随后自动执行 retained-state/hot/recovery
   第二轮及后续回归、短测。若出现第二次 host boundary 或任一非 LOW_MEMORY terminal
   failure，立即保留证据并 fail-closed；未达到全部门槛不得标记 DONE。
+
+### C4-R05：12 小时 host phase timeout 基线启动（2026-09-02 02:29）
+
+- **任务 ID / 状态**：`C4-R05 / IN_PROGRESS`。本段记录用户要求的 12 小时编排器超时
+  基线启动；不改变 C4-R05 的两轮、商业样本、真实首帧或双用户短测验收门槛，也不把历史
+  formal lane 改写为 PASS。
+- **开始时间与基线**：2026-09-02 02:29:06 +08:00；开始 commit、分支和远端 HEAD
+  均为 `14a6f38bf6fa1132998227f2bb34cf813071cf35`、
+  `feature/t57-r03-va-pro-capability-campaign`、
+  `origin/feature/t57-r03-va-pro-capability-campaign`；启动前工作区干净，Git 身份为
+  `OpenAI <openai@users.noreply.github.com>`。上一已完成任务 C4-TEMP-01 的实现提交为
+  `7c0c819a58513f89e91ec0fb44cdc05a151e2c32`，回执/收口提交为
+  `2cd121711df9a8347dd7e9e897f1eb6cdf60fcbb`。
+- **上一回执与历史失败**：上一 R05 host-boundary 回执和首失败证据继续保留；
+  `formal-two-round-20260901-rebootstrap-v1`、`formal-two-round-20260901-process-tree-fix-v1`
+  均为历史观察，不与本次新 formal lane 合并。最新首失败 `quark/user1/cold-020` 的
+  `debug-command-result timeout`、Host `LOW_MEMORY` 证据、attempt=1 原始快照及独立
+  post-restart observation 均保持权威边界。
+- **实现摘要**：`run_c4_r05_rd.py` 新增并默认使用
+  `DEFAULT_PHASE_TIMEOUT_SECONDS = 43,200`，通过 `--phase-timeout-seconds` 记录在任务摘要；
+  R04、add-gate、launch matrix、回归阶段均使用该预算，launch matrix 同时向嵌套
+  `run_c4_r03_low_memory_continuation.py` 传递 `--child-timeout-seconds 43,200`。构建阶段仍
+  为独立 3,600 秒；case 级 cold 30 秒、hot 10 秒 `FIRST_FRAME_DRAWN` deadline 未改变。
+- **设计/证据文件**：新增
+  `docs/review/C4_R05_HOST_PHASE_TIMEOUT_BUDGET_20260902.md`；本次新 formal raw lane 预定为
+  `verification/catch-up/C4-R05/formal-two-round-20260902-timeout12h-v1/`，历史 raw lane
+  只读保留。`.gitignore` 仅忽略 raw lane，curated JSON、命令记录、回执和索引按任务书单独固化。
+- **验收前检查**：`python scripts/verify-catch-up-continuation.py` PASS；动态解析 MuMu
+  `RD测试` 得到实例索引 `1`、API `32`、型号 `22041211A`、ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`、Android ID `398eea33120cd887`、boot ID
+  `51c808e4-f08f-4a9e-a663-792bc715e383`；resolved serial 仅记录于设备快照，不进入源码。
+  `python -m py_compile ...`、`python scripts/check-c4-r05-orchestrator.py` 和
+  `python -m unittest scripts/test_c4_r05_orchestrator.py` 均通过（10 tests）。
+- **当前 Known Issues**：`KI-R03-053/054/057/058/059/061/062/063/064/065/066/067/068`
+  仍按各自记录保持未关闭；`KI-R03-060` 保持已接受但必须回归的开放项；C5-T01 至 C5-T04
+  继续为 `NOT_APPLICABLE`。12 小时 host timeout 只修正阶段预算，不关闭任何 KI。
+- **下一步**：本段回执提交并推送后，从新 clean commit 启动两轮 C4-R05 formal acceptance；
+  首次非允许环境例外失败立即保留证据并停止，所有阶段通过后才执行回归和 30 分钟双用户
+  短测。当前 C4-R05 未达到 DONE，C6-T01 不前移。
