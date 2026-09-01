@@ -7,6 +7,7 @@ import json
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,8 +19,10 @@ from run_c4_r05_rd import (  # noqa: E402
     launch_continuation,
     read_summary,
     require_pass,
+    run_launch_matrix,
     run_command,
     safe_name,
+    DEFAULT_PHASE_TIMEOUT_SECONDS,
 )
 from run_c4_r03_low_memory_continuation import (  # noqa: E402
     classify_low_memory,
@@ -30,6 +33,28 @@ from types import SimpleNamespace
 
 
 class C4R05OrchestratorTests(unittest.TestCase):
+    def test_r05_phase_timeout_default_is_twelve_hours(self) -> None:
+        self.assertEqual(DEFAULT_PHASE_TIMEOUT_SECONDS, 12 * 60 * 60)
+
+    def test_launch_matrix_passes_phase_timeout_to_child_and_host_boundary(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with patch("run_c4_r05_rd.run_command") as mocked:
+                mocked.return_value = {
+                    "label": "launch",
+                    "returncode": 0,
+                    "timedOut": False,
+                    "summary": {"status": "PASS"},
+                }
+                run_launch_matrix(
+                    "RD测试", 25, "0,1", "fixture", root / "round", root,
+                )
+            command = mocked.call_args.args[1]
+            self.assertIn("--child-timeout-seconds", command)
+            child_index = command.index("--child-timeout-seconds")
+            self.assertEqual(command[child_index + 1], str(12 * 60 * 60))
+            self.assertEqual(mocked.call_args.kwargs["timeout_seconds"], 12 * 60 * 60)
+
     def test_safe_name_is_deterministic(self) -> None:
         self.assertEqual(safe_name("round 1/first-frame"), "round_1_first-frame")
 

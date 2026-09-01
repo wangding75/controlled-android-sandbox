@@ -30,7 +30,8 @@ def main() -> int:
         "reported_drawn_false", "surfaceNonEmpty", "nonBlack", "retryBudget",
         "automaticRetryPerformed", "firstFailure", "pressure-minutes",
         "c1-activity", "c2-window-audio", "c4-cas-only", "sx-f1-f5-business",
-        "artifact-index.json",
+        "artifact-index.json", "DEFAULT_PHASE_TIMEOUT_SECONDS",
+        "--phase-timeout-seconds", "--child-timeout-seconds",
     )
     for token in required:
         if token not in text:

@@ -49,6 +49,7 @@ from run_rd_campaign import (  # noqa: E402
 TASK_ID = "C4-R05"
 FIRST_FRAME_STAGE = "FIRST_FRAME_DRAWN"
 DEFAULT_OUTPUT = ROOT / "verification" / "catch-up" / TASK_ID
+DEFAULT_PHASE_TIMEOUT_SECONDS = 12 * 60 * 60
 APK_PATHS = {
     "host": ROOT / "app/build/outputs/apk/debug/app-debug.apk",
     "fixture": ROOT / "fixture-basic/build/outputs/apk/debug/fixture-basic-debug.apk",
@@ -352,7 +353,8 @@ def launch_continuation(lane: Path, targets: str, users: str, loops: int) -> dic
 
 
 def run_command(label: str, command: list[str], output: Path, *,
-                summary_path: Path | None = None, timeout_seconds: int = 14_400) -> dict[str, Any]:
+                summary_path: Path | None = None,
+                timeout_seconds: int = DEFAULT_PHASE_TIMEOUT_SECONDS) -> dict[str, Any]:
     """Run one phase once and preserve complete stdout/stderr before classification."""
     command_dir = output / "commands"
     command_dir.mkdir(parents=True, exist_ok=True)
@@ -474,7 +476,8 @@ def prepare_round(instance_name: str, round_name: str, output: Path) -> dict[str
     return payload
 
 
-def run_r04_contracts(instance_name: str, round_output: Path, root_output: Path) -> list[dict[str, Any]]:
+def run_r04_contracts(instance_name: str, round_output: Path, root_output: Path,
+                      phase_timeout_seconds: int) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
     for mode in ("failure-injection", "recovery"):
         phase_output = round_output / f"r04-{mode}"
@@ -482,26 +485,29 @@ def run_r04_contracts(instance_name: str, round_output: Path, root_output: Path)
                    "--mode", mode, "--instance-name", instance_name,
                    "--output", str(phase_output)]
         record = run_command(f"{round_output.name}-r04-{mode}", command, root_output,
-                             summary_path=phase_output / "runner-summary.json")
+                             summary_path=phase_output / "runner-summary.json",
+                             timeout_seconds=phase_timeout_seconds)
         records.append(require_pass(record, f"{round_output.name}-r04-{mode}"))
     return records
 
 
 def run_add_gate(instance_name: str, round_output: Path, root_output: Path,
-                 reduced_scope: bool) -> dict[str, Any]:
+                 reduced_scope: bool, phase_timeout_seconds: int) -> dict[str, Any]:
     phase_output = round_output / "add-gate"
     command = [sys.executable, str(TOOLS / "run_c4_r02_rd.py"),
                "--instance-name", instance_name, "--output", str(phase_output)]
     if reduced_scope:
         command.append("--reduced-r05-scope")
     record = run_command(f"{round_output.name}-c4-r02-add-gate", command, root_output,
-                         summary_path=phase_output / "summary.json", timeout_seconds=14_400)
+                         summary_path=phase_output / "summary.json",
+                         timeout_seconds=phase_timeout_seconds)
     return require_pass(record, f"{round_output.name}-c4-r02-add-gate")
 
 
 def run_launch_matrix(instance_name: str, loops: int, users: str, targets: str,
                       round_output: Path, root_output: Path,
-                      continuation: dict[str, Any] | None = None) -> dict[str, Any]:
+                      continuation: dict[str, Any] | None = None,
+                      phase_timeout_seconds: int = DEFAULT_PHASE_TIMEOUT_SECONDS) -> dict[str, Any]:
     phase_output = round_output / "launch-matrix"
     # The wrapper delegates every observation to run_c4_r03_rd.py and only handles the
     # user-approved MuMu LOW_MEMORY restart boundary around that fail-fast child.  A host
@@ -510,7 +516,8 @@ def run_launch_matrix(instance_name: str, loops: int, users: str, targets: str,
     base_command = [sys.executable, str(TOOLS / "run_c4_r03_low_memory_continuation.py"),
                     "--instance-name", instance_name, "--loops", str(loops),
                     "--users", users, "--targets", targets,
-                    "--output", str(phase_output)]
+                    "--output", str(phase_output),
+                    "--child-timeout-seconds", str(phase_timeout_seconds)]
     command = list(base_command)
     if continuation and not continuation.get("complete"):
         command.extend([
@@ -533,7 +540,8 @@ def run_launch_matrix(instance_name: str, loops: int, users: str, targets: str,
     phase_label = f"{round_output.name}-c4-r03-launch-matrix"
     while True:
         record = run_command(phase_label, command, root_output,
-                             summary_path=phase_output / "c4-r03-summary.json", timeout_seconds=14_400)
+                             summary_path=phase_output / "c4-r03-summary.json",
+                             timeout_seconds=phase_timeout_seconds)
         records.append(record)
         if not record.get("timedOut"):
             completed = require_pass(record, phase_label)
@@ -608,7 +616,8 @@ def run_launch_matrix(instance_name: str, loops: int, users: str, targets: str,
     return result
 
 
-def run_regressions(instance_name: str, output: Path) -> list[dict[str, Any]]:
+def run_regressions(instance_name: str, output: Path,
+                    phase_timeout_seconds: int) -> list[dict[str, Any]]:
     """Run the required C1/C2/C4/SX gates only after both formal rounds pass."""
     commands = [
         ("c1-activity", [sys.executable, str(TOOLS / "run_c1_t01_rd.py"),
@@ -636,7 +645,7 @@ def run_regressions(instance_name: str, output: Path) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
     for label, command, summary_path in commands:
         record = run_command(label, command, output, summary_path=summary_path,
-                             timeout_seconds=14_400)
+                             timeout_seconds=phase_timeout_seconds)
         records.append(require_pass(record, label))
     return records
 
@@ -809,6 +818,9 @@ def main() -> int:
     parser.add_argument("--rounds", type=int, default=2)
     parser.add_argument("--pressure-minutes", type=int, default=15)
     parser.add_argument("--pressure-minimum-cycles", type=int, default=50)
+    parser.add_argument("--phase-timeout-seconds", type=int,
+                        default=DEFAULT_PHASE_TIMEOUT_SECONDS,
+                        help="maximum duration for each R05 phase and nested launch child")
     parser.add_argument("--acceptance-scope", choices=("c4-stage-reduced", "overall-50"),
                         default="c4-stage-reduced",
                         help="C4 stage gate uses two rounds of 25 loops; overall post-C7 acceptance uses two rounds of 50")
@@ -822,6 +834,8 @@ def main() -> int:
             or args.pressure_minimum_cycles < 50:
         raise SystemExit(f"{args.acceptance_scope} requires exactly {expected_rounds} round(s), {expected_loops} launch loops, "
                          "15-minute lanes, and >=50 cycles")
+    if args.phase_timeout_seconds <= 0:
+        raise SystemExit("--phase-timeout-seconds must be positive")
     users = [int(value.strip()) for value in args.users.split(",") if value.strip()]
     if users != [0, 1]:
         raise SystemExit("C4-R05 requires users=0,1")
@@ -839,6 +853,11 @@ def main() -> int:
         "startedAt": now_iso(),
         "instanceName": args.instance_name,
         "attemptPolicy": {"attempt": 1, "retryBudget": 0, "automaticRetryPerformed": False},
+        "orchestration": {
+            "phaseTimeoutSeconds": args.phase_timeout_seconds,
+            "phaseTimeoutHours": args.phase_timeout_seconds / 3600,
+            "nestedLaunchChildTimeoutSeconds": args.phase_timeout_seconds,
+        },
         "acceptance": {
             "rounds": ["clean-install-cold", "retained-hot-recovery"],
             "addGates": ({"fixture": 25, "dingtalk": 5, "quark": 5, "hongguo": 5, "fanqie": 5}
@@ -917,12 +936,17 @@ def main() -> int:
             else:
                 round_report["prepare"] = prepare_round(args.instance_name, round_name, round_output)
                 round_report["r04"] = [record["summary"] for record in
-                                        run_r04_contracts(args.instance_name, round_output, output)]
+                                        run_r04_contracts(
+                                            args.instance_name, round_output, output,
+                                            args.phase_timeout_seconds)]
                 round_report["addGate"] = run_add_gate(
-                    args.instance_name, round_output, output, reduced_scope=reduced_scope)["summary"]
+                    args.instance_name, round_output, output,
+                    reduced_scope=reduced_scope,
+                    phase_timeout_seconds=args.phase_timeout_seconds)["summary"]
             launch_result = run_launch_matrix(
                 args.instance_name, args.loops, args.users, args.targets, round_output, output,
-                continuation=continuation if index == 1 else None)
+                continuation=continuation if index == 1 else None,
+                phase_timeout_seconds=args.phase_timeout_seconds)
             round_report["launchMatrix"] = launch_result["summary"]
             if launch_result.get("hostPhaseContinuations"):
                 round_report["launchMatrixHostPhaseContinuations"] = launch_result[
@@ -931,7 +955,9 @@ def main() -> int:
             round_report.update({"status": "PASS", "completedAt": now_iso()})
         report["regressions"] = [record.get("summary") or {"label": record.get("label"),
                                                               "returncode": record.get("returncode")}
-                                 for record in run_regressions(args.instance_name, output / "regressions")]
+                                 for record in run_regressions(
+                                     args.instance_name, output / "regressions",
+                                     args.phase_timeout_seconds)]
         for user in users:
             pressure_environment = resolve_rd_environment(args.instance_name)
             report["pressure"].append(run_pressure_lane(
