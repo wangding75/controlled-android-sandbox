@@ -1,11 +1,11 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：2.0
-更新时间：2026-08-30 22:11（Asia/Shanghai）
+更新时间：2026-09-01 13:11（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
-当前阶段：`C4`（IN_PROGRESS，REOPENED，原 C4-T05 证据不足；R05 正式重验中）
+当前阶段：`C4`（BLOCKED，REOPENED，R05 正式两轮验收出现权威非 LOW_MEMORY 失败）
 当前任务：`C4-R05`
 下一任务：`C4-R05`
 最后完成任务：`C4-TEMP-01`
@@ -26,7 +26,7 @@
 | C1 组件/包/进程 | DONE | 双用户、50 轮与任务书规定压力 | §5 C1-GATE |
 | C2 系统服务/F2-F5 | DONE | SX/XH 调用面 L3，P0/P1 无 NOT_PROVEN | §5 C2-T07 |
 | C3 Native/ABI/隔离 | IN_PROGRESS | trusted/hostile 闭环，条件项有决策 | §5 C3-T01 |
-| C4 SX 迁移 | IN_PROGRESS | C4-R01..R05；真实首帧、添加矩阵和 30 分钟双用户压力 | §5 PLAN-20260824-C4-REOPEN |
+| C4 SX 迁移 | BLOCKED | C4-R01..R05；真实首帧、添加矩阵和 30 分钟双用户压力 | §5 C4-R05 formal blocker（2026-09-01） |
 | C5 XH 支持 | NOT_APPLICABLE | 用户决定跳过，不阻塞 C6/C7 | §5 PLAN-20260824-C4-REOPEN |
 | C6 API/ABI 矩阵 | PENDING | 声明组合均有 Android Matrix 证据 | - |
 | C7 OEM/发布 | PENDING | 商业矩阵与 VA PRO scope 总验收 | - |
@@ -69,7 +69,7 @@
 | C4-R03 | 启动 readiness 与窗口合同 | DONE | C4-R01 | `d8797c89` | §5 C4-R03（用户批准残余风险豁免） |
 | C4-R04 | C4 fail-closed 验收编排 | DONE | C4-R02,C4-R03 | `1d9b83d54c13d2a758752281dbc492859d8bd05d` | §5 C4-R04 |
 | C4-TEMP-01 | CAS 导入/克隆/添加/启动耗时根因与修复 | DONE | C4-R04；完成后解除 C4-R05 临时阻断 | `7c0c819a58513f89e91ec0fb44cdc05a151e2c32` | §5 C4-TEMP-01 修复完成（2026-08-30） |
-| C4-R05 | MuMu RD 正式重验与关门 | IN_PROGRESS | C4-R04,C4-TEMP-01 | `5ee894f3e32339b951ba7c81f19010f1d13bf392`（历史阻断基线） | §5 C4-R05 正式重验启动（2026-08-30） |
+| C4-R05 | MuMu RD 正式重验与关门 | BLOCKED | C4-R04,C4-TEMP-01 | `58e86b09cf8a6671e3d064042976ba5487c57ec2`（本轮验收基线） | §5 C4-R05 formal failure classification（2026-09-01） |
 | C5-T01 | 原始 XH 产品能力契约 | NOT_APPLICABLE | C2,C3 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T02 | XH CAS Host/SDK 集成 | NOT_APPLICABLE | C5-T01,C4-T02 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T03 | 原始 XH/DingTalk 验收 | NOT_APPLICABLE | C5-T02,C4 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
@@ -83,7 +83,8 @@
 
 ## 4. 阻断项
 
-当前 C4 阶段阻断：`KI-R03-053`、`KI-R03-054`、`KI-R03-057`、`KI-R03-058`、`KI-R03-059`、`KI-R03-061`、`KI-R03-062`；
+当前 C4 阶段阻断：`KI-R03-053`、`KI-R03-054`、`KI-R03-057`、`KI-R03-058`、`KI-R03-059`、`KI-R03-061`、`KI-R03-062`、
+`KI-R03-063`、`KI-R03-064`、`KI-R03-065`、`KI-R03-066`；
 `KI-R03-060` 为已接受但仍开放的强制回归项。原 `aapt2` 供应链缺口已按官方 Google Maven 字节比对修复，严格 Gradle 与
 M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均已 `FIXED`，
 两者 `blocks_current_campaign: false`。C0-T02 的锁定构建已连续两轮成功并完成哈希一致性核验。
@@ -3602,3 +3603,89 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   启动下一次 DebugCommandActivity 前动态等待 ATMS ActivityRecord 与 WM Window 消失；
   不停止 Guest、不固定 sleep、不自动重试。原始 full snapshot 保留在失败目录。
 - **本地验证**：`python -m py_compile tools/capability/run_p1_00_rd.py tools/capability/run_c4_r03_rd.py tools/capability/run_c4_r05_rd.py` PASS；`python scripts/check-c4-r05-orchestrator.py` PASS；`python scripts/verify-catch-up-continuation.py` PASS。待新 clean commit 构建并重跑 formal 两轮，才能关闭该 KI 和 C4-R05。
+
+### C4-R05：正式两轮验收在 LOW_MEMORY 恢复后的独立 hot 续接失败（2026-09-01）
+
+- **任务 ID / 最终状态**：`C4-R05 / BLOCKED`。本段是当前正式验收的失败回执；不得将
+  C4-R05 标记为 `DONE`，不得进入后续任务，C4 阶段保持 `BLOCKED`。
+- **开始/结束时间**：formal run `2026-09-01T11:21:45.130817+08:00` 至
+  `2026-09-01T12:58:29.787644+08:00`（Asia/Shanghai）。开始基线为 clean commit
+  `58e86b09cf8a6671e3d064042976ba5487c57ec2`，分支为
+  `feature/t57-r03-va-pro-capability-campaign`；启动前 local/remote HEAD 一致，Git 身份为
+  `OpenAI <openai@users.noreply.github.com>`。
+- **上一任务回执**：`C4-TEMP-01 / DONE`，实现提交
+  `7c0c819a58513f89e91ec0fb44cdc05a151e2c32`，回执/收口提交
+  `2cd121711df9a8347dd7e9e897f1eb6cdf60fcbb`。本轮被测基线承接了 R05 hot Host Activity
+  teardown barrier 的 `58e86b09` 修复；此前针对性 recovery prewarm 复测已通过，但不替代本轮。
+- **执行环境与 RD 快照**：动态解析 MuMu `RD测试`（index 1，`MuMuPlayer-12.0-1`），
+  serial `127.0.0.1:16416`，API `32`，型号 `22041211A`，ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，Android ID `398eea33120cd887`，
+  formal start boot `de531bad-89f7-4470-ae4c-408a70bfdf43`。APK/commit/device 及全量
+  first-failure artifact 索引见
+  `verification/catch-up/C4-R05/20260901-formal-failure-classification.md`。
+- **验收范围**：按 R05 `c4-stage-reduced` 两轮门禁启动：两轮、每 target/user 冷热各 25
+  次，fixture 添加 25 次、商业样本添加各 5 次，C1/C2/C4/SX 回归，user0/user1 各 15 分钟
+  且至少 50 周期；未执行 8 小时 soak。构建命令、R04 failure-injection/recovery 和 R02
+  减半添加门禁均 `PASS`。
+- **首次失败证据**：`attempt-001` 是用户会话中断，只有 3 个已持久化 case row，没有失败
+  case；selector 只从 durable row 续接，未把中断当 PASS。首次实际失败为 DingTalk
+  `com.alibaba.android.rimet` / user1 / hot-019，request
+  `71304b9029ce4641b1d0307b4777fab9`，operation
+  `71304b9029ce4641b1d0307b4777fab9-launch`，runner operation
+  `c4-r03-dingtalk-u1-hot-19-a2-71304b9029`，attempt=2、retryBudget=0、
+  `retryable=false`、`automaticRetryPerformed=false`；命令因
+  `RD_ENVIRONMENT_RESOLUTION_BLOCKED: debug-command-result timeout` 失败。Host
+  `ApplicationExitInfo` 明确记录 `com.warden.controlledsandbox.debug`、reason
+  `3 (LOW_MEMORY)`、PSS `188MB`、RSS `246MB`，并有同时间 lowmemorykiller 记录，完整快照保留。
+- **允许的恢复及终止失败**：依据 R05 LOW_MEMORY 例外，仅动态解析 MuMuManager 并重启一次；
+  `restart.json` 记录 boot 从 `de531bad-89f7-4470-ae4c-408a70bfdf43` 变为
+  `fbd12b02-b1dd-49e0-9946-6f94b0da4a64`。attempt-003 使用新 request
+  `fbfdb9b18d0e413b8471199e13e56254`、operation
+  `fbfdb9b18d0e413b8471199e13e56254-launch`，runner operation
+  `c4-r03-dingtalk-u1-hot-19-a3-fbfdb9b18d`，仍为 retryBudget=0 且无自动重试；
+  command/operation 均报告 `PASS/LAUNCH_PASS`，但关联真实首帧的 readiness 为 `18,345 ms`，
+  超过 hot deadline `10,000 ms`，分类为 `READINESS_SLO_EXCEEDED`。Window、Surface、
+  Activity resumed、非黑截图均有效，但不能覆盖超时门禁；该非 LOW_MEMORY 失败使本轮正式
+  停止，未再重试。
+- **根因及分类**：分类为“MuMu/RD Host memory-pressure process-owner 边界 + 新 boot 后
+  CAS/Guest recovery-startup latency”，不是黑屏、静态 marker、Guest 进程存在或 SX UI
+  成功。重启后同一请求阶段记录 package state `5262 ms`、package universe `4338 ms`、
+  broker connect `11849 ms`、Guest prepare `11653 ms`，最终在 `FIRST_FRAME_DRAWN` 真实成立
+  时已超出 hot SLO。现有证据不能唯一证明 DingTalk SDK 或单一 CAS 方法为唯一根因，需继续
+  以 `NEEDS_REPRODUCTION_AND_CLASSIFICATION` 处理，不得擅自做包名分支、扩大 deadline 或
+  用 fixed sleep 掩盖。
+- **VA/NBB 对照**：已复核 VA `VActivityManagerService.startProcessIfNeedLocked/processDead`、
+  `ActivityStack.startActivityProcess/processDied`、`VirtualRuntime.crash`，以及 NBB
+  `BProcessManagerService.startProcessLocked`、`ActivityStack.startActivityProcess`、
+  `BActivityThread.bindApplication`。两者均以真实 process owner/death/rebind 为边界；CAS
+  对应 `RuntimeGuestLifecycleCoordinator` 与 generation-fenced
+  `GuestRecoveryPrewarmCoordinator`。本次只确认恢复后启动成本超界，未形成可安全采纳的
+  新源码修复；既有 teardown barrier 仍保持有效。
+- **实现摘要/修改文件**：本轮被测实现为 `58e86b09` 的动态 Host Activity teardown
+  barrier；本次新增的是失败分类与治理记录，不宣称已修复 post-restart latency。新增
+  `verification/catch-up/C4-R05/20260901-formal-failure-classification.md`，更新
+  `docs/review/KNOWN_ISSUES.yaml` 新增 `KI-R03-066`；本段账本为独立进度提交。
+- **验收结果与商业样本矩阵**：R04 注入/恢复 `PASS`；R02 reduced add gate `PASS`（fixture
+  25，DingTalk/夸克/红果/番茄小说各 5）。R03 预期 500 行，实际 188 个 terminal coordinate：
+  fixture `100`，DingTalk user0 `50`，DingTalk user1 `38`（含 hot-019 终止失败）；夸克、
+  红果、番茄小说启动行尚未执行。第二轮、C1/C2/C4/SX 回归和双用户 15 分钟/50 周期短测
+  未执行，不能据此关闭 C4。
+- **Known Issues 变化**：新增 `KI-R03-066`，状态 `RECORDED`、
+  `acceptance: NOT_FIXED`、`blocks_current_campaign: true`；`KI-R03-053/054/057/058/059/061/062/063/064/065`
+  均未被本轮擅自关闭，`KI-R03-060` 仍为已接受但必须回归的开放项。C5-T01 至 C5-T04
+  保持 `NOT_APPLICABLE`，C6-T01 不前移。
+- **重试记录**：attempt-001 为会话中断；attempt-002 为 Host-scoped LOW_MEMORY 首失败，
+  仅执行一次有依据的动态 MuMu 重启；attempt-003 为新 boot 上的独立人工续接，并非隐藏
+  重试。所有失败记录 `retryBudget=0`、`automaticRetryPerformed=false`；无 deadline 扩大、
+  无 fixed sleep、无吞异常、无以晚到首帧改写失败。
+- **偏离任务书/遗留风险**：正式两轮在第一轮 R03 launch matrix 处 fail-closed 停止，属于
+  任务书允许的阻断路径；没有执行未达到条件的后续轮次。遗留风险为 Host 低内存 owner
+  收敛及新 boot 后 CAS/Guest readiness 是否能在 hot SLO 内恢复，需新 clean commit、独立
+  raw 目录和完整两轮回归验证。
+- **实现提交与回执提交**：被测实现基线 `58e86b09cf8a6671e3d064042976ba5487c57ec2`；
+  本次失败证据/KI 回执提交 `72841e79`（完整 SHA 见推送核验）；本段为独立进度回执提交。
+  `72841e79` 已推送到 `origin/feature/t57-r03-va-pro-capability-campaign`。
+- **下一任务/恢复条件**：下一任务仍为 `C4-R05`（BLOCKED recovery），不得写成 C6-T01。
+  恢复前必须完成有界 Host process-owner/memory-pressure 与 post-restart Guest readiness
+  设计/修复或明确外部环境校正；随后在新的 clean commit 上重新开始，不得把本轮历史行
+  合并为 PASS，并完成两轮正式矩阵、商业样本、回归和双用户短测后再评估关门。
