@@ -4,8 +4,9 @@
 The ordinary C4-R03 runner remains fail-fast and keeps every first failure authoritative.
 This wrapper adds only the user-approved environment exception: when the failed launch has
 explicit host-process ``ApplicationExitInfo`` reason ``LOW_MEMORY``, restart the dynamically
-resolved MuMu instance and invoke a separately recorded manual continuation from that exact
-target/user/iteration/mode.  Any other first failure is returned unchanged and stops the lane.
+resolved MuMu instance, rebootstrap the new Host/Guest owner once, and invoke a separately
+recorded manual continuation from that exact target/user/iteration/mode.  Any other first
+failure is returned unchanged and stops the lane.
 """
 
 from __future__ import annotations
@@ -250,7 +251,7 @@ def restart_mumu(instance_name: str, child_dir: Path, recovery_dir: Path) -> dic
 
 
 def child_command(args: argparse.Namespace, child_dir: Path, *, resume: dict[str, Any] | None,
-                  attempt: int) -> list[str]:
+                  attempt: int, post_restart_rebootstrap: bool = False) -> list[str]:
     command = [
         sys.executable, str(TOOLS / "run_c4_r03_rd.py"),
         "--instance-name", args.instance_name,
@@ -268,13 +269,18 @@ def child_command(args: argparse.Namespace, child_dir: Path, *, resume: dict[str
             "--resume-attempt", str(attempt),
             "--resume-of", str(resume["previousLane"]),
         ])
+        if post_restart_rebootstrap:
+            command.append("--post-restart-rebootstrap")
     return command
 
 
 def run_child(args: argparse.Namespace, child_dir: Path, *, resume: dict[str, Any] | None,
-              attempt: int) -> dict[str, Any]:
+              attempt: int, post_restart_rebootstrap: bool = False) -> dict[str, Any]:
     child_dir.mkdir(parents=True, exist_ok=True)
-    command = child_command(args, child_dir, resume=resume, attempt=attempt)
+    command = child_command(
+        args, child_dir, resume=resume, attempt=attempt,
+        post_restart_rebootstrap=post_restart_rebootstrap,
+    )
     started = now_iso()
     started_mono = time.monotonic()
     try:
@@ -440,6 +446,7 @@ def main() -> int:
     resume: dict[str, Any] | None = None
     terminal_failure: dict[str, Any] | None = None
     attempt = 1
+    post_restart_rebootstrap = False
     if args.seed_existing_child is not None:
         seed = args.seed_existing_child if args.seed_existing_child.is_absolute() \
             else ROOT / args.seed_existing_child
@@ -459,7 +466,10 @@ def main() -> int:
             attempt += 1
     while True:
         child_dir = args.output / f"attempt-{attempt:03d}"
-        child = run_child(args, child_dir, resume=resume, attempt=attempt)
+        child = run_child(
+            args, child_dir, resume=resume, attempt=attempt,
+            post_restart_rebootstrap=post_restart_rebootstrap,
+        )
         children.append(child)
         write_json(args.output / "children.json", children)
         summary = child.get("summary") or {}
@@ -477,6 +487,18 @@ def main() -> int:
             break
         low_memory["attempt"] = attempt
         low_memory["childOutput"] = child.get("output")
+        if low_memory_events:
+            # The R05 exception is exactly one dynamic restart plus one independent
+            # continuation.  A second host LOW_MEMORY is a new failure, not a retry budget
+            # that can be silently extended by this wrapper.
+            low_memory["policyDecision"] = "STOP_LOW_MEMORY_RESTART_BUDGET_EXHAUSTED"
+            terminal_failure = {
+                "attempt": attempt,
+                "classification": "LOW_MEMORY_RESTART_BUDGET_EXHAUSTED",
+                "lowMemory": low_memory,
+                "previousRecoveries": low_memory_events,
+            }
+            break
         recovery_dir = args.output / "low-memory-recovery" / f"event-{len(low_memory_events) + 1:03d}"
         low_memory["restart"] = restart_mumu(args.instance_name, child_dir, recovery_dir)
         low_memory_events.append(low_memory)
@@ -503,6 +525,7 @@ def main() -> int:
             }
             break
         attempt += 1
+        post_restart_rebootstrap = True
         print(json.dumps({
             "event": "LOW_MEMORY_NON_BLOCKING_RESTARTED",
             "attempt": attempt,

@@ -455,6 +455,65 @@ def run_one(serial: str, root: Path, target: dict[str, Any], user: int,
     return row
 
 
+def run_post_restart_rebootstrap(serial: str, root: Path, target: dict[str, Any], user: int,
+                                 attempt_number: int,
+                                 resume_metadata: dict[str, Any]) -> dict[str, Any]:
+    """Re-establish the new Host/Guest owner after the one allowed MuMu restart.
+
+    A complete emulator reboot invalidates the old in-memory Broker/session state.  This is an
+    explicit recovery operation, not a launch retry: it has its own request id and artifact,
+    prepares only the exact target/user, and never changes the launch SLO or the original failure.
+    """
+    output = root / "post-restart-rebootstrap" / target["target"] / f"user-{user}"
+    request_id = f"c4-r03-rebootstrap-u{user}-{uuid.uuid4().hex}"
+    started_at = now_iso()
+    started = time.monotonic()
+    result = debug_command(
+        serial,
+        ["--es", "command", "prepare", "--es", "package", target["package"],
+         "--ei", "user", str(user), "--es", "requestId", request_id,
+         "--ez", "trustNativeGuest", "true"],
+        deadline_sec=90,
+        force_stop_host=True,
+    )
+    operation = result.get("result", {}).get("operation", {}) if isinstance(result, dict) else {}
+    operation_status = str(operation.get("status") or "").upper()
+    passed = (
+        str(result.get("status") or "").upper() == "PASS"
+        and operation_status in {"PREPARED", "ALREADY_PREPARED"}
+    )
+    record = {
+        "schemaVersion": 1,
+        "kind": "POST_RESTART_GUEST_REBOOTSTRAP",
+        "target": target["target"],
+        "package": target["package"],
+        "user": user,
+        "attempt": attempt_number,
+        "retryBudget": 0,
+        "automaticRetryPerformed": False,
+        "retryable": False,
+        "command": "prepare",
+        "requestId": request_id,
+        "operationId": (result.get("result", {}).get("operationId", "")
+                         if isinstance(result, dict) else ""),
+        "startedAt": started_at,
+        "completedAt": now_iso(),
+        "elapsedMs": round((time.monotonic() - started) * 1000),
+        "status": "PASS" if passed else "FAIL",
+        "operationStatus": operation_status,
+        "result": result,
+        "resume": resume_metadata,
+        "contract": {
+            "activityLaunchIssued": False,
+            "launchRowCounted": False,
+            "originalFailureRemainsAuthoritative": True,
+            "requiresPreparedTerminal": ["PREPARED", "ALREADY_PREPARED"],
+        },
+    }
+    write_json(output / "post-restart-rebootstrap.json", record)
+    return record
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--instance-name", default="RD测试")
@@ -472,6 +531,8 @@ def main() -> int:
                         help="manual post-restart attempt number; automatic retries remain disabled")
     parser.add_argument("--resume-of", default="",
                         help="prior lane/case path retained as the first-failure evidence")
+    parser.add_argument("--post-restart-rebootstrap", action="store_true",
+                        help="perform one explicit prepare after a completed MuMu LOW_MEMORY restart")
     args = parser.parse_args()
     if not 1 <= args.loops <= 50:
         raise SystemExit("--loops must be between 1 and 50")
@@ -486,6 +547,8 @@ def main() -> int:
             raise SystemExit("--resume-iteration must be >= 1")
         if args.resume_attempt < 2:
             raise SystemExit("manual resume attempt must be >= 2")
+    if args.post_restart_rebootstrap and not resume_requested:
+        raise SystemExit("post-restart rebootstrap requires an explicit manual resume coordinate")
     environment = resolve_rd_environment(args.instance_name)
     args.output.mkdir(parents=True, exist_ok=True)
     write_json(args.output / "environment.json", environment)
@@ -536,7 +599,100 @@ def main() -> int:
             "previousLane": args.resume_of,
             "note": "The prior first-failure evidence remains authoritative; this lane is a separately recorded post-restart observation.",
         }
+    post_restart_rebootstrap: dict[str, Any] | None = None
+    if args.post_restart_rebootstrap:
+        resume_target = next(target for target in selected if target["target"] == args.resume_target)
+        post_restart_rebootstrap = run_post_restart_rebootstrap(
+            environment["adb_serial"], args.output, resume_target, args.resume_user,
+            args.resume_attempt, resume_metadata,
+        )
+        resume_metadata["postRestartRebootstrap"] = {
+            "path": str((args.output / "post-restart-rebootstrap" / args.resume_target
+                          / f"user-{args.resume_user}" / "post-restart-rebootstrap.json").resolve()),
+            "status": post_restart_rebootstrap["status"],
+            "requestId": post_restart_rebootstrap["requestId"],
+            "operationId": post_restart_rebootstrap["operationId"],
+        }
+    if resume_metadata:
         write_json(args.output / "resume.json", resume_metadata)
+
+    if post_restart_rebootstrap is not None and post_restart_rebootstrap["status"] != "PASS":
+        target = next(target for target in selected if target["target"] == args.resume_target)
+        case_dir = args.output / "attempts" / target["target"] / f"user-{args.resume_user}"
+        case_dir = case_dir / f"{args.resume_mode}-{args.resume_iteration:03d}"
+        case_dir.mkdir(parents=True, exist_ok=True)
+        row = {
+            "task": TASK_ID,
+            "target": target["target"],
+            "package": target["package"],
+            "user": args.resume_user,
+            "mode": args.resume_mode,
+            "iteration": args.resume_iteration,
+            "requestId": post_restart_rebootstrap["requestId"],
+            "operationId": post_restart_rebootstrap["operationId"],
+            "attempt": args.resume_attempt,
+            "retryBudget": 0,
+            "automaticRetryPerformed": False,
+            "retryable": False,
+            "startedAt": post_restart_rebootstrap["startedAt"],
+            "completedAt": post_restart_rebootstrap["completedAt"],
+            "elapsedMs": post_restart_rebootstrap["elapsedMs"],
+            "commandResult": post_restart_rebootstrap["result"],
+            "rebootstrap": post_restart_rebootstrap,
+            "errorClassification": "POST_RESTART_REBOOTSTRAP_FAILED",
+            "firstAttemptFailure": False,
+            "failureDetected": True,
+            "artifacts": str(case_dir.resolve()),
+        }
+        try:
+            row["firstFailureFullSnapshot"] = capture_snapshot(
+                environment["adb_serial"], case_dir / "first-failure-full", target["package"])
+        except Exception as error:
+            row["firstFailureSnapshotError"] = f"{type(error).__name__}:{error}"
+        write_json(case_dir / "case.json", row)
+        remaining_expected = sum(
+            1 for target_index, selected_target in enumerate(selected)
+            for user_index, selected_user in enumerate(users)
+            for iteration in range(1, args.loops + 1)
+            for mode in ("cold", "hot")
+            if (target_index, user_index, iteration, 0 if mode == "cold" else 1)
+            >= resume_position
+        )
+        summary = {
+            "schemaVersion": 1,
+            "task": TASK_ID,
+            "status": "FAIL",
+            "instanceName": environment["instance_name"],
+            "resolvedSerial": environment["adb_serial"],
+            "loops": args.loops,
+            "users": users,
+            "targetNames": [target["target"] for target in selected],
+            "attemptPolicy": {
+                "attempt": args.resume_attempt,
+                "retryBudget": 0,
+                "automaticRetries": 0,
+                "manualResumeAfterRestart": True,
+                "postRestartRebootstrap": True,
+            },
+            "expectedRows": remaining_expected,
+            "resume": resume_metadata,
+            "blockedAt": {
+                "target": args.resume_target,
+                "user": args.resume_user,
+                "iteration": args.resume_iteration,
+                "mode": args.resume_mode,
+                "classification": "POST_RESTART_REBOOTSTRAP_FAILED",
+            },
+            "rows": [row],
+            "rawDirectory": str(args.output.resolve()),
+        }
+        write_json(args.output / "first-failure.json", summary["blockedAt"])
+        write_json(args.output / "c4-r03-summary.json", summary)
+        print(json.dumps({"status": "FAIL", "rows": 1,
+                          "blockedAt": summary["blockedAt"],
+                          "output": str(args.output)}, ensure_ascii=False, indent=2))
+        return 1
+
     rows: list[dict[str, Any]] = []
     blocked_at = None
     expected_rows = 0

@@ -1,11 +1,11 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：2.0
-更新时间：2026-09-01 13:11（Asia/Shanghai）
+更新时间：2026-09-01 13:26（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
-当前阶段：`C4`（BLOCKED，REOPENED，R05 正式两轮验收出现权威非 LOW_MEMORY 失败）
+当前阶段：`C4`（IN_PROGRESS，REOPENED，R05 正在处理 post-LOW_MEMORY 新 boot 恢复边界）
 当前任务：`C4-R05`
 下一任务：`C4-R05`
 最后完成任务：`C4-TEMP-01`
@@ -26,7 +26,7 @@
 | C1 组件/包/进程 | DONE | 双用户、50 轮与任务书规定压力 | §5 C1-GATE |
 | C2 系统服务/F2-F5 | DONE | SX/XH 调用面 L3，P0/P1 无 NOT_PROVEN | §5 C2-T07 |
 | C3 Native/ABI/隔离 | IN_PROGRESS | trusted/hostile 闭环，条件项有决策 | §5 C3-T01 |
-| C4 SX 迁移 | BLOCKED | C4-R01..R05；真实首帧、添加矩阵和 30 分钟双用户压力 | §5 C4-R05 formal blocker（2026-09-01） |
+| C4 SX 迁移 | IN_PROGRESS | C4-R01..R05；真实首帧、添加矩阵和 30 分钟双用户压力 | §5 C4-R05 post-restart recovery（2026-09-01） |
 | C5 XH 支持 | NOT_APPLICABLE | 用户决定跳过，不阻塞 C6/C7 | §5 PLAN-20260824-C4-REOPEN |
 | C6 API/ABI 矩阵 | PENDING | 声明组合均有 Android Matrix 证据 | - |
 | C7 OEM/发布 | PENDING | 商业矩阵与 VA PRO scope 总验收 | - |
@@ -69,7 +69,7 @@
 | C4-R03 | 启动 readiness 与窗口合同 | DONE | C4-R01 | `d8797c89` | §5 C4-R03（用户批准残余风险豁免） |
 | C4-R04 | C4 fail-closed 验收编排 | DONE | C4-R02,C4-R03 | `1d9b83d54c13d2a758752281dbc492859d8bd05d` | §5 C4-R04 |
 | C4-TEMP-01 | CAS 导入/克隆/添加/启动耗时根因与修复 | DONE | C4-R04；完成后解除 C4-R05 临时阻断 | `7c0c819a58513f89e91ec0fb44cdc05a151e2c32` | §5 C4-TEMP-01 修复完成（2026-08-30） |
-| C4-R05 | MuMu RD 正式重验与关门 | BLOCKED | C4-R04,C4-TEMP-01 | `58e86b09cf8a6671e3d064042976ba5487c57ec2`（本轮验收基线） | §5 C4-R05 formal failure classification（2026-09-01） |
+| C4-R05 | MuMu RD 正式重验与关门 | IN_PROGRESS | C4-R04,C4-TEMP-01 | `898dc4d53c2e723d56522ec273c88dc120545559`（恢复修复开始基线） | §5 C4-R05 post-restart recovery（2026-09-01） |
 | C5-T01 | 原始 XH 产品能力契约 | NOT_APPLICABLE | C2,C3 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T02 | XH CAS Host/SDK 集成 | NOT_APPLICABLE | C5-T01,C4-T02 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T03 | 原始 XH/DingTalk 验收 | NOT_APPLICABLE | C5-T02,C4 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
@@ -3689,3 +3689,33 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   恢复前必须完成有界 Host process-owner/memory-pressure 与 post-restart Guest readiness
   设计/修复或明确外部环境校正；随后在新的 clean commit 上重新开始，不得把本轮历史行
   合并为 PASS，并完成两轮正式矩阵、商业样本、回归和双用户短测后再评估关门。
+
+### C4-R05：post-LOW_MEMORY 新 boot Guest rebootstrap 恢复（2026-09-01）
+
+- **状态**：`IN_PROGRESS`。本段重新开启唯一当前任务 C4-R05；C4 同步从 `BLOCKED` 恢复为
+  `IN_PROGRESS (REOPENED)`。原 2026-09-01 首次 LOW_MEMORY 和 post-restart hot SLO 失败仍保留，
+  不作为 PASS 的组成部分。
+- **开始时间与基线**：2026-09-01 13:26（Asia/Shanghai）；开始 commit、分支和远端 HEAD
+  均为 `898dc4d53c2e723d56522ec273c88dc120545559`、
+  `feature/t57-r03-va-pro-capability-campaign`、
+  `origin/feature/t57-r03-va-pro-capability-campaign`；工作区干净；上一回执提交为
+  `898dc4d5`，上一被测实现基线为 `58e86b09`。
+- **上一任务回执**：C4-TEMP-01 已 DONE；其实现提交为 `7c0c819a`，正式回执/格式提交链已
+  推送。C4-R05 上一轮正式失败回执为 `72841e79`（证据/KI）和 `898dc4d5`（账本）。
+- **执行环境与设备快照**：Windows PowerShell；MuMu `RD测试` 动态解析，API 32、型号
+  `22041211A`；本恢复执行前必须再次解析 serial、boot id、ABI、Android ID 和实例索引；
+  禁止将 serial/端口/型号写入源码或 runner。
+- **事实源与专项设计**：已重新完整读取任务书、进度账本、C4 重测根因与验收计划、Known
+  Issues、能力工作流、提交身份策略、C4-R01/R02/R03/R04/R05 专项设计、VA/NBB 参考映射及
+  `docs/review/C4_R05_POST_RESTART_REBOOTSTRAP_DESIGN_20260901.md`。
+- **恢复设计**：仅在 host-scoped `LOW_MEMORY` 且一次动态 MuMu 重启成功后，发出一次独立的
+  package-neutral `prepare` rebootstrap；显式记录新 request/operation、boot、阶段和终态。
+  随后原坐标按原 hot/cold 模式重新发出真实 launch，仍执行原 10/30 秒 SLO 和
+  `FIRST_FRAME_DRAWN`/Window/Surface/非黑截图门禁。第二次 LOW_MEMORY、rebootstrap 失败或
+  任一非 LOW_MEMORY 失败均直接 BLOCKED；不扩大 deadline、不固定 readiness sleep、不隐藏
+  首次失败。
+- **当前 Known Issues**：`KI-R03-066` 继续 `RECORDED/NOT_FIXED/blocks_current_campaign=true`；
+  其余 C4 P0/P1/高风险问题和 `KI-R03-060` 回归要求原样保留。任务尚未达到 DONE，C6-T01
+  不前移。
+- **下一步**：先实现并单测该有界 rebootstrap，编译和定向回归通过后，用新的 clean commit
+  执行完整 R05 两轮；只有完整矩阵、回归和双用户短测全通过才可追加 DONE 回执。

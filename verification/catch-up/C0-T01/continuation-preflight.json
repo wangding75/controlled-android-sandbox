@@ -2,7 +2,7 @@
   "schema_version": 1,
   "task_id": "C4-R05",
   "status": "PASS",
-  "captured_at": "2026-08-31T13:21:45.930801+00:00",
+  "captured_at": "2026-09-01T05:31:11.453824+00:00",
   "ledger": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
     "next_task": "C4-R05",
@@ -27,21 +27,21 @@
   },
   "git": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "head": "305ca2a291f6c6116e6f54ad2e4e4410d7001523",
+    "head": "898dc4d53c2e723d56522ec273c88dc120545559",
     "remote_branch": "origin/feature/t57-r03-va-pro-capability-campaign",
-    "remote_head": "305ca2a291f6c6116e6f54ad2e4e4410d7001523",
+    "remote_head": "898dc4d53c2e723d56522ec273c88dc120545559",
     "identity": {
       "name": "OpenAI",
       "email": "openai@users.noreply.github.com"
     },
-    "status_short": ""
+    "status_short": "M docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md\n M tools/capability/run_c4_r03_low_memory_continuation.py\n M tools/capability/run_c4_r03_rd.py\n?? docs/review/C4_R05_POST_RESTART_REBOOTSTRAP_DESIGN_20260901.md\n?? scripts/test_c4_r03_rebootstrap.py"
   },
   "device": {
     "instance_name": "RD测试",
-    "resolved_serial": "127.0.0.1:16417",
+    "resolved_serial": "127.0.0.1:16416",
     "api": "32",
     "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
-    "boot_id": "1e0d252c-0d7e-494a-9792-7422a244b6bc",
+    "boot_id": "fbd12b02-b1dd-49e0-9946-6f94b0da4a64",
     "android_id": "398eea33120cd887",
     "model": "22041211A"
   },
