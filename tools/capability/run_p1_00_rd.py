@@ -46,13 +46,14 @@ def _host_activity_teardown_state(serial: str) -> dict[str, Any]:
     windows = run_adb(serial, ["shell", "dumpsys", "window", "windows"], check=False)
 
     def activity_line(line: str) -> bool:
-        return HOST_PACKAGE in line and any(
-            marker in line
-            for marker in ("ActivityRecord{", "cmp=", "mActivityComponent=", "packageName=")
-        )
+        # The Guest trampoline is also declared by the Host package (for example
+        # StubActivity60W1), but it must remain alive across hot commands.  The
+        # teardown barrier fences only the command Activity that the next `am start`
+        # will replace.
+        return HOST_PACKAGE in line and "DebugCommandActivity" in line
 
     def window_line(line: str) -> bool:
-        return HOST_PACKAGE in line and ("Window{" in line or "package=" in line)
+        return HOST_PACKAGE in line and "DebugCommandActivity" in line
 
     activity_rows = [line.strip() for line in activities.stdout.splitlines() if activity_line(line)]
     window_rows = [line.strip() for line in windows.stdout.splitlines() if window_line(line)]
