@@ -8,7 +8,9 @@ first non-PASS phase.  The launch-matrix child delegates its individual observat
 exit is recorded, the emulator is restarted, and the matrix continues from a separately
 recorded coordinate.  Child campaigns keep their own request-scoped raw evidence; this runner
 records the command, summary, commit and phase decision without turning a later observation into
-an automatic retry.
+an automatic retry.  If the bounded host-side phase envelope expires, the complete child process
+tree is terminated before durable-lane classification or continuation so a stale nested child
+cannot overlap the next APK install/rebootstrap operation.
 """
 
 from __future__ import annotations
@@ -112,6 +114,56 @@ def artifact_index(root: Path) -> list[dict[str, Any]]:
 
 def safe_name(value: str) -> str:
     return "".join(char if char.isalnum() or char in "-_" else "_" for char in value)
+
+
+def _process_output(value: Any) -> str:
+    """Normalize subprocess output from both text and timeout exception paths."""
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return str(value)
+
+
+def terminate_process_tree(pid: int) -> dict[str, Any]:
+    """Terminate a timed-out phase and every nested runner it owns.
+
+    ``subprocess.run(timeout=...)`` only terminates its direct child on Windows.  R05 nests
+    the low-memory wrapper and R03 runner, so leaving descendants alive permits a continuation's
+    ``install -r`` to race the old child at the same device.  The termination is deliberately
+    bounded and fully recorded; it is a process-boundary cleanup, never a test retry.
+    """
+    record: dict[str, Any] = {"attempted": True, "pid": pid}
+    if pid <= 0:
+        record.update({"status": "SKIPPED", "reason": "invalid pid"})
+        return record
+    if os.name == "nt":
+        command = ["taskkill", "/PID", str(pid), "/T", "/F"]
+        record["command"] = command
+        try:
+            completed = subprocess.run(
+                command, cwd=ROOT, text=True, encoding="utf-8", errors="replace",
+                capture_output=True, check=False, timeout=30,
+            )
+            record.update({
+                "status": "PASS" if completed.returncode == 0 else "NOT_FOUND_OR_FAILED",
+                "returncode": completed.returncode,
+                "stdout": completed.stdout or "",
+                "stderr": completed.stderr or "",
+            })
+        except (OSError, subprocess.TimeoutExpired) as error:
+            record.update({"status": "ERROR", "error": f"{type(error).__name__}:{error}"})
+        return record
+
+    import signal
+
+    try:
+        process_group = os.getpgid(pid)
+        os.killpg(process_group, signal.SIGTERM)
+        record.update({"status": "PASS", "signal": "SIGTERM", "processGroup": process_group})
+    except OSError as error:
+        record.update({"status": "NOT_FOUND_OR_FAILED", "error": f"{type(error).__name__}:{error}"})
+    return record
 
 
 def read_summary(path: Path) -> dict[str, Any]:
@@ -308,26 +360,37 @@ def run_command(label: str, command: list[str], output: Path, *,
     started = now_iso()
     started_mono = time.monotonic()
     timed_out = False
+    process_termination: dict[str, Any] | None = None
+    popen_kwargs: dict[str, Any] = {
+        "cwd": ROOT,
+        "text": True,
+        "encoding": "utf-8",
+        "errors": "replace",
+        "stdout": subprocess.PIPE,
+        "stderr": subprocess.PIPE,
+        "env": {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+    }
+    if os.name != "nt":
+        popen_kwargs["start_new_session"] = True
+    process = subprocess.Popen(command, **popen_kwargs)
     try:
-        completed = subprocess.run(
-            command,
-            cwd=ROOT,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            capture_output=True,
-            check=False,
-            timeout=timeout_seconds,
-            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
-        )
-        returncode = completed.returncode
-        stdout = completed.stdout or ""
-        stderr = completed.stderr or ""
+        stdout, stderr = process.communicate(timeout=timeout_seconds)
+        returncode = process.returncode
     except subprocess.TimeoutExpired as error:
         timed_out = True
         returncode = 124
-        stdout = str(error.stdout or "")
-        stderr = str(error.stderr or "") + f"\nTIMEOUT after {timeout_seconds}s\n"
+        process_termination = terminate_process_tree(process.pid)
+        try:
+            stdout, stderr = process.communicate(timeout=30)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            stdout, stderr = process.communicate()
+            process_termination["fallbackKill"] = True
+        stdout = _process_output(stdout) or _process_output(error.stdout)
+        stderr = _process_output(stderr) or _process_output(error.stderr)
+        stderr += f"\nTIMEOUT after {timeout_seconds}s\n"
+    stdout = _process_output(stdout)
+    stderr = _process_output(stderr)
     record: dict[str, Any] = {
         "label": label,
         "command": command,
@@ -337,9 +400,12 @@ def run_command(label: str, command: list[str], output: Path, *,
         "returncode": returncode,
         "timedOut": timed_out,
         "timeoutSeconds": timeout_seconds,
+        "processPid": process.pid,
         "stdoutPath": str((command_dir / f"{prefix}.stdout.txt").resolve()),
         "stderrPath": str((command_dir / f"{prefix}.stderr.txt").resolve()),
     }
+    if process_termination is not None:
+        record["processTermination"] = process_termination
     write_text(command_dir / f"{prefix}.stdout.txt", stdout)
     write_text(command_dir / f"{prefix}.stderr.txt", stderr)
     if summary_path is not None:

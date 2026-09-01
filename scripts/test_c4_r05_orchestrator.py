@@ -18,6 +18,7 @@ from run_c4_r05_rd import (  # noqa: E402
     launch_continuation,
     read_summary,
     require_pass,
+    run_command,
     safe_name,
 )
 from run_c4_r03_low_memory_continuation import (  # noqa: E402
@@ -43,6 +44,19 @@ class C4R05OrchestratorTests(unittest.TestCase):
             require_pass(record, "launch")
         self.assertEqual(context.exception.phase, "launch")
         self.assertEqual(context.exception.evidence, record)
+
+    def test_timeout_records_process_tree_termination_before_continuation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            record = run_command(
+                "bounded-timeout",
+                [sys.executable, "-c", "import time; time.sleep(5)"],
+                Path(temporary),
+                timeout_seconds=1,
+            )
+        self.assertTrue(record["timedOut"])
+        self.assertEqual(record["returncode"], 124)
+        self.assertEqual(record["processTermination"]["pid"], record["processPid"])
+        self.assertTrue(record["processTermination"]["attempted"])
 
     def test_read_summary_and_artifact_index_are_machine_readable(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
