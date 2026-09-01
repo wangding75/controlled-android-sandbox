@@ -1971,3 +1971,44 @@ issues:
       A hot command now waits for live ATMS ActivityRecord and WM Window teardown before starting
       the next DebugCommandActivity, while preserving the Guest process and hot state. The fix
       remains open until the full formal two-round run passes.
+
+  - issue_id: KI-R03-066
+    title: C4-R05 post-LOW_MEMORY restart hot continuation exceeds readiness SLO
+    capability: activity_framework
+    classification: NEEDS_REPRODUCTION_AND_CLASSIFICATION
+    severity: HIGH
+    status: RECORDED
+    discovered_by: C4-R05 formal two-round 2026-09-01
+    evidence:
+      - verification/catch-up/C4-R05/20260901-formal-failure-classification.md
+      - verification/catch-up/C4-R05/formal-two-round-20260901-hot-barrier/summary.json
+      - verification/catch-up/C4-R05/formal-two-round-20260901-hot-barrier/round-1-clean-install-cold/launch-matrix/low-memory-recovery/event-001/restart.json
+      - verification/catch-up/C4-R05/formal-two-round-20260901-hot-barrier/round-1-clean-install-cold/launch-matrix/attempt-002/attempts/dingtalk/user-1/hot-019/first-failure-full
+      - verification/catch-up/C4-R05/formal-two-round-20260901-hot-barrier/round-1-clean-install-cold/launch-matrix/attempt-003/attempts/dingtalk/user-1/hot-019/case.json
+      - docs/review/C4_R05_FINAL_TWO_ROUND_EVIDENCE_BOUNDARY_DESIGN_20260827.md
+      - tools/capability/run_c4_r03_low_memory_continuation.py
+    match_patterns:
+      - READINESS_SLO_EXCEEDED
+      - LOW_MEMORY
+      - RD_ENVIRONMENT_RESOLUTION_BLOCKED
+      - com.alibaba.android.rimet
+      - FIRST_FRAME_DRAWN
+    blocks_current_campaign: true
+    follow_up_required: true
+    follow_up_task: C4-R05 fresh clean-commit recovery and post-restart latency regression
+    acceptance: NOT_FIXED
+    fix_policy: BOUNDED_HOST_PROCESS_OWNER_AND_POST_RESTART_GUEST_READINESS_CLASSIFICATION
+    notes: >
+      In the formal R05 lane, the first actual failure was DingTalk user1 hot-019 in
+      attempt-002. Host-scoped ApplicationExitInfo and lowmemorykiller logcat prove that
+      com.warden.controlledsandbox.debug was killed with reason LOW_MEMORY at 12:55:38.513;
+      the policy-approved dynamic MuMu restart changed boot
+      de531bad-89f7-4470-ae4c-408a70bfdf43 to fbd12b02-b1dd-49e0-9946-6f94b0da4a64.
+      The independent attempt-003 observation used a new request and retryBudget=0, reached
+      correlated ACTIVITY_RESUMED and FIRST_FRAME_DRAWN with valid Window/Surface/non-black
+      evidence, but readiness took 18345 ms against the 10000 ms hot SLO and was therefore a
+      real READINESS_SLO_EXCEEDED failure. Package state, package universe, broker connect and
+      Guest prepare consumed 5262, 4338, 11849 and 11653 ms respectively after the new boot.
+      No FATAL/ANR or unique DingTalk/UI root cause was proven. The interruption, original
+      LOW_MEMORY failure, and post-restart SLO failure remain separate authoritative evidence;
+      no package-specific change, deadline extension, fixed sleep, or hidden retry is justified.
