@@ -2,7 +2,7 @@
   "schema_version": 1,
   "task_id": "C4-R05",
   "status": "PASS",
-  "captured_at": "2026-09-01T05:32:45.236271+00:00",
+  "captured_at": "2026-09-01T05:36:01.769763+00:00",
   "ledger": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
     "next_task": "C4-R05",
@@ -27,9 +27,9 @@
   },
   "git": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "head": "aec961b3a65764b6c98119fe7cb04ca9bb793e80",
+    "head": "46a6d8a87fbecba739e8c893c176ec282af10d4e",
     "remote_branch": "origin/feature/t57-r03-va-pro-capability-campaign",
-    "remote_head": "aec961b3a65764b6c98119fe7cb04ca9bb793e80",
+    "remote_head": "46a6d8a87fbecba739e8c893c176ec282af10d4e",
     "identity": {
       "name": "OpenAI",
       "email": "openai@users.noreply.github.com"
