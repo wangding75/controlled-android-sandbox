@@ -126,6 +126,14 @@ def debug_command(
         if probe.returncode != 0:
             break
         time.sleep(0.1)
+    if not force_stop_host:
+        # A hot lane preserves the Guest process, but each debug command still finishes its
+        # Host Activity after publishing the result.  Starting the next command while that
+        # ActivityRecord is being removed is a real API-32 ClientTransaction race: ATMS can
+        # accept START while the old record/window is still attached, then dispatch a stale
+        # transaction to the new Host process.  Fence the Host framework state dynamically;
+        # this does not stop or recreate the Guest process and therefore preserves hot state.
+        teardown = _wait_for_host_activity_teardown(serial)
     # The explicit force-stop above is the cold-start boundary.  Do not append ``-S`` here:
     # ``am start -S`` performs a second asynchronous kill while ActivityTaskManager is still
     # removing the previous ClientTransaction.  On API 32 that race can dispatch an orphaned

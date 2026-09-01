@@ -3587,3 +3587,18 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   两轮正式矩阵；`KI-R03-064` 仍保持 `RECORDED`、`acceptance: NOT_FIXED`、阻断状态。
 - 当前下一步：在该 clean commit 上启动新的 R05 formal 两轮验收；旧 formal 输出不与
   新 commit 混合，旧输出仅作为首次失败证据保留。
+
+### C4-R05：hot Host Activity teardown race 首次失败与修复（2026-09-01）
+
+- **首次失败与中断关系**：formal lane `formal-two-round-20260831-prewarm-rollback-v2`
+  的首个非环境失败是 Quark user0 hot-011，request=`ab260ac494814d72b3637abad6ad899e`、
+  attempt=1、retryBudget=0、automaticRetryPerformed=false。前一轮 Host StubActivity60
+  出现 top-resumed/pause timeout，下一次 START 虽返回但没有 Guest ActivityRecord/Window
+  生命周期证据，30 秒观察到期后 fail-closed。该失败发生在后续低内存检测与 MuMu restart
+  之前，故不是中断重试引起；重启后的独立 attempt=2 首帧可见但 readiness=13032 ms，
+  超过 hot 10 秒 SLO。
+- **分类与修复**：新增 `KI-R03-065`，分类为验收编排/Host ActivityRecord teardown
+  证据缺口，不归因于 Quark SDK。`tools/capability/run_p1_00_rd.py` 对 hot command 在
+  启动下一次 DebugCommandActivity 前动态等待 ATMS ActivityRecord 与 WM Window 消失；
+  不停止 Guest、不固定 sleep、不自动重试。原始 full snapshot 保留在失败目录。
+- **本地验证**：`python -m py_compile tools/capability/run_p1_00_rd.py tools/capability/run_c4_r03_rd.py tools/capability/run_c4_r05_rd.py` PASS；`python scripts/check-c4-r05-orchestrator.py` PASS；`python scripts/verify-catch-up-continuation.py` PASS。待新 clean commit 构建并重跑 formal 两轮，才能关闭该 KI 和 C4-R05。

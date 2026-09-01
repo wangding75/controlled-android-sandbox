@@ -1940,3 +1940,34 @@ issues:
       that this was not an automatic retry. A rollback path now terminates ALLOCATED/PREPARING
       leases, releases the slot, removes prepared state and invalidates component ownership.
       Full two-round R05 regression is required before closing this issue.
+
+  - issue_id: KI-R03-065
+    title: Hot formal runner starts a new Host Activity before the prior record/window is torn down
+    capability: activity_framework
+    classification: TEST_EVIDENCE_GAP
+    severity: HIGH
+    status: RECORDED
+    discovered_by: C4-R05 formal two-round 2026-08-31
+    evidence:
+      - verification/catch-up/C4-R05/formal-two-round-20260831-prewarm-rollback-v2/round-1-clean-install-cold/launch-matrix/attempt-001/attempts/quark/user-0/hot-011/case.json
+      - verification/catch-up/C4-R05/formal-two-round-20260831-prewarm-rollback-v2/round-1-clean-install-cold/launch-matrix/attempt-001/attempts/quark/user-0/hot-011/first-failure-full/logcat.txt
+      - tools/capability/run_p1_00_rd.py
+    match_patterns:
+      - LAUNCH_GATE_FAILED
+      - StubActivity60
+      - top resumed state loss timeout
+      - ActivityTaskManager: START
+    blocks_current_campaign: true
+    follow_up_required: true
+    follow_up_task: C4-R05 full two-round clean-commit regression
+    acceptance: NOT_FIXED
+    fix_policy: C4_R05_DYNAMIC_HOST_ACTIVITY_TEARDOWN_BARRIER
+    notes: >
+      The first Quark user0 hot-011 failure was attempt=1 with retryBudget=0 and no automatic
+      retry. The prior Host StubActivity60 had a top-resumed/pause timeout immediately before
+      the next START; the new Host START returned, but no Guest ActivityRecord/window callback
+      was observed within the 30-second launch observation. The failure occurred before the
+      later host-scoped emulator restart, so interruption did not cause the first failure.
+      A hot command now waits for live ATMS ActivityRecord and WM Window teardown before starting
+      the next DebugCommandActivity, while preserving the Guest process and hot state. The fix
+      remains open until the full formal two-round run passes.
