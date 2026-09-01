@@ -350,6 +350,81 @@ def reconstruct_interrupted_summary(args: argparse.Namespace, child_dir: Path) -
     }
 
 
+def _attempt_sort_key(path: Path) -> tuple[int, str]:
+    suffix = path.name.removeprefix("attempt-")
+    return (int(suffix) if suffix.isdigit() else -1, path.name)
+
+
+def reconstruct_interrupted_lane(args: argparse.Namespace, lane_dir: Path) -> dict[str, Any]:
+    """Reconstruct every durable row across a host-truncated launch lane.
+
+    A host phase boundary can leave more than one child: the first child may contain the
+    explicit LOW_MEMORY failure and the one approved post-restart continuation may contain
+    the replacement observation.  Seeding only the newest child would erase that history and
+    could make the aggregate under-count or misclassify the lane.  Keep all case rows in
+    attempt order; ``aggregate`` later selects the latest terminal row per coordinate while
+    retaining the earlier rows under ``observations``.
+    """
+    attempt_dirs = sorted(
+        (path for path in lane_dir.glob("attempt-*") if path.is_dir()),
+        key=_attempt_sort_key,
+    )
+    rows: list[dict[str, Any]] = []
+    source_attempts: list[str] = []
+    blocked_at: dict[str, Any] | None = None
+    for attempt_dir in attempt_dirs:
+        child_rows: list[dict[str, Any]] = []
+        for path in sorted(attempt_dir.rglob("case.json")):
+            row = read_json(path)
+            if row.get("task") != TASK_ID:
+                continue
+            child_rows.append(row)
+            if blocked_at is None and row.get("failureDetected"):
+                blocked_at = {
+                    key: row.get(key)
+                    for key in ("target", "user", "mode", "iteration", "classification")
+                    if key in row
+                }
+        if child_rows:
+            rows.extend(child_rows)
+            source_attempts.append(str(attempt_dir.resolve()))
+
+    targets = parse_csv(args.targets)
+    users = parse_csv(args.users, cast=int)
+    summaries = [
+        read_json(attempt_dir / "c4-r03-summary.json")
+        for attempt_dir in attempt_dirs
+    ]
+    for summary in summaries:
+        candidate = summary.get("blockedAt")
+        if isinstance(candidate, dict):
+            blocked_at = candidate
+            break
+    return {
+        "schemaVersion": 1,
+        "task": TASK_ID,
+        "status": "INTERRUPTED",
+        "instanceName": args.instance_name,
+        "loops": args.loops,
+        "users": users,
+        "targetNames": targets,
+        "expectedRows": len(targets) * len(users) * args.loops * 2,
+        "observedRows": len(rows),
+        "attemptPolicy": {
+            "attempt": len(attempt_dirs),
+            "retryBudget": 0,
+            "automaticRetries": 0,
+            "sessionInterrupted": True,
+            "durableLaneSeed": True,
+            "sourceAttempts": source_attempts,
+        },
+        "blockedAt": blocked_at,
+        "rows": rows,
+        "rawDirectory": str(lane_dir.resolve()),
+        "sourceAttempts": source_attempts,
+    }
+
+
 def seed_existing_child(args: argparse.Namespace, child_dir: Path) -> dict[str, Any]:
     summary = read_json(child_dir / "c4-r03-summary.json")
     if not summary:
@@ -370,6 +445,35 @@ def seed_existing_child(args: argparse.Namespace, child_dir: Path) -> dict[str, 
         "note": "Completed case.json rows are retained; the missing final summary represents a session interruption, not a test pass.",
     }
     write_json(args.output / "seed-existing-child.json", record)
+    return record
+
+
+def seed_existing_lane(args: argparse.Namespace, lane_dir: Path) -> dict[str, Any]:
+    """Seed all durable attempts from a host-truncated lane without erasing history."""
+    summary = reconstruct_interrupted_lane(args, lane_dir)
+    rows = summary.get("rows") or []
+    if not rows:
+        raise SystemExit(f"seed lane has no completed case rows: {lane_dir}")
+    low_memory = classify_low_memory(summary)
+    record = {
+        "attempt": len(summary.get("sourceAttempts") or []),
+        "startedAt": rows[0].get("startedAt") if isinstance(rows[0], dict) else "",
+        "completedAt": rows[-1].get("completedAt") if isinstance(rows[-1], dict) else "",
+        "elapsedMs": 0,
+        "command": ["seed-existing-lane", str(lane_dir.resolve())],
+        "returncode": 124,
+        "output": str(lane_dir.resolve()),
+        "summary": summary,
+        "seededExisting": True,
+        "seededExistingLane": True,
+        "sourceAttempts": summary.get("sourceAttempts") or [],
+        "seededLowMemoryEvents": [low_memory] if low_memory is not None else [],
+        "note": (
+            "All durable case.json rows across the prior attempts are retained. The missing "
+            "host-phase summary represents a bounded session interruption, not a test pass."
+        ),
+    }
+    write_json(args.output / "seed-existing-lane.json", record)
     return record
 
 
@@ -429,8 +533,11 @@ def main() -> int:
     parser.add_argument("--targets", default=DEFAULT_TARGETS)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--child-timeout-seconds", type=int, default=14_400)
-    parser.add_argument("--seed-existing-child", type=Path, default=None,
-                        help="seed completed case rows from a child whose final summary was interrupted")
+    seed_group = parser.add_mutually_exclusive_group()
+    seed_group.add_argument("--seed-existing-child", type=Path, default=None,
+                            help="seed completed case rows from one interrupted child")
+    seed_group.add_argument("--seed-existing-lane", type=Path, default=None,
+                            help="seed all durable case rows from a host-truncated launch lane")
     parser.add_argument("--resume-target", default="")
     parser.add_argument("--resume-user", type=int, default=None)
     parser.add_argument("--resume-iteration", type=int, default=None)
@@ -447,13 +554,20 @@ def main() -> int:
     terminal_failure: dict[str, Any] | None = None
     attempt = 1
     post_restart_rebootstrap = False
-    if args.seed_existing_child is not None:
-        seed = args.seed_existing_child if args.seed_existing_child.is_absolute() \
-            else ROOT / args.seed_existing_child
+    if args.seed_existing_child is not None or args.seed_existing_lane is not None:
+        seed_argument = args.seed_existing_child or args.seed_existing_lane
+        seed = seed_argument if seed_argument.is_absolute() else ROOT / seed_argument
         required = (args.resume_target, args.resume_user, args.resume_iteration, args.resume_mode)
         if not seed.is_dir() or not all(value not in (None, "") for value in required):
-            raise SystemExit("seed-existing-child requires an existing child and explicit resume target/user/iteration/mode")
-        children.append(seed_existing_child(args, seed))
+            raise SystemExit(
+                "an existing seed child/lane and explicit resume target/user/iteration/mode are required"
+            )
+        if args.seed_existing_lane is not None:
+            seeded = seed_existing_lane(args, seed)
+            low_memory_events.extend(seeded.get("seededLowMemoryEvents") or [])
+        else:
+            seeded = seed_existing_child(args, seed)
+        children.append(seeded)
         resume = {
             "target": args.resume_target,
             "user": args.resume_user,
@@ -462,6 +576,14 @@ def main() -> int:
             "previousLane": str(seed.resolve()),
         }
         attempt = 2
+        if args.seed_existing_lane is not None:
+            existing_attempts = [
+                int(path.name.removeprefix("attempt-"))
+                for path in seed.glob("attempt-*")
+                if path.is_dir() and path.name.removeprefix("attempt-").isdigit()
+            ]
+            if existing_attempts:
+                attempt = max(existing_attempts) + 1
         while (args.output / f"attempt-{attempt:03d}").exists():
             attempt += 1
     while True:

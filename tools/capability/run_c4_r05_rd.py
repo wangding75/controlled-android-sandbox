@@ -130,9 +130,10 @@ def is_environment_interruption(row: dict[str, Any]) -> bool:
     """Recognize only a durable device-loss observation that may be resumed once.
 
     A launch/readiness failure remains terminal by default.  The exception is deliberately
-    narrow: the command must report the explicit environment-resolution block and the device
-    snapshot must prove that no screenshot/surface was available.  This keeps real CAS/App
-    launch failures fail-closed while allowing a user-approved continuation after an emulator
+    narrow: the command must report the explicit environment-resolution block and either the
+    device snapshot must prove that no screenshot/surface was available or the durable failure
+    snapshot must prove a host-scoped LOW_MEMORY exit.  This keeps real CAS/App launch failures
+    fail-closed while allowing only the documented environment continuation after an emulator
     restart, without deleting or rewriting the original failed row.
     """
     if not row.get("failureDetected"):
@@ -141,11 +142,47 @@ def is_environment_interruption(row: dict[str, Any]) -> bool:
     detail = str(command.get("detail") or "")
     device = row.get("device") or {}
     screenshot = device.get("screenshot") or {}
-    return (
+    device_loss = (
         bool(ENVIRONMENT_INTERRUPTION_RE.search(detail))
         and str(command.get("status") or "").upper() == "ERROR"
         and device.get("surfaceNonEmpty") is False
         and bool(screenshot.get("error"))
+    )
+    if device_loss:
+        return True
+    return is_host_low_memory_interruption(row)
+
+
+def host_low_memory_evidence(row: dict[str, Any]) -> list[str]:
+    artifacts = Path(str(row.get("artifacts", "")))
+    full = artifacts / "first-failure-full"
+    if not full.is_dir():
+        return []
+    paths = [full / "application-exit-info.txt"]
+    paths.extend(sorted(full.glob("*.txt")))
+    matches: list[str] = []
+    for path in dict.fromkeys(paths):
+        if not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if LOW_MEMORY_RE.search(text) and HOST_PACKAGE_RE.search(text):
+            matches.append(str(path.resolve()))
+    return matches
+
+
+def is_host_low_memory_interruption(row: dict[str, Any]) -> bool:
+    """Allow a continuation only for an explicit host LOW_MEMORY environment boundary."""
+    if not row.get("failureDetected"):
+        return False
+    command = row.get("commandResult") or {}
+    detail = str(command.get("detail") or "")
+    return (
+        bool(ENVIRONMENT_INTERRUPTION_RE.search(detail))
+        and str(command.get("status") or "").upper() == "ERROR"
+        and bool(host_low_memory_evidence(row))
     )
 
 
@@ -213,6 +250,7 @@ def launch_continuation(lane: Path, targets: str, users: str, loops: int) -> dic
             target, user, iteration, mode = coordinate
             return {
                 "previousLane": str(latest_child.resolve()),
+                "seedLane": str(lane.resolve()),
                 "target": target,
                 "user": user,
                 "iteration": iteration,
@@ -224,8 +262,10 @@ def launch_continuation(lane: Path, targets: str, users: str, loops: int) -> dic
         if row.get("failureDetected"):
             if is_environment_interruption(row):
                 target, user, iteration, mode = coordinate
+                low_memory = is_host_low_memory_interruption(row)
                 return {
                     "previousLane": str(latest_child.resolve()),
+                    "seedLane": str(lane.resolve()),
                     "target": target,
                     "user": user,
                     "iteration": iteration,
@@ -236,8 +276,10 @@ def launch_continuation(lane: Path, targets: str, users: str, loops: int) -> dic
                     "environmentInterruption": {
                         "coordinate": list(coordinate),
                         "source": str(sources[coordinate].resolve()),
-                        "classification": "ENVIRONMENT_RESTART_INTERRUPTION",
+                        "classification": ("HOST_LOW_MEMORY_INTERRUPTION" if low_memory
+                                            else "ENVIRONMENT_RESTART_INTERRUPTION"),
                         "originalFailurePreserved": True,
+                        "evidence": host_low_memory_evidence(row) if low_memory else [],
                     },
                 }
             raise PhaseFailure("launch-continuation", "existing lane contains a non-terminal failure",
@@ -245,6 +287,7 @@ def launch_continuation(lane: Path, targets: str, users: str, loops: int) -> dic
                                 "source": str(sources[coordinate].resolve())})
     result = {
         "previousLane": str(latest_child.resolve()),
+        "seedLane": str(lane.resolve()),
         "completedRows": len(observed),
         "expectedRows": len(expected),
         "attempts": [str(path.resolve()) for path in attempt_dirs],
@@ -264,6 +307,7 @@ def run_command(label: str, command: list[str], output: Path, *,
     prefix = f"{len(list(command_dir.glob('*.json'))):03d}-{safe_name(label)}"
     started = now_iso()
     started_mono = time.monotonic()
+    timed_out = False
     try:
         completed = subprocess.run(
             command,
@@ -280,6 +324,7 @@ def run_command(label: str, command: list[str], output: Path, *,
         stdout = completed.stdout or ""
         stderr = completed.stderr or ""
     except subprocess.TimeoutExpired as error:
+        timed_out = True
         returncode = 124
         stdout = str(error.stdout or "")
         stderr = str(error.stderr or "") + f"\nTIMEOUT after {timeout_seconds}s\n"
@@ -290,6 +335,8 @@ def run_command(label: str, command: list[str], output: Path, *,
         "completedAt": now_iso(),
         "elapsedMs": round((time.monotonic() - started_mono) * 1000),
         "returncode": returncode,
+        "timedOut": timed_out,
+        "timeoutSeconds": timeout_seconds,
         "stdoutPath": str((command_dir / f"{prefix}.stdout.txt").resolve()),
         "stderrPath": str((command_dir / f"{prefix}.stderr.txt").resolve()),
     }
@@ -391,14 +438,17 @@ def run_launch_matrix(instance_name: str, loops: int, users: str, targets: str,
                       continuation: dict[str, Any] | None = None) -> dict[str, Any]:
     phase_output = round_output / "launch-matrix"
     # The wrapper delegates every observation to run_c4_r03_rd.py and only handles the
-    # user-approved MuMu LOW_MEMORY restart boundary around that fail-fast child.
-    command = [sys.executable, str(TOOLS / "run_c4_r03_low_memory_continuation.py"),
-               "--instance-name", instance_name, "--loops", str(loops),
-               "--users", users, "--targets", targets,
-               "--output", str(phase_output)]
+    # user-approved MuMu LOW_MEMORY restart boundary around that fail-fast child.  A host
+    # phase timeout is a separate, bounded session boundary: it may seed the complete durable
+    # lane once, but it never changes the per-case readiness SLO or becomes a PASS by itself.
+    base_command = [sys.executable, str(TOOLS / "run_c4_r03_low_memory_continuation.py"),
+                    "--instance-name", instance_name, "--loops", str(loops),
+                    "--users", users, "--targets", targets,
+                    "--output", str(phase_output)]
+    command = list(base_command)
     if continuation and not continuation.get("complete"):
         command.extend([
-            "--seed-existing-child", str(continuation["previousLane"]),
+            "--seed-existing-lane", str(continuation.get("seedLane", phase_output)),
             "--" + "resume-target", str(continuation["target"]),
             "--" + "resume-user", str(continuation["user"]),
             "--" + "resume-iteration", str(continuation["iteration"]),
@@ -412,9 +462,84 @@ def run_launch_matrix(instance_name: str, loops: int, users: str, targets: str,
         return {"label": f"{round_output.name}-c4-r03-launch-matrix",
                 "returncode": 0, "summary": summary,
                 "continuedExistingOutput": True}
-    record = run_command(f"{round_output.name}-c4-r03-launch-matrix", command, root_output,
-                         summary_path=phase_output / "c4-r03-summary.json", timeout_seconds=14_400)
-    return require_pass(record, f"{round_output.name}-c4-r03-launch-matrix")
+    records: list[dict[str, Any]] = []
+    host_phase_continuations: list[dict[str, Any]] = []
+    phase_label = f"{round_output.name}-c4-r03-launch-matrix"
+    while True:
+        record = run_command(phase_label, command, root_output,
+                             summary_path=phase_output / "c4-r03-summary.json", timeout_seconds=14_400)
+        records.append(record)
+        if not record.get("timedOut"):
+            completed = require_pass(record, phase_label)
+            break
+
+        summary_status = str((record.get("summary") or {}).get("status") or "MISSING")
+        if summary_status != "MISSING":
+            raise PhaseFailure(
+                phase_label,
+                "host phase timed out with a non-missing child summary; fail-closed",
+                record,
+            )
+        if host_phase_continuations:
+            raise PhaseFailure(
+                phase_label,
+                "host phase continuation budget exhausted",
+                {"record": record, "hostPhaseContinuations": host_phase_continuations},
+            )
+
+        progress = launch_continuation(phase_output, targets, users, loops)
+        if progress.get("complete"):
+            raise PhaseFailure(
+                phase_label,
+                "host phase timed out although the durable lane is complete but summary is missing",
+                {"record": record, "progress": progress},
+            )
+        if int(progress.get("completedRows", 0)) <= 0:
+            raise PhaseFailure(
+                phase_label,
+                "host phase timed out without durable case rows for continuation",
+                {"record": record, "progress": progress},
+            )
+        continuation_event = {
+            "classification": "HOST_PHASE_BOUNDARY_INTERRUPTION",
+            "decision": "CONTINUE_ONCE_FROM_FULL_DURABLE_LANE",
+            "retryable": True,
+            "automaticRetryPerformed": False,
+            "retryBudget": 0,
+            "continuationBudget": 1,
+            "sourceCommand": record,
+            "progress": progress,
+            "originalFailurePreserved": True,
+        }
+        host_phase_continuations.append(continuation_event)
+        command = list(base_command)
+        command.extend([
+            "--seed-existing-lane", str(phase_output),
+            "--" + "resume-target", str(progress["target"]),
+            "--" + "resume-user", str(progress["user"]),
+            "--" + "resume-iteration", str(progress["iteration"]),
+            "--" + "resume-mode", str(progress["mode"]),
+        ])
+        phase_label = f"{round_output.name}-c4-r03-launch-matrix-host-continuation-001"
+
+    result = {
+        "label": completed.get("label", phase_label),
+        "returncode": completed.get("returncode", 1),
+        "summary": completed.get("summary") or {},
+        "commands": records,
+        "hostPhaseContinuations": host_phase_continuations,
+    }
+    if host_phase_continuations:
+        result["summary"] = {
+            **result["summary"],
+            "hostPhaseContinuation": {
+                "budget": 1,
+                "used": len(host_phase_continuations),
+                "events": host_phase_continuations,
+                "originalFailurePreserved": True,
+            },
+        }
+    return result
 
 
 def run_regressions(instance_name: str, output: Path) -> list[dict[str, Any]]:
@@ -729,9 +854,14 @@ def main() -> int:
                                         run_r04_contracts(args.instance_name, round_output, output)]
                 round_report["addGate"] = run_add_gate(
                     args.instance_name, round_output, output, reduced_scope=reduced_scope)["summary"]
-            round_report["launchMatrix"] = run_launch_matrix(
+            launch_result = run_launch_matrix(
                 args.instance_name, args.loops, args.users, args.targets, round_output, output,
-                continuation=continuation if index == 1 else None)["summary"]
+                continuation=continuation if index == 1 else None)
+            round_report["launchMatrix"] = launch_result["summary"]
+            if launch_result.get("hostPhaseContinuations"):
+                round_report["launchMatrixHostPhaseContinuations"] = launch_result[
+                    "hostPhaseContinuations"
+                ]
             round_report.update({"status": "PASS", "completedAt": now_iso()})
         report["regressions"] = [record.get("summary") or {"label": record.get("label"),
                                                               "returncode": record.get("returncode")}

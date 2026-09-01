@@ -2012,3 +2012,41 @@ issues:
       No FATAL/ANR or unique DingTalk/UI root cause was proven. The interruption, original
       LOW_MEMORY failure, and post-restart SLO failure remain separate authoritative evidence;
       no package-specific change, deadline extension, fixed sleep, or hidden retry is justified.
+
+  - issue_id: KI-R03-067
+    title: C4-R05 launch matrix host phase timeout truncates durable LOW_MEMORY continuation
+    capability: activity_framework
+    classification: TEST_EVIDENCE_GAP
+    severity: HIGH
+    status: RECORDED
+    discovered_by: C4-R05 formal two-round 2026-09-01
+    evidence:
+      - verification/catch-up/C4-R05/formal-two-round-20260901-rebootstrap-v1/summary.json
+      - verification/catch-up/C4-R05/formal-two-round-20260901-rebootstrap-v1/commands/004-round-1-clean-install-cold-c4-r03-launch-matrix.json
+      - verification/catch-up/C4-R05/formal-two-round-20260901-rebootstrap-v1/round-1-clean-install-cold/launch-matrix/attempt-001/attempts/quark/user-1/cold-006/case.json
+      - verification/catch-up/C4-R05/formal-two-round-20260901-rebootstrap-v1/round-1-clean-install-cold/launch-matrix/attempt-002/post-restart-rebootstrap/quark/user-1/post-restart-rebootstrap.json
+      - docs/review/C4_R05_HOST_PHASE_BOUNDARY_CONTINUATION_DESIGN_20260901.md
+      - tools/capability/run_c4_r05_rd.py
+      - tools/capability/run_c4_r03_low_memory_continuation.py
+    match_patterns:
+      - TIMEOUT after 14400s
+      - summaryStatus=MISSING
+      - HOST_PHASE_BOUNDARY_INTERRUPTION
+      - POST_RESTART_GUEST_REBOOTSTRAP
+      - LOW_MEMORY
+    blocks_current_campaign: true
+    follow_up_required: true
+    follow_up_task: C4-R05 full two-round clean-commit regression
+    acceptance: NOT_FIXED
+    fix_policy: C4_R05_DURABLE_HOST_PHASE_CONTINUATION_WITHOUT_SLO_CHANGE
+    notes: >
+      The first formal launch phase reached a host-scoped LOW_MEMORY failure at Quark user1
+      cold-006, completed the one policy-approved dynamic MuMu restart and independent Guest
+      rebootstrap, and then left durable case rows through fanqie user1 hot-015. The enclosing
+      run_command 14,400-second process envelope expired before the child could write its final
+      summary, returning 124 with summaryStatus=MISSING. This is an orchestration-boundary
+      evidence gap, not proof of an App/UI or Guest readiness success. The fix preserves all
+      prior attempt rows, selects the exact first missing coordinate, and permits one bounded
+      continuation only; it does not enlarge the cold/hot readiness SLO, add a launch retry, or
+      rewrite the original LOW_MEMORY failure. A complete two-round R05 run must prove the
+      behavior before this issue can be closed.

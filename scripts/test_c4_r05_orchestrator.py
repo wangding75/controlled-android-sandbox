@@ -20,6 +20,12 @@ from run_c4_r05_rd import (  # noqa: E402
     require_pass,
     safe_name,
 )
+from run_c4_r03_low_memory_continuation import (  # noqa: E402
+    classify_low_memory,
+    reconstruct_interrupted_lane,
+    seed_existing_lane,
+)
+from types import SimpleNamespace
 
 
 class C4R05OrchestratorTests(unittest.TestCase):
@@ -107,6 +113,65 @@ class C4R05OrchestratorTests(unittest.TestCase):
             self.assertTrue(continuation["complete"])
             self.assertEqual(continuation["recoveredEnvironmentCoordinates"],
                              [["dingtalk", 0, 1, "cold"]])
+
+    def test_full_lane_seed_preserves_low_memory_failure_and_recovery_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            lane = root / "launch-matrix"
+            failed_dir = lane / "attempt-001" / "attempts" / "dingtalk" / "user-0" / "cold-001"
+            recovered_dir = lane / "attempt-002" / "attempts" / "dingtalk" / "user-0" / "cold-001"
+            hot_dir = lane / "attempt-002" / "attempts" / "dingtalk" / "user-0" / "hot-001"
+            failed_dir.mkdir(parents=True)
+            recovered_dir.mkdir(parents=True)
+            hot_dir.mkdir(parents=True)
+            exit_info = failed_dir / "first-failure-full" / "application-exit-info.txt"
+            exit_info.parent.mkdir(parents=True)
+            exit_info.write_text(
+                "package: com.warden.controlledsandbox.debug\n"
+                "process=com.warden.controlledsandbox.debug reason=3 (LOW_MEMORY)\n",
+                encoding="utf-8",
+            )
+            failed = {
+                "task": "C4-R03", "target": "dingtalk", "user": 0,
+                "iteration": 1, "mode": "cold", "failureDetected": True,
+                "startedAt": "2026-09-01T00:00:00Z", "completedAt": "2026-09-01T00:00:01Z",
+                "artifacts": str(failed_dir),
+                "commandResult": {
+                    "status": "ERROR",
+                    "detail": "RD_ENVIRONMENT_RESOLUTION_BLOCKED: debug-command-result timeout",
+                },
+            }
+            recovered = {
+                "task": "C4-R03", "target": "dingtalk", "user": 0,
+                "iteration": 1, "mode": "cold", "failureDetected": False,
+                "startedAt": "2026-09-01T00:00:02Z", "completedAt": "2026-09-01T00:00:03Z",
+            }
+            hot = {
+                "task": "C4-R03", "target": "dingtalk", "user": 0,
+                "iteration": 1, "mode": "hot", "failureDetected": False,
+                "startedAt": "2026-09-01T00:00:04Z", "completedAt": "2026-09-01T00:00:05Z",
+            }
+            (failed_dir / "case.json").write_text(json.dumps(failed), encoding="utf-8")
+            (recovered_dir / "case.json").write_text(json.dumps(recovered), encoding="utf-8")
+            (hot_dir / "case.json").write_text(json.dumps(hot), encoding="utf-8")
+            args = SimpleNamespace(
+                instance_name="RD测试", loops=1, users="0", targets="dingtalk",
+                output=root / "seed-output",
+            )
+            summary = reconstruct_interrupted_lane(args, lane)
+            low_memory_classification = classify_low_memory(summary)
+            seeded = seed_existing_lane(args, lane)
+            continuation = launch_continuation(lane, "dingtalk", "0", 1)
+
+        self.assertEqual(len(summary["rows"]), 3)
+        self.assertEqual(summary["blockedAt"]["target"], "dingtalk")
+        self.assertEqual(len(seeded["sourceAttempts"]), 2)
+        self.assertEqual(len(seeded["seededLowMemoryEvents"]), 1)
+        self.assertEqual(len((seeded["summary"] or {}).get("rows", [])), 3)
+        self.assertEqual(low_memory_classification["classification"], "LOW_MEMORY")
+        self.assertTrue(continuation["complete"])
+        self.assertEqual(continuation["recoveredEnvironmentCoordinates"],
+                         [["dingtalk", 0, 1, "cold"]])
 
 
 if __name__ == "__main__":
