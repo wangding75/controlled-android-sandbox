@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "task": "C4-R05",
+  "status": "BLOCKED",
+  "classification": "TEST_EVIDENCE_GAP",
+  "failureCause": "CONTINUATION_OVERLAP_DURING_HOST_PHASE_TIMEOUT",
+  "formalRun": "verification/catch-up/C4-R05/formal-two-round-20260901-rebootstrap-v1",
+  "round": "round-2-retained-hot-recovery",
+  "environment": {
+    "instanceName": "RD测试",
+    "resolvedSerial": "127.0.0.1:16416",
+    "model": "22041211A",
+    "api": "32",
+    "bootId": "e4a3f3da-5a51-4469-9478-48abc08db353"
+  },
+  "firstFailure": {
+    "target": "fanqie",
+    "package": "com.dragon.read",
+    "user": 1,
+    "mode": "cold",
+    "iteration": 18,
+    "requestId": "accc3d917b884c53a5316accb5626803",
+    "operationId": "accc3d917b884c53a5316accb5626803-launch",
+    "setupRequestId": "c01bd5e0b22547c8a59b99e29a061392",
+    "attempt": 1,
+    "retryBudget": 0,
+    "automaticRetryPerformed": false,
+    "retryable": false,
+    "errorClassification": "COLD_STOP_SETUP_FAILED",
+    "detail": "RD_ENVIRONMENT_RESOLUTION_BLOCKED: debug-command-result timeout; last=",
+    "artifacts": "verification/catch-up/C4-R05/formal-two-round-20260901-rebootstrap-v1/round-2-retained-hot-recovery/launch-matrix/attempt-001/attempts/fanqie/user-1/cold-018"
+  },
+  "hostPhaseBoundary": {
+    "commandRecord": "verification/catch-up/C4-R05/formal-two-round-20260901-rebootstrap-v1/commands/009-round-2-retained-hot-recovery-c4-r03-launch-matrix.json",
+    "returncode": 124,
+    "timedOut": true,
+    "timeoutSeconds": 14400,
+    "startedAt": "2026-09-01T11:02:29.025372+00:00",
+    "completedAt": "2026-09-01T15:02:29.019032+00:00",
+    "summaryStatus": "MISSING"
+  },
+  "overlappingContinuation": {
+    "attempt": 2,
+    "installEvidence": "verification/catch-up/C4-R05/formal-two-round-20260901-rebootstrap-v1/round-2-retained-hot-recovery/launch-matrix/attempt-002/install.json",
+    "packages": [
+      "com.warden.controlledsandbox.debug",
+      "com.warden.controlledsandbox.companion32.debug",
+      "com.warden.controlledsandbox.fixture",
+      "com.warden.controlledsandbox.fixture32"
+    ],
+    "deviceSignature": "ActivityManager installPackageLI force-stopped the Host; ApplicationExitInfo reason USER REQUESTED",
+    "separateObservation": true,
+    "doesNotReplaceFirstFailure": true
+  },
+  "policy": {
+    "automaticRetryPerformed": false,
+    "firstFailurePreserved": true,
+    "readinessSloChanged": false,
+    "fixedSleepAdded": false,
+    "formalPassClaimed": false
+  },
+  "fix": {
+    "file": "tools/capability/run_c4_r05_rd.py",
+    "method": "run_command",
+    "decision": "TERMINATE_COMPLETE_CHILD_PROCESS_TREE_BEFORE_CONTINUATION",
+    "windowsMechanism": "taskkill /PID /T /F",
+    "posixMechanism": "process-group SIGTERM",
+    "recordedInCommandEvidence": true
+  },
+  "evidence": [
+    "verification/catch-up/C4-R05/formal-two-round-20260901-rebootstrap-v1/round-2-retained-hot-recovery/launch-matrix/attempt-001/attempts/fanqie/user-1/cold-018/first-failure-full/logcat.txt",
+    "verification/catch-up/C4-R05/formal-two-round-20260901-rebootstrap-v1/round-2-retained-hot-recovery/launch-matrix/attempt-001/attempts/fanqie/user-1/cold-018/first-failure-full/application-exit-info.txt",
+    "docs/review/C4_R05_FORMAL_TIMEOUT_PROCESS_TREE_BOUNDARY_20260901.md"
+  ]
+}

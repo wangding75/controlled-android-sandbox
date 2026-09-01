@@ -2050,3 +2050,39 @@ issues:
       continuation only; it does not enlarge the cold/hot readiness SLO, add a launch retry, or
       rewrite the original LOW_MEMORY failure. A complete two-round R05 run must prove the
       behavior before this issue can be closed.
+
+  - issue_id: KI-R03-068
+    title: C4-R05 timed-out nested launch child overlaps continuation APK install
+    capability: activity_framework
+    classification: TEST_EVIDENCE_GAP
+    severity: HIGH
+    status: RECORDED
+    discovered_by: C4-R05 formal two-round 2026-09-01
+    evidence:
+      - verification/catch-up/C4-R05/formal-two-round-20260901-rebootstrap-v1/commands/009-round-2-retained-hot-recovery-c4-r03-launch-matrix.json
+      - verification/catch-up/C4-R05/formal-two-round-20260901-rebootstrap-v1/round-2-retained-hot-recovery/launch-matrix/attempt-001/attempts/fanqie/user-1/cold-018/case.json
+      - verification/catch-up/C4-R05/formal-two-round-20260901-rebootstrap-v1/round-2-retained-hot-recovery/launch-matrix/attempt-001/attempts/fanqie/user-1/cold-018/first-failure-full
+      - verification/catch-up/C4-R05/formal-two-round-20260901-rebootstrap-v1/round-2-retained-hot-recovery/launch-matrix/attempt-002/install.json
+      - docs/review/C4_R05_FORMAL_TIMEOUT_PROCESS_TREE_BOUNDARY_20260901.md
+      - tools/capability/run_c4_r05_rd.py
+    match_patterns:
+      - COLD_STOP_SETUP_FAILED
+      - installPackageLI
+      - RD_ENVIRONMENT_RESOLUTION_BLOCKED
+      - TIMEOUT after 14400s
+      - processTermination
+    blocks_current_campaign: true
+    follow_up_required: true
+    follow_up_task: C4-R05 fresh clean-commit two-round formal acceptance
+    acceptance: NOT_FIXED
+    fix_policy: C4_R05_TERMINATE_TIMEOUT_PROCESS_TREE_BEFORE_CONTINUATION
+    notes: >
+      The retained/hot formal lane reached the host phase envelope while a nested R03 child
+      was still alive. A separately started continuation installed the four runner APKs; the
+      device recorded installPackageLI force-stopping the Host, and the old cold-stop operation
+      then timed out without debug-command-result.json. This is an orchestration race, not
+      evidence of a Fanqie or CAS readiness failure. The original full snapshot and the
+      separate continuation observation remain authoritative and are not merged. R05 now
+      terminates the complete timed-out child process tree and records the termination before
+      considering a durable-lane continuation. A fresh clean-commit formal run must pass before
+      this issue or C4-R05 can close.
