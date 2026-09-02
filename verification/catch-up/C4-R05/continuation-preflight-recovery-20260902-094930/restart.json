@@ -1,0 +1,91 @@
+{
+  "instanceName": "RD测试",
+  "instanceIndex": 1,
+  "mumuRoot": "C:\\Program Files\\Netease\\MuMu Player 12",
+  "manager": "C:\\Program Files\\Netease\\MuMu Player 12\\nx_main\\MuMuManager.exe",
+  "bootIdBefore": "3e612f4b-d8e0-4333-b5e1-71697f5944b7",
+  "command": [
+    "C:\\Program Files\\Netease\\MuMu Player 12\\nx_main\\MuMuManager.exe",
+    "control",
+    "--vmindex",
+    "1",
+    "restart"
+  ],
+  "startedAt": "2026-09-02T01:49:46.799346+00:00",
+  "returncode": 0,
+  "stdout": "{\n  \"errcode\": 0,\n  \"errmsg\": \"\"\n}\n",
+  "stderr": "",
+  "status": "PASS",
+  "bootIdAfter": "754f6e00-da46-426d-857e-4bce363cad10",
+  "environmentAfter": {
+    "instance_name": "RD测试",
+    "adb_serial": "127.0.0.1:16416",
+    "device_name": "22041211A",
+    "api_level": "32",
+    "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+    "boot_id": "754f6e00-da46-426d-857e-4bce363cad10",
+    "android_id": "398eea33120cd887",
+    "manufacturer": "Redmi",
+    "release": "12",
+    "mumu": {
+      "project": "Controlled Android Sandbox / 闪现2",
+      "instanceName": "RD测试",
+      "instanceIndex": 1,
+      "instanceId": "ginstance1400760658835456101",
+      "vmName": "MuMuPlayer-12.0-1",
+      "runtimeStatus": "device",
+      "mumuPlayerState": "",
+      "mumuManager": {},
+      "resolvedSerial": "127.0.0.1:16416",
+      "configuredSerial": "127.0.0.1:16416",
+      "manufacturer": "Redmi",
+      "model": "22041211A",
+      "release": "12",
+      "api": "32",
+      "androidId": "398eea33120cd887",
+      "abiList": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+      "bootId": "754f6e00-da46-426d-857e-4bce363cad10",
+      "timestamp": "2026-09-02T01:50:03.384803+00:00",
+      "mumuRoot": "C:\\Program Files\\Netease\\MuMu Player 12",
+      "config": {
+        "extraConfig": "C:\\Program Files\\Netease\\MuMu Player 12\\vms\\MuMuPlayer-12.0-1\\configs\\extra_config.json",
+        "vmConfig": "C:\\Program Files\\Netease\\MuMu Player 12\\vms\\MuMuPlayer-12.0-1\\configs\\vm_config.json",
+        "configuredHostPort": 16416,
+        "runtimeHost": "127.0.0.1",
+        "runtimeHostPort": 16416,
+        "configuredManufacturer": "Redmi",
+        "configuredModel": "22041211A"
+      },
+      "adb": {
+        "path": "adb",
+        "connect": {
+          "attempt": 1,
+          "returnCode": 0,
+          "stdout": "already connected to 127.0.0.1:16416",
+          "stderr": "",
+          "getState": "device"
+        },
+        "devices": "List of devices attached\n127.0.0.1:16416        device product:rubens model:22041211A device:rubens transport_id:873\n\n",
+        "getState": "device"
+      }
+    },
+    "adb_devices": "List of devices attached\n127.0.0.1:16416        device product:rubens model:22041211A device:rubens transport_id:873\n\n"
+  },
+  "observations": [
+    {
+      "timestamp": "2026-09-02T01:49:47.407917+00:00",
+      "error": "RD_ENVIRONMENT_RESOLUTION_BLOCKED: adb -s 127.0.0.1:16416 shell getprop ro.product.manufacturer failed (1): error: closed"
+    },
+    {
+      "timestamp": "2026-09-02T01:50:00.270182+00:00",
+      "error": "RD_ENVIRONMENT_RESOLUTION_BLOCKED: adb -s 127.0.0.1:16416 shell settings get secure android_id failed (1): error: closed"
+    },
+    {
+      "timestamp": "2026-09-02T01:50:03.866091+00:00",
+      "bootId": "754f6e00-da46-426d-857e-4bce363cad10",
+      "serial": "127.0.0.1:16416",
+      "runtimeStatus": "device"
+    }
+  ],
+  "completedAt": "2026-09-02T01:50:03.866118+00:00"
+}

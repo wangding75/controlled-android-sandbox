@@ -1,13 +1,13 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：2.0
-更新时间：2026-09-02 09:48（Asia/Shanghai）
+更新时间：2026-09-02 09:50（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C4`（IN_PROGRESS，R05 按宿主机性能策略记录 LOW_MEMORY 并继续矩阵）
 当前任务：`C4-R05`（IN_PROGRESS）
-下一任务：`C4-R05`（从 Quark user0/cold-009 续接）
+下一任务：`C4-R05`
 最后完成任务：`C4-TEMP-01`
 
 ## 1. 使用规则
@@ -3874,3 +3874,20 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
 - **提交/推送**：策略实现提交 `cd7cdf3dc0fafc8a4fafbe67db1aacaf77d465fe` 已推送；本回执
   文件、Known Issue、进度和选定原始失败 bundle 另形成独立证据/进度提交并推送。随后
   从本坐标续接矩阵；回执提交 SHA、`git ls-remote`、工作区干净状态在提交后回填并核验。
+
+### C4-R05：非阻断 LOW_MEMORY 策略启用后的续接预检（2026-09-02 09:49-09:50）
+
+- **首次预检失败证据**：`2026-09-02 09:49:30 +08:00` 首次运行
+  `python scripts/verify-catch-up-continuation.py`，动态 MuMu `RD测试` 的 ADB 查询返回
+  `RD_ENVIRONMENT_RESOLUTION_BLOCKED ... error: closed`；原始记录见
+  `verification/catch-up/C4-R05/continuation-preflight-failure-20260902-094930.md`，未先行重试。
+- **恢复与设备快照**：按动态实例名调用 MuMu Manager restart，manager 返回 0；boot 从
+  `3e612f4b-d8e0-4333-b5e1-71697f5944b7` 变为
+  `754f6e00-da46-426d-857e-4bce363cad10`，恢复记录见
+  `verification/catch-up/C4-R05/continuation-preflight-recovery-20260902-094930/restart.json`。
+- **预检结果**：恢复后 `python scripts/verify-catch-up-continuation.py --output
+  verification/catch-up/C4-R05/continuation-preflight-nonblocking-20260902.json` PASS；
+  分支为 `feature/t57-r03-va-pro-capability-campaign`，本地/远端 HEAD 均为
+  `196e34f7a8d0887e6255d967ee00e9aa05ceb013`，静态执行 serial 扫描无 unexpected 项。
+- **续接坐标**：当前任务仍为 `C4-R05 / IN_PROGRESS`，后续从已保存的 Quark `user0 /
+  cold-009` 精确坐标启动；Host `LOW_MEMORY` 继续按只记录、动态恢复、不按次数阻断策略处理。
