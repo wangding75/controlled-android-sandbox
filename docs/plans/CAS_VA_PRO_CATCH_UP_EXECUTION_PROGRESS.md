@@ -3994,3 +3994,19 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
 - **推送/远端验证**：实现提交已推送，进度与 Known Issues 将以独立回执提交推送；本
   条完成后必须再次执行续接预检并核对工作区干净、local/remote HEAD 一致，然后继续
   当前正式矩阵。
+
+### C4-R05：用户要求调整回归批次并主动停止 C1（2026-09-02 13:22）
+
+- **任务状态**：`C4-R05 / IN_PROGRESS`，没有任务完成或状态前移。当前 C1 子回归被
+  用户明确要求停止，未生成当前 R05 C1 回执，因此不判定为 PASS/DONE。
+- **中断事实**：父编排器在 C1 子任务运行期间收到用户 `Ctrl+C`；停止前原始证据保留
+  在 `artifacts/capability-audit/catch-up-c1-t01/20260902T045201Z/`，并由
+  `docs/review/C4_R05_C1_USER_INTERRUPT_20260902.md` 记录。该事件是编排调整，不是
+  测试失败、设备阻断或自动重试。
+- **用户指定的新顺序**：C1 Activity、C2 Window/Audio、C2 Device Audio、C4 CAS-only
+  组成一个 `c1-c2-c4` 连续回归批次；SX F1-F5 保持独立的
+  `sx-f1-f5-business` 批次。每个子门继续保留独立 summary、原始证据和 fail-closed
+  判定，不能用批次合并降低验收门槛。
+- **实现与验证**：编排器、单元测试和说明文件待提交为本次批次调整变更；在重新启动
+  R05 前必须通过 `python -m unittest scripts/test_c4_r05_orchestrator.py`、静态检查、
+  提交推送和续接预检。正式两轮输出不重跑，按现有 durable evidence 续接。

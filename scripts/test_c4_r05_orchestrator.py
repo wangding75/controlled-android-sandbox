@@ -21,6 +21,7 @@ from run_c4_r05_rd import (  # noqa: E402
     require_pass,
     run_launch_matrix,
     run_command,
+    run_regressions,
     safe_name,
     DEFAULT_PHASE_TIMEOUT_SECONDS,
 )
@@ -99,6 +100,34 @@ class C4R05OrchestratorTests(unittest.TestCase):
             require_pass(record, "launch")
         self.assertEqual(context.exception.phase, "launch")
         self.assertEqual(context.exception.evidence, record)
+
+    def test_regressions_are_batched_as_c1_c2_c4_then_sx(self) -> None:
+        def fake_run_command(label, command, output, *, summary_path, timeout_seconds):
+            return {
+                "label": label,
+                "returncode": 0,
+                "timedOut": False,
+                "elapsedMs": 1,
+                "summaryPath": str(summary_path),
+                "summary": {"status": "PASS"},
+                "stdoutPath": str(output / f"{label}.stdout.txt"),
+                "stderrPath": str(output / f"{label}.stderr.txt"),
+            }
+
+        with tempfile.TemporaryDirectory() as temporary:
+            with patch("run_c4_r05_rd.run_command", side_effect=fake_run_command) as mocked:
+                groups = run_regressions("RD测试", Path(temporary), 12 * 60 * 60)
+
+        self.assertEqual([group["label"] for group in groups], ["c1-c2-c4", "sx-f1-f5-business"])
+        self.assertEqual(
+            [gate["label"] for gate in groups[0]["summary"]["gates"]],
+            ["c1-activity", "c2-window-audio", "c2-device-audio", "c4-cas-only"],
+        )
+        self.assertEqual(
+            [gate["label"] for gate in groups[1]["summary"]["gates"]],
+            ["sx-f1-f5-business"],
+        )
+        self.assertEqual(mocked.call_count, 5)
 
     def test_timeout_records_process_tree_termination_before_continuation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

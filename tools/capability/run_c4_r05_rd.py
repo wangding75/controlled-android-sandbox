@@ -667,10 +667,85 @@ def run_launch_matrix(instance_name: str, loops: int, users: str, targets: str,
     return result
 
 
+def run_regression_group(
+    group_label: str,
+    commands: list[tuple[str, list[str], Path]],
+    output: Path,
+    phase_timeout_seconds: int,
+) -> dict[str, Any]:
+    """Run one named regression batch while retaining every child gate boundary.
+
+    Grouping is an orchestration/reporting boundary, not a relaxed acceptance boundary:
+    each child command still writes its own stdout/stderr/summary, is checked fail-closed,
+    and stops the group at its first non-PASS result.  The group receipt makes the
+    requested C1+C2+C4 versus SX sequencing explicit without merging their evidence.
+    """
+    started = now_iso()
+    started_mono = time.monotonic()
+    group_record: dict[str, Any] = {
+        "label": group_label,
+        "status": "IN_PROGRESS",
+        "startedAt": started,
+        "phaseTimeoutSeconds": phase_timeout_seconds,
+        "gates": [],
+    }
+    group_path = output / "groups" / f"{safe_name(group_label)}.json"
+    try:
+        for label, command, summary_path in commands:
+            record = run_command(
+                label,
+                command,
+                output,
+                summary_path=summary_path,
+                timeout_seconds=phase_timeout_seconds,
+            )
+            group_record["gates"].append({
+                "label": label,
+                "returncode": record.get("returncode"),
+                "timedOut": record.get("timedOut", False),
+                "elapsedMs": record.get("elapsedMs"),
+                "summaryPath": record.get("summaryPath"),
+                "summaryStatus": (record.get("summary") or {}).get("status", ""),
+                "stdoutPath": record.get("stdoutPath"),
+                "stderrPath": record.get("stderrPath"),
+            })
+            require_pass(record, label)
+    except PhaseFailure as error:
+        group_record.update({
+            "status": "FAIL",
+            "completedAt": now_iso(),
+            "elapsedMs": round((time.monotonic() - started_mono) * 1000),
+            "firstFailure": {
+                "phase": error.phase,
+                "detail": error.detail,
+                "evidence": error.evidence,
+            },
+        })
+        write_json(group_path, group_record)
+        raise PhaseFailure(
+            f"{group_label}/{error.phase}",
+            error.detail,
+            {"group": group_record, "childFailure": error.evidence},
+        ) from error
+
+    group_record.update({
+        "status": "PASS",
+        "completedAt": now_iso(),
+        "elapsedMs": round((time.monotonic() - started_mono) * 1000),
+    })
+    write_json(group_path, group_record)
+    return {
+        "label": group_label,
+        "returncode": 0,
+        "summary": group_record,
+        "summaryPath": str(group_path.resolve()),
+    }
+
+
 def run_regressions(instance_name: str, output: Path,
                     phase_timeout_seconds: int) -> list[dict[str, Any]]:
-    """Run the required C1/C2/C4/SX gates only after both formal rounds pass."""
-    commands = [
+    """Run C1+C2+C4 as one batch, then run SX as its own batch."""
+    c1_c2_c4 = [
         ("c1-activity", [sys.executable, str(TOOLS / "run_c1_t01_rd.py"),
                           "--instance", instance_name, "--loops", "50",
                           "--receipt", str(output / "c1-t01-rd-summary.json")],
@@ -688,17 +763,17 @@ def run_regressions(instance_name: str, output: Path,
                           "--instance", instance_name, "--verification-dir",
                           str(output / "c4-cas-only")],
          output / "c4-cas-only" / "c4-t04-rd-summary.json"),
+    ]
+    sx = [
         ("sx-f1-f5-business", [sys.executable, str(TOOLS / "run_c4_t05_rd.py"),
                                 "--instance", instance_name, "--verification-dir",
                                 str(output / "sx-f1-f5-business")],
          output / "sx-f1-f5-business" / "c4-t05-rd-summary.json"),
     ]
-    records: list[dict[str, Any]] = []
-    for label, command, summary_path in commands:
-        record = run_command(label, command, output, summary_path=summary_path,
-                             timeout_seconds=phase_timeout_seconds)
-        records.append(require_pass(record, label))
-    return records
+    return [
+        run_regression_group("c1-c2-c4", c1_c2_c4, output, phase_timeout_seconds),
+        run_regression_group("sx-f1-f5-business", sx, output, phase_timeout_seconds),
+    ]
 
 
 def capture_pressure_resources(serial: str, output: Path, tag: str) -> dict[str, Any]:
