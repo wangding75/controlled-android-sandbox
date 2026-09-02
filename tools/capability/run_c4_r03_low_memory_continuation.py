@@ -581,6 +581,15 @@ def main() -> int:
         if args.seed_existing_lane is not None:
             seeded = seed_existing_lane(args, seed)
             low_memory_events.extend(seeded.get("seededLowMemoryEvents") or [])
+            resume_coordinate = (
+                getattr(args, "resume_target", ""), getattr(args, "resume_user", None),
+                getattr(args, "resume_iteration", None), getattr(args, "resume_mode", "")
+            )
+            post_restart_rebootstrap = any(
+                (event.get("target"), event.get("user"), event.get("iteration"), event.get("mode"))
+                == resume_coordinate
+                for event in (seeded.get("seededLowMemoryEvents") or [])
+            )
         else:
             seeded = seed_existing_child(args, seed)
         children.append(seeded)
