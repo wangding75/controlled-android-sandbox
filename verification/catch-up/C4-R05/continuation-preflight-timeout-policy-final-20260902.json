@@ -1,0 +1,305 @@
+{
+  "schema_version": 1,
+  "task_id": "C4-R05",
+  "status": "PASS",
+  "captured_at": "2026-09-02T04:04:46.450669+00:00",
+  "ledger": {
+    "branch": "feature/t57-r03-va-pro-capability-campaign",
+    "next_task": "C4-R05",
+    "active_task": "C4-R05",
+    "last_completed": "C4-TEMP-01",
+    "first_ready_pending": null,
+    "dependencies": "C4-R04,C4-TEMP-01"
+  },
+  "last_receipt": {
+    "task_id": "C4-TEMP-01",
+    "status": "`DONE`",
+    "implementation_commits": [
+      "7c0c819a58513f89e91ec0fb44cdc05a151e2c32"
+    ],
+    "receipt_commit": "b2c021c884058491bf8a966eca653906138f84e2",
+    "baseline_commit": "f4d69bb53d6a8f2cc70469902c40ffad77d2d431",
+    "evidence_paths": [
+      "docs/review/C4_TEMP_01_CAS_IMPORT_LAUNCH_LATENCY_ROOT_CAUSE_AND_FIX_DESIGN_20260828.md",
+      "docs/review/KNOWN_ISSUES.yaml",
+      "verification/catch-up/C4-TEMP-01/20260830T181923-benchmark-summary.json"
+    ]
+  },
+  "git": {
+    "branch": "feature/t57-r03-va-pro-capability-campaign",
+    "head": "26a5283c496b4b26b47b8dd040c0fc4b26a10511",
+    "remote_branch": "origin/feature/t57-r03-va-pro-capability-campaign",
+    "remote_head": "26a5283c496b4b26b47b8dd040c0fc4b26a10511",
+    "identity": {
+      "name": "OpenAI",
+      "email": "openai@users.noreply.github.com"
+    },
+    "status_short": ""
+  },
+  "device": {
+    "instance_name": "RD测试",
+    "resolved_serial": "127.0.0.1:16416",
+    "api": "32",
+    "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+    "boot_id": "754f6e00-da46-426d-857e-4bce363cad10",
+    "android_id": "398eea33120cd887",
+    "model": "22041211A"
+  },
+  "static_checks": {
+    "required_files": [
+      "docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md",
+      "docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md",
+      "docs/capability/CAPABILITY_CAMPAIGN_WORKFLOW.md",
+      "docs/COMMIT_IDENTITY_POLICY.md",
+      "verification/approved-commit-identities.txt"
+    ],
+    "unexpected_hard_coded_serials": [],
+    "allowlisted_historical_guards": [
+      {
+        "file": "scripts/check-c2-t03-location.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "scripts/check-c2-t03-location.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "scripts/check-c2-t03-location.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "scripts/check-c3-t02-file-proc-network-fd.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "scripts/check-c3-t02-file-proc-network-fd.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "scripts/check-c3-t02-file-proc-network-fd.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "scripts/check-c3-t02-file-proc-network-fd.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "scripts/check-c3-t02-file-proc-network-fd.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "scripts/check-c3-t02-file-proc-network-fd.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "scripts/check-c3-t04-hostile-isolation.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "scripts/check-c3-t04-hostile-isolation.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "scripts/check-c3-t04-hostile-isolation.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "scripts/check-c3-t05-seccomp-decision.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "scripts/check-c3-t05-seccomp-decision.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "scripts/check-c3-t05-seccomp-decision.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "scripts/check-c3-t06-art-xposed-decision.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "scripts/check-c3-t06-art-xposed-decision.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "scripts/check-c3-t06-art-xposed-decision.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "scripts/check-c4-t01-sx-freeze.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "scripts/check-c4-t01-sx-freeze.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "scripts/check-c4-t01-sx-freeze.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "scripts/check-c4-t02-sx-adapter.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "scripts/check-c4-t02-sx-adapter.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "scripts/check-c4-t02-sx-adapter.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "scripts/check-c4-t03-sx-migration.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "scripts/check-c4-t03-sx-migration.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "scripts/check-c4-t03-sx-migration.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "scripts/check-c4-t04-cas-only-runtime.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "scripts/check-c4-t04-cas-only-runtime.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "scripts/check-c4-t04-cas-only-runtime.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "scripts/check-c4-t05-sx-business.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "scripts/check-c4-t05-sx-business.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "scripts/check-c4-t05-sx-business.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "scripts/check-native-enforcement-poc.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "tools/capability/run_c3_t04_rd.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "tools/capability/run_c3_t04_rd.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "tools/capability/run_c3_t04_rd.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "tools/capability/run_c3_t05_rd.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "tools/capability/run_c3_t05_rd.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "tools/capability/run_c3_t05_rd.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "tools/capability/run_c3_t06_rd.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "tools/capability/run_c3_t06_rd.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "tools/capability/run_c3_t06_rd.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "tools/capability/run_c4_t01_rd.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "tools/capability/run_c4_t01_rd.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "tools/capability/run_c4_t01_rd.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "tools/capability/run_c4_t02_rd.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "tools/capability/run_c4_t02_rd.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "tools/capability/run_c4_t02_rd.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "tools/capability/run_c4_t03_rd.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "tools/capability/run_c4_t03_rd.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "tools/capability/run_c4_t03_rd.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "tools/capability/run_c4_t04_rd.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "tools/capability/run_c4_t04_rd.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "tools/capability/run_c4_t04_rd.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "tools/capability/run_c4_t05_rd.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "tools/capability/run_c4_t05_rd.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "tools/capability/run_c4_t05_rd.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "tools/capability/run_rd_campaign.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "tools/capability/run_rd_campaign.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "tools/capability/run_rd_campaign.py",
+        "serial": "127.0.0.1:7555"
+      }
+    ]
+  },
+  "evidence_directory": "verification/catch-up/C4-R05"
+}
