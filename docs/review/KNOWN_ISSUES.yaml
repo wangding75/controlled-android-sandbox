@@ -1616,6 +1616,9 @@ issues:
       - artifacts/capability-audit/catch-up-c4-r03/continuation-final-fanqie-u0-u1-25-20260825/attempts/fanqie/user-0/cold-001
       - artifacts/capability-audit/catch-up-c4-r03/continuation-final-fanqie-u1-25-20260825/attempts/fanqie/user-1/cold-002
       - artifacts/capability-audit/catch-up-c4-r03/continuation-after-reboot-fanqie-u1-from-cold2-a2-20260825/attempts/fanqie/user-1/cold-002
+      - verification/catch-up/C4-R05/20260902-formal-fanqie-cold004-non-low-memory-timeout.md
+      - verification/catch-up/C4-R05/formal-two-round-20260902-timeout12h-v1/round-2-retained-hot-recovery/launch-matrix/attempt-002/attempts/fanqie/user-0/cold-004/case.json
+      - verification/catch-up/C4-R05/formal-two-round-20260902-timeout12h-v1/round-2-retained-hot-recovery/launch-matrix/attempt-002/attempts/fanqie/user-0/cold-004/first-failure-full
       - sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestContentProviderFrameworkInterceptor.java
       - sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeBrokerBridge.java
     match_patterns:
@@ -1624,6 +1627,10 @@ issues:
       - GuestContentProviderFrameworkInterceptor
       - GuestRuntimeBrokerBridge
       - com.dragon.read.plugin.common.services.MiraPluginServiceManagerImpl.isPluginInstalled
+      - GUEST_PREPARE
+      - PREPARE_RETURN
+      - APPLICATION_ONCREATE
+      - java.util.concurrent.TimeoutException
       - FIRST_FRAME_DRAWN
     blocks_current_campaign: true
     fix_policy: C4_R03_CLASSIFY_PROVIDER_READINESS_THEN_C4_R04_FAIL_CLOSED
@@ -1644,7 +1651,23 @@ issues:
       Fanqie user0/user1 cold/hot targeted validation then passed 4/4 at 15978/463/16744/626 ms
       with valid Activity, Window, Surface and non-black screenshot evidence. The required 500-row
       matrix is still incomplete, so this issue remains RECORDED and blocking; the historical first
-      failures remain authoritative and no conclusion is generalized from Quark.
+      failures remain authoritative and no conclusion is generalized from Quark. On 2026-09-02,
+      the retained/hot formal lane recorded a new Fanqie user0/cold-004 failure after the prior
+      Quark Host LOW_MEMORY recovery. Request
+      `82ed7754c0af4a80a5ed1e3d290a64a0` / operation
+      `82ed7754c0af4a80a5ed1e3d290a64a0-launch` had attempt=2, retryBudget=0,
+      automaticRetryPerformed=false and retryable=false. The Guest completed provider preparation
+      at cumulative 11561 ms, entered `APPLICATION_ONCREATE` at 11575 ms, then returned
+      `GUEST_PREPARE` `TimeoutException` at 30233 ms and rolled back; no Activity resume,
+      Window evidence or FIRST_FRAME_DRAWN was correlated to the request. The process and a
+      non-black screenshot remained present in the post-failure snapshot, but neither can replace
+      the failed request-scoped terminal result. `dumpsys activity exit-info` records only explicit
+      USER REQUESTED cold-stop events and contains no Host LOW_MEMORY. This is therefore a real
+      non-LOW_MEMORY formal gate failure, not an event covered by KI-R03-069's non-blocking policy.
+      The observation proves the Guest prepare/Application.onCreate deadline boundary but does not
+      yet separate app/SDK startup work from a generic CAS Guest/broker delay; root cause remains
+      pending classification. No deadline extension, package-specific fix or retry is justified,
+      and C4-R05 remains blocked until this boundary is classified and a bounded regression passes.
 
   - issue_id: KI-R03-060
     title: DingTalk hot launch readiness exceeds SLO while MuMu reports device-not-responding LMK pressure

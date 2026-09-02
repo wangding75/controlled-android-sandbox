@@ -1,12 +1,12 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：2.0
-更新时间：2026-09-02 09:50（Asia/Shanghai）
+更新时间：2026-09-02 11:43（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
-当前阶段：`C4`（IN_PROGRESS，R05 按宿主机性能策略记录 LOW_MEMORY 并继续矩阵）
-当前任务：`C4-R05`（IN_PROGRESS）
+当前阶段：`C4`（BLOCKED，R05 的 Host LOW_MEMORY 按宿主机性能策略记录并续接；当前存在非 LOW_MEMORY 启动超时阻断）
+当前任务：`C4-R05`（BLOCKED）
 下一任务：`C4-R05`
 最后完成任务：`C4-TEMP-01`
 
@@ -26,7 +26,7 @@
 | C1 组件/包/进程 | DONE | 双用户、50 轮与任务书规定压力 | §5 C1-GATE |
 | C2 系统服务/F2-F5 | DONE | SX/XH 调用面 L3，P0/P1 无 NOT_PROVEN | §5 C2-T07 |
 | C3 Native/ABI/隔离 | IN_PROGRESS | trusted/hostile 闭环，条件项有决策 | §5 C3-T01 |
-| C4 SX 迁移 | IN_PROGRESS | C4-R01..R05；真实首帧、添加矩阵和 30 分钟双用户压力；Host LOW_MEMORY 仅记录并续接 | §5 C4-R05 LOW_MEMORY continuation（2026-09-02） |
+| C4 SX 迁移 | BLOCKED | C4-R01..R05；真实首帧、添加矩阵和 30 分钟双用户压力；Host LOW_MEMORY 仅记录并续接；非 LOW_MEMORY 失败 fail-closed | §5 C4-R05 Fanqie cold-004 blocking evidence（2026-09-02） |
 | C5 XH 支持 | NOT_APPLICABLE | 用户决定跳过，不阻塞 C6/C7 | §5 PLAN-20260824-C4-REOPEN |
 | C6 API/ABI 矩阵 | PENDING | 声明组合均有 Android Matrix 证据 | - |
 | C7 OEM/发布 | PENDING | 商业矩阵与 VA PRO scope 总验收 | - |
@@ -69,7 +69,7 @@
 | C4-R03 | 启动 readiness 与窗口合同 | DONE | C4-R01 | `d8797c89` | §5 C4-R03（用户批准残余风险豁免） |
 | C4-R04 | C4 fail-closed 验收编排 | DONE | C4-R02,C4-R03 | `1d9b83d54c13d2a758752281dbc492859d8bd05d` | §5 C4-R04 |
 | C4-TEMP-01 | CAS 导入/克隆/添加/启动耗时根因与修复 | DONE | C4-R04；完成后解除 C4-R05 临时阻断 | `7c0c819a58513f89e91ec0fb44cdc05a151e2c32` | §5 C4-TEMP-01 修复完成（2026-08-30） |
-| C4-R05 | MuMu RD 正式重验与关门 | IN_PROGRESS | C4-R04,C4-TEMP-01 | `0b78ea9fd4fbfafe2ff1608a9f56466b3b3d0b0d`（12h formal baseline） | §5 C4-R05 LOW_MEMORY continuation（2026-09-02） |
+| C4-R05 | MuMu RD 正式重验与关门 | BLOCKED | C4-R04,C4-TEMP-01 | `29e4f72246e24f37430249c0a660ba23f2443249`（当前续接基线） | §5 C4-R05 Fanqie cold-004 blocking evidence（2026-09-02） |
 | C5-T01 | 原始 XH 产品能力契约 | NOT_APPLICABLE | C2,C3 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T02 | XH CAS Host/SDK 集成 | NOT_APPLICABLE | C5-T01,C4-T02 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T03 | 原始 XH/DingTalk 验收 | NOT_APPLICABLE | C5-T02,C4 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
@@ -3891,3 +3891,56 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   `196e34f7a8d0887e6255d967ee00e9aa05ceb013`，静态执行 serial 扫描无 unexpected 项。
 - **续接坐标**：当前任务仍为 `C4-R05 / IN_PROGRESS`，后续从已保存的 Quark `user0 /
   cold-009` 精确坐标启动；Host `LOW_MEMORY` 继续按只记录、动态恢复、不按次数阻断策略处理。
+
+### C4-R05：Fanqie cold-004 非 LOW_MEMORY 启动超时阻断（2026-09-02 11:34-11:43）
+
+- **最终状态**：`C4-R05 / BLOCKED`。本条不是 DONE 回执；C4 同步标记为 `BLOCKED`，不得进入
+  `C6-T01`。阻断只针对本次真实非 `LOW_MEMORY` 终态失败；Host `LOW_MEMORY` 的无限次数记录、
+  动态重启和续接策略仍然有效。
+- **开始基线与环境**：本次续接使用 commit
+  `29e4f72246e24f37430249c0a660ba23f2443249`，分支
+  `feature/t57-r03-va-pro-capability-campaign`，本地与远端一致，Git 身份为
+  `OpenAI <openai@users.noreply.github.com>`。动态解析 MuMu `RD测试` 为 API 32、model
+  `22041211A`、ABI `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`、boot
+  `754f6e00-da46-426d-857e-4bce363cad10`；设备快照位于 formal lane 的 `attempt-002/environment.json`。
+- **动态样本**：番茄免费小说 `com.dragon.read`，7.1.9.32/71932，base-only、0 split、
+  primary ABI `arm64-v8a`，revision/base hash
+  `35493ffa0979bc1e10d5e177a0526c3d3d922af779dca4d8c91505c50757daf9`。
+- **首失败证据**：round-2 retained/hot/recovery 的
+  `fanqie/user-0/cold-004`，request
+  `82ed7754c0af4a80a5ed1e3d290a64a0`，operation
+  `82ed7754c0af4a80a5ed1e3d290a64a0-launch`，runner operation
+  `c4-r03-fanqie-u0-cold-4-a2-82ed7754c`；request 于本地 `11:34:27.141` 开始，命令于
+  `11:35:40.899` 失败，完整快照于 `11:35:50.879` 保存。case 的 `attempt=2` 是前一
+  Quark Host LOW_MEMORY 之后的 durable-lane 观察，不是此坐标的隐藏重试；本坐标
+  `retryBudget=0`、`automaticRetryPerformed=false`、`retryable=false`。
+- **失败链路**：`GUEST_PREPARE` 完成 Provider 阶段（累计 `11561 ms`），在累计
+  `11575 ms` 进入 `APPLICATION_ONCREATE`，未产生对应结束、Activity resumed 或
+  `FIRST_FRAME_DRAWN`；`30233 ms` 回滚并以 `java.util.concurrent.TimeoutException` 返回
+  `PREPARE_RETURN FAILED`。截图虽非黑，快照仍为 `resumed_guest_stub_count=0`，无目标
+  Activity/Window/首帧；非黑截图不能替代 request-scoped terminal result。
+- **分类与根因**：完整 `application-exit-info` 只有显式 `USER REQUESTED` 冷停记录，
+  没有 Host `LOW_MEMORY`；无 FATAL、ANR 或进程死亡。分类为
+  `LAUNCH_RESULT_NOT_PASS`，归入既有 `KI-R03-059`；根因保持“待验证”，证据只证明
+  Guest prepare deadline 在 App `Application.onCreate` 未返回时到期，尚不能区分 App/SDK
+  启动工作与 CAS Guest/broker 边界延迟。未修改生产代码、未放宽 cold 30 秒 SLO、未固定
+  sleep、未增加隐藏重试。
+- **矩阵进度**：round-1 已有 500/500 terminal coordinate（含已记录并恢复的 Host
+  LOW_MEMORY）；round-2 add gate 137/137 通过；round-2 launch 当前 407 个唯一坐标，
+  406 PASS、1 个非 PASS，已完成 fixture/DingTalk/夸克各 100/100，Fanqie 6/7（user0
+  cold-004 失败），尚未完成剩余 Fanqie 及后续回归、30 分钟双用户短测。番茄小说该失败
+  直接使 R05 formal gate 不通过，不能用夸克成功抵消。
+- **VA/NBB 对照**：沿用 `C4_R03_LAUNCH_READINESS_WINDOW_DESIGN_20260824.md`、
+  `C4_R05_FINAL_TWO_ROUND_EVIDENCE_BOUNDARY_DESIGN_20260827.md` 及已有
+  `KI-R03-059` 映射，覆盖 CAS `GuestContentProviderFrameworkInterceptor`、
+  `GuestRuntimeBrokerBridge`、`RuntimeActivityLaunchCoordinator`、`GuestLaunchGate` 与
+  VA/NBB 的 `VActivityManagerService`/`ActivityStack`/`VirtualRuntime`、
+  `BProcessManagerService`/`ActivityStack`/`BActivityThread` 的 process owner、token、
+  Window identity、package 和 lifecycle 边界。当前证据不足以提出新的生产修复。
+- **证据文件**：完整快照在
+  `verification/catch-up/C4-R05/formal-two-round-20260902-timeout12h-v1/round-2-retained-hot-recovery/launch-matrix/attempt-002/attempts/fanqie/user-0/cold-004/first-failure-full/`；
+  归纳报告为 `verification/catch-up/C4-R05/20260902-formal-fanqie-cold004-non-low-memory-timeout.md`。
+  账本和 Known Issues 已记录本次失败，原始首失败未被后续观察覆盖。
+- **恢复条件与下一任务**：完成 App/SDK 与 CAS Guest/broker 边界分类并形成有证据修复或
+  明确外部归属；在 clean commit 上重新通过该坐标及剩余两轮门禁后，才可恢复
+  `C4-R05`。下一任务字段保持 `C4-R05`，不前移 `C6-T01`。
