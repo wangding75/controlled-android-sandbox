@@ -1,14 +1,14 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：2.0
-更新时间：2026-09-02 14:04（Asia/Shanghai）
+更新时间：2026-09-02 18:39（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C6`（IN_PROGRESS；按用户明确指令提前进入 C6，C4-R05 正式关门及 C1/C2/C4 合并回归延后至完整回归处理）
 当前任务：`C6-T01`（IN_PROGRESS）
 下一任务：`C6-T01`
-最后完成任务：`C4-TEMP-01`
+最后完成任务：`C6-T01A`
 
 ## 1. 使用规则
 
@@ -75,6 +75,7 @@
 | C5-T03 | 原始 XH/DingTalk 验收 | NOT_APPLICABLE | C5-T02,C4 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T04 | 可选 Xposed 模块验收 | NOT_APPLICABLE | C3-T06,C5-T01 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C6-T01 | API33-37 回归 | IN_PROGRESS（用户授权提前进入） | C4-R05（用户授权跳过当前依赖） | - | §5 C6-T01（2026-09-02） |
+| C6-T01A | Unified Android Verification Harness Foundation | DONE | C6-T01 | `6b03d5ca95f45d48bbcadab56fb0beddab3aa287` | §5 C6-T01A |
 | C6-T02 | ARM/跨宽度/16KB | PENDING | C3-T03,C6-T01 | - | - |
 | C6-T03 | Android Matrix 发布门禁 | PENDING | C6-T01,C6-T02 | - | - |
 | C7-T01 | OEM 优先级与代表设备 | PENDING | C6 | - | - |
@@ -4040,3 +4041,57 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
 - **Known Issues**：不关闭、不新增；C4 的开放项继续按原记录保留。C5-T01 至 C5-T04
   继续为 `NOT_APPLICABLE`。
 - **下一任务**：`C6-T01`；完成 C6-T01 前不前移 C6-T02。
+
+### C6-T01A：统一 Android 验收 Harness Foundation（2026-09-02）
+
+- **状态**：`DONE`；本子任务结论为 `PASS_WITH_DISCOVERED_PRODUCT_DEFECT`。父任务
+  `C6-T01` 仍为 `IN_PROGRESS`，C4-R05 仍按既有记录延后，未因本子任务关闭 C4 或推进
+  `C6-T02`。
+- **开始基线**：`feature/t57-r03-va-pro-capability-campaign` @
+  `94415f9523161d08983790b07d2a397ba4c5d633`；开始前 `git status --short` 为空。
+- **实现摘要**：新增 capability-oriented `tools/verification/`，包含 testcase contract、
+  fail-closed runner、分项 timeout/retry policy、failure classification、通用 device/ADB
+  facade、动态设备 metadata、非黑屏/first-frame readiness gate、S01-S10 smoke、JSON schema、
+  compact reporting 和 harness 自测。MuMu 设备仍由现有 `scripts/mumu_instance.py` 按实例名
+  `RD测试` 动态解析；未在新源码中硬编码 serial，未恢复历史 `verify-all.sh`、task-specific
+  runner 或 `verification/catch-up`，未修改 CAS product modules/fixtures。
+- **变更文件**：`.gitignore`、`scripts/mumu_instance.py`（仅扩展现有 bounded ADB runner 供
+  新 facade 复用）、`tools/verification/` 下 `core/`、`device/`、`capabilities/`、
+  `reporting/`、`schemas/`、自测和 RD smoke entry point；阶段报告为
+  `reports/t57-r03/c6/C6_T01A_VERIFICATION_HARNESS_REPORT.md`。
+- **构建与自测**：`./gradlew.bat projects` PASS；`./gradlew.bat assembleDebug` PASS；
+  `./gradlew.bat test` PASS；`python -m unittest tools.verification.test_harness -v` PASS（6 tests）；
+  `python scripts/mumu_instance.py --instance-name RD测试` PASS。既有 32-bit native CXX5202
+  warning 仅为构建 warning，不是本任务新增失败。
+- **真实 smoke**：run id `c6-t01a-rd-api32-20260902-final2`，S01-S10 全部真实执行；
+  `10 total / 4 PASS / 6 FAIL / 0 BLOCKED_ENV / 0 UNSUPPORTED_PLATFORM`，6 个 FAIL 均为
+  `PRODUCT_DEFECT`。S01 Host install/start、S02 import/add、S03 cold first-frame、S10
+  process death/recovery PASS；S04 warm reuse、S05 service、S06 broadcast、S07 provider、
+  S08 PendingIntent、S09 package lifecycle FAIL。S09 的 retry 为 PASS，但 testcase 仍按
+  fail-closed 规则保留 FAIL；S04/S05/S06/S07/S08 也均保留 first/retry attempt 和最终分类。
+- **设备与证据**：动态 `RD测试` serial `127.0.0.1:16416`；Redmi `22041211A`；API 32 /
+  Android 12；ABI `x86_64`，ABI list `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`；page size
+  `4096`；fingerprint `Redmi/rubens/rubens:12/V417IR/2428:user/release-keys`；4 个 APK
+  SHA-256、kernel、boot ID、required `getprop`、`getconf PAGE_SIZE` 和 `adb get-state` 均
+  已保存。完整原始证据只在本地
+  `out/verification/c6-t01a-rd-api32-20260902-final2/`，该目录被 `.gitignore` 忽略。
+- **发现的产品缺陷**：S04 `ACTIVITY_REUSE_NOT_OBSERVED`；S05
+  `DEBUG_RESULT_TIMEOUT` 且诊断证据含 Guest foreground-service crash；S06
+  `DEBUG_COMMAND_NOT_PASS`；S07 retry `PROVIDER_QUERY_NOT_OK`；S08
+  `DEBUG_COMMAND_NOT_PASS`；S09 首次 `DEBUG_RESULT_TIMEOUT` 后 retry PASS 但仍 FAIL。每项
+  的复现操作、signature 和下一建议均收录于阶段 compact report，建议后续独立产品修复任务
+  `C6-T01B` 处理后重跑，C6-T01A 不在本轮修复业务逻辑。
+- **Known Limitations**：本轮只验证当前 RD/API32；API33-37、真实 ARM64 设备、16 KB page
+  size 和跨 bitness matrix 留给后续 C6 任务。RD shell UID 不允许直接 `kill -9` app PID，
+  harness 记录失败并使用显式标注的 Host `force-stop` fallback，再以 observed PID exit、
+  新 PID、新 session、真实 `FIRST_FRAME_DRAWN` 和非黑屏恢复作为 S10 证据；未把 generation
+  不递增臆判为失败。
+- **Git hygiene**：implementation commit 前后 `git diff --check` PASS；`git ls-files out` 为空；
+  原始 logcat/screenshot/dumpsys/process dump/APK output 未进入 Git。报告、账本和独立回执
+  提交后须保持工作区 clean，并以远端 branch HEAD 对比本地 HEAD。
+- **实现提交 SHA**：`6b03d5ca95f45d48bbcadab56fb0beddab3aa287`，提交主题
+  `C6-T01A: establish unified Android verification harness`。
+- **回执提交**：本段随独立提交主题 `docs(progress): record [C6-T01A] receipt` 提交；
+  implementation 与 receipt 按任务书两提交协议一起推送并验证。
+- **报告**：`reports/t57-r03/c6/C6_T01A_VERIFICATION_HARNESS_REPORT.md`。
+- **下一任务**：仍为 `C6-T01`；本轮不开始 `C6-T01B`，不执行 C6-T02。
