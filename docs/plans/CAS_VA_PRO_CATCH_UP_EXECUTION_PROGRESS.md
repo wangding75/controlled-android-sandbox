@@ -1,13 +1,13 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：2.0
-更新时间：2026-09-02 12:00（Asia/Shanghai）
+更新时间：2026-09-02 14:04（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
-当前阶段：`C4`（IN_PROGRESS，R05 的 Host LOW_MEMORY 按宿主机性能策略记录并续接；明确 launch/Guest TimeoutException 按最多 5 次重试续接；其他失败仍 fail-closed）
-当前任务：`C4-R05`（IN_PROGRESS）
-下一任务：`C4-R05`
+当前阶段：`C6`（IN_PROGRESS；按用户明确指令提前进入 C6，C4-R05 正式关门及 C1/C2/C4 合并回归延后至完整回归处理）
+当前任务：`C6-T01`（IN_PROGRESS）
+下一任务：`C6-T01`
 最后完成任务：`C4-TEMP-01`
 
 ## 1. 使用规则
@@ -26,9 +26,9 @@
 | C1 组件/包/进程 | DONE | 双用户、50 轮与任务书规定压力 | §5 C1-GATE |
 | C2 系统服务/F2-F5 | DONE | SX/XH 调用面 L3，P0/P1 无 NOT_PROVEN | §5 C2-T07 |
 | C3 Native/ABI/隔离 | IN_PROGRESS | trusted/hostile 闭环，条件项有决策 | §5 C3-T01 |
-| C4 SX 迁移 | IN_PROGRESS | C4-R01..R05；真实首帧、添加矩阵和 30 分钟双用户压力；Host LOW_MEMORY 仅记录并续接；明确 launch/Guest TimeoutException 最多 5 次重试；其他失败 fail-closed | §5 C4-R05 timeout continuation（2026-09-02） |
+| C4 SX 迁移 | BLOCKED（按用户指令延后关门） | C4-R05 正式关门及 C1/C2/C4 合并回归延后至完整回归；现有失败证据保留，不宣称 C4 DONE | §5 C4-R05 timeout continuation（2026-09-02） |
 | C5 XH 支持 | NOT_APPLICABLE | 用户决定跳过，不阻塞 C6/C7 | §5 PLAN-20260824-C4-REOPEN |
-| C6 API/ABI 矩阵 | PENDING | 声明组合均有 Android Matrix 证据 | - |
+| C6 API/ABI 矩阵 | IN_PROGRESS（用户授权提前进入） | 声明组合均有 Android Matrix 证据；不得将本次提前进入解释为 C4 已关闭 | §5 C6-T01（2026-09-02） |
 | C7 OEM/发布 | PENDING | 商业矩阵与 VA PRO scope 总验收 | - |
 
 ## 3. 任务状态
@@ -69,12 +69,12 @@
 | C4-R03 | 启动 readiness 与窗口合同 | DONE | C4-R01 | `d8797c89` | §5 C4-R03（用户批准残余风险豁免） |
 | C4-R04 | C4 fail-closed 验收编排 | DONE | C4-R02,C4-R03 | `1d9b83d54c13d2a758752281dbc492859d8bd05d` | §5 C4-R04 |
 | C4-TEMP-01 | CAS 导入/克隆/添加/启动耗时根因与修复 | DONE | C4-R04；完成后解除 C4-R05 临时阻断 | `7c0c819a58513f89e91ec0fb44cdc05a151e2c32` | §5 C4-TEMP-01 修复完成（2026-08-30） |
-| C4-R05 | MuMu RD 正式重验与关门 | IN_PROGRESS | C4-R04,C4-TEMP-01 | `9cb1bc3f04365564761d3689ee0b6782a475d8f3`（timeout continuation policy） | §5 C4-R05 timeout continuation（2026-09-02） |
+| C4-R05 | MuMu RD 正式重验与关门 | BLOCKED（延后至完整回归） | C4-R04,C4-TEMP-01 | `9cb1bc3f04365564761d3689ee0b6782a475d8f3`（timeout continuation policy） | §5 C4-R05 timeout continuation（2026-09-02） |
 | C5-T01 | 原始 XH 产品能力契约 | NOT_APPLICABLE | C2,C3 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T02 | XH CAS Host/SDK 集成 | NOT_APPLICABLE | C5-T01,C4-T02 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T03 | 原始 XH/DingTalk 验收 | NOT_APPLICABLE | C5-T02,C4 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T04 | 可选 Xposed 模块验收 | NOT_APPLICABLE | C3-T06,C5-T01 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
-| C6-T01 | API33-37 回归 | PENDING | C4-R05 | - | - |
+| C6-T01 | API33-37 回归 | IN_PROGRESS（用户授权提前进入） | C4-R05（用户授权跳过当前依赖） | - | §5 C6-T01（2026-09-02） |
 | C6-T02 | ARM/跨宽度/16KB | PENDING | C3-T03,C6-T01 | - | - |
 | C6-T03 | Android Matrix 发布门禁 | PENDING | C6-T01,C6-T02 | - | - |
 | C7-T01 | OEM 优先级与代表设备 | PENDING | C6 | - | - |
@@ -4022,3 +4022,21 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   的预检快照随本进度提交保存。
 - **恢复条件**：提交并推送新的预检快照，确认工作区干净且 local/remote HEAD 一致，
   再从现有 formal durable evidence 续接 R05，并使用新的 `c1-c2-c4` → SX 批次。
+
+### C6-T01：用户授权提前进入 C6，C4-R05 延后至完整回归（2026-09-02 14:04）
+
+- **状态变更**：按用户明确指令，当前任务从 `C4-R05` 切换为 `C6-T01`；`C4-R05`
+  记录为 `BLOCKED（延后至完整回归）`，不改写为 `DONE`。C4 阶段仍未关闭。
+- **用户授权偏离**：任务书原依赖为 `C6-T01 <- C4-R05`；本次仅更新进度账本，记录用户
+  授权在 C4-R05 正式关门前提前进入 C6。该切换不表示 C4-R05 的 formal、商业样本、
+  C1/C2/C4 合并回归、SX 回归或双用户短测已经通过。
+- **延后项**：C4-R05 未完成的正式矩阵、商业样本门禁、C1/C2/C4 复合回归和 SX 回归
+  统一保留，待完整回归时执行并单独验收；原始失败证据与 Known Issues 不删除、不降级。
+- **C6 当前项**：`C6-T01`（API33-37 统一回归）登记为 `IN_PROGRESS`；`C6-T02`、
+  `C6-T03` 继续 `PENDING`。本条没有执行 C6 代码、构建或设备测试。
+- **切换基线**：仓库分支为 `feature/t57-r03-va-pro-capability-campaign`，HEAD 为
+  `1bb57b3511f2c0924ce03a42a6d7f35f48ee99b3`，远端同分支 HEAD 当前一致；工作区已有
+  未提交的 `tools/capability/run_c4_r05_rd.py` 改动，本次仅修改本进度账本，未覆盖该改动。
+- **Known Issues**：不关闭、不新增；C4 的开放项继续按原记录保留。C5-T01 至 C5-T04
+  继续为 `NOT_APPLICABLE`。
+- **下一任务**：`C6-T01`；完成 C6-T01 前不前移 C6-T02。
