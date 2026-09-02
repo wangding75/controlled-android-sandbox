@@ -105,7 +105,7 @@
         ]
       }
     ],
-    "outputDirectory": "artifacts/m5-device-test-build"
+    "outputDirectory": "build/device-test-build"
   },
   "deviceLabBuild": {
     "schemaVersion": 1,
@@ -168,7 +168,7 @@
         ]
       }
     ],
-    "outputDirectory": "artifacts/m5-device-lab-build"
+    "outputDirectory": "build/device-lab-build"
   },
   "deviceLab": {
     "schemaVersion": 1,

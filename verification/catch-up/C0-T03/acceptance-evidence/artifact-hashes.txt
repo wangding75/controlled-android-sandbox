@@ -1,5 +1,0 @@
-e6c565f7f9349901f5ac91fc234a052e86c6409d1d7eeaa2e1695c33b8fdeb9d  D:\github\controlled-android-sandbox\app\build\outputs\apk\debug\app-debug.apk  3710513 bytes
-af85225a53002ce43084b5a32db5a17193be75c7bec0d2477780eb44702fb169  D:\github\controlled-android-sandbox\fixture-basic\build\outputs\apk\debug\fixture-basic-debug.apk  1766894 bytes
-33cc3e77f0d0f48f03c0ab4b84053084a8b100318d3c6a33f0ce2a522008e77d  D:\github\controlled-android-sandbox\fixture-compat32\build\outputs\apk\debug\fixture-compat32-debug.apk  619259 bytes
-cdb690449ee858954625a24f2683e15208dd7727bed9cb13a55bb82b61712483  D:\github\controlled-android-sandbox\sandbox-companion32\build\outputs\apk\debug\sandbox-companion32-debug.apk  4218435 bytes
-01ffbd66955b3f18b9c08a282c3c9aa24756c25ff38ca61f004af8e698227797  D:\github\controlled-android-sandbox\verification\catch-up\C0-T03\c0-t03-head.bundle  40002395 bytes

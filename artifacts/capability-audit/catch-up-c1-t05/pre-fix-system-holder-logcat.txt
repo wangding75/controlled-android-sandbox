@@ -1,7 +1,0 @@
-C1-T05 pre-fix RD discovery 2026-08-21
-instance=RD测试 api=32
-PENDING_INTENT_BROKER_RELAY_CREATED virtualUserId=0
-CS_PI_HOLDER: ALARM_SCHEDULED alarm=2000ms
-Permission Denial: com.warden.controlledsandbox.fixture.SYSTEM_HOLDER_ALARM broadcast from com.warden.controlledsandbox.debug requires CHANGE_DEVICE_IDLE_TEMP_WHITELIST or START_ACTIVITIES_FROM_BACKGROUND or START_FOREGROUND_SERVICES_FROM_BACKGROUND
-SYSTEM_HOLDER_RELAY missing
-Interpretation: the system-held PendingIntent was created, but delivery stayed on the original Guest broadcast path instead of the explicit Host relay.

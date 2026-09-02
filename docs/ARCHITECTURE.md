@@ -121,7 +121,7 @@ Virtual UIDs preserve a stable app ID across virtual users while changing the us
 
 ## Component bridges
 
-> Historical / Superseded for the T57 normal path. The paragraph below is retained as the pre-T57 development description. Current T57 status is in `docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md` and `docs/capability/CAPABILITY_REGISTRY.yaml`.
+> The component bridges below describe the current scope-limited implementation. Capability status and known gaps are maintained in `docs/capability/CAPABILITY_REGISTRY.yaml`.
 
 Current bridges are intentionally explicit:
 
@@ -181,7 +181,7 @@ This boundary serializes package writes, prevents process-label spoofing, closes
 
 Package Service also owns a Runtime-role-only `IVirtualSystemServiceSession` capability. The capability is fixed to package, virtual user, virtual process and Runtime generation and exposes only bounded Clipboard, Account, Alarm and Notification/Job namespace operations. Guest code receives the scoped session Binder through its Runtime specification, never the Package Service root Binder.
 
-## M4-T12 lifecycle ownership
+## Lifecycle ownership
 
 Notification, Notification Channel/Group and Job ownership are persisted by the scoped Package Service
 `VirtualSystemServiceStore`. Framework proxies reserve state before host delegation and commit only
@@ -197,13 +197,13 @@ Provider cursor/file cleanup delivery is owned by `RuntimeProviderResourceCoordi
 `RuntimeBrokerService`. The central Broker retains orchestration and Session ownership while Provider
 resource invalidation and best-effort physical close delivery are delegated.
 
-## M4-T13 Guest Job execution ownership
+## Guest Job execution ownership
 
 Android `JobParameters` and its host callback never cross directly into Guest code. The trusted `VirtualJobService` extracts a bounded `VirtualJobParametersSnapshot` and calls Package Service. Package Service validates the persisted Job owner and current Runtime observer, transitions the record through `DISPATCHING` and `RUNNING`, and creates an `IVirtualJobExecution` capability bound to Guest ID, process, generation and dispatch token.
 
 The Guest runtime reconstructs version-adapted `JobParameters`, invokes the declared Guest `JobService` on its main thread and exposes only a restricted raw `IJobCallback` implementation for `jobFinished`. Completion returns through the scoped execution Binder to the trusted Host callback. Runtime death, callback death, replacement, timeout and stop invalidate the capability and apply an explicit reschedule decision.
 
-## M4-T14 Service lifecycle ownership
+## Service lifecycle ownership
 
 `RuntimeServiceCoordinator` owns Broker-side started, bound, foreground and recovery state. `RuntimeBrokerService` supplies only the generic component route and Guest Binder invocation. Bound clients may attach a Binder token; the coordinator links it to death, performs best-effort Guest unbind and removes authoritative connection ownership.
 

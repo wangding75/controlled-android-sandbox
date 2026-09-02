@@ -294,15 +294,15 @@ reduction was used.
 | `cmd /c gradlew.bat :app:assembleDebug :fixture-basic:assembleDebug :fixture-compat32:assembleDebug :sandbox-companion32:assembleDebug --no-daemon` | PASS; all configured arm64-v8a, armeabi-v7a, x86, x86_64 native builds completed |
 | `python tools/static_android_compile.py` | PASS |
 | `python tools/capability/run_local_capability_audit.py --all` | `29 PASS / 13 KNOWN_ISSUE / 0 EXPECTED_WARNING / 0 NEW_REGRESSION / 13 FAIL / 0 UNVERIFIED`; exit reflects pre-existing known issues |
-| `python scripts/check-native-files-loader.py` | PASS |
+| `python scripts/check-native-hostile-profile.py` | PASS |
 | `python scripts/check-native-boundary-matrix.py` | PASS |
 | `git diff --check` | PASS; only the tracked JSON line-ending warning is reported by Git |
 | `bash scripts/test-native.sh` policy/FS/procfs/FD/syscall tests | PASS through deterministic test execution, including new convergence substrate and short/zero-argument prctl assertions |
 | `bash scripts/test-native.sh` complete host interceptor runner | Integration Verification Debt: WSL host lacks `android/log.h` and `jni.h`; Android Gradle/NDK build is the authoritative source compile |
 | ASAN/UBSAN/CMake sanitizer target | Not run; no existing suitable P3 target was present, and no new sanitizer infrastructure was started |
 
-The final serialized audit artifact was:
-`artifacts/capability-audit/all/20260820T191922Z`.
+The final serialized audit output was generated locally and is not retained in
+the source tree.
 
 The host runner failure is recorded in
 `build/verification/native-host-test-execution.json` and is not counted as a
@@ -315,11 +315,11 @@ Dynamic resolution selected serial `127.0.0.1:16416`, API32. No historical
 serial was hardcoded.
 
 - Native adversarial campaign: PASS, all ten cases produced meaningful output;
-  evidence `artifacts/capability-audit/native/20260820T191403Z`.
+  raw session output was generated locally and is not retained in the source tree.
 - Native enforcement campaign: PASS; FS/NET enforcement proven on RD, isolated
   UID/process distinct, FD and stale-revision cases covered, seccomp fixture64
-  and fixture32 feasibility recorded; evidence
-  `artifacts/capability-audit/native-enforcement/20260820T191448Z`.
+  and fixture32 feasibility recorded; raw session output was generated locally
+  and is not retained in the source tree.
 - Direct x86 companion evidence is retained as source/device coverage evidence;
   it is not promoted to translated-ABI parity.
 - `PR_GET_NAME`, dumpable, seccomp, and no-new-privs results are observed and

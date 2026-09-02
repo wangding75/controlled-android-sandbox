@@ -58,6 +58,6 @@ dependency verification and `--write-locks`. AGP-private `_internal-*` test-plat
 are explicitly excluded because they are plugin-owned tool graphs rather than product dependencies.
 CI then runs `tools/gradle_lock_state.py verify --require-clean`;
 new, missing, modified, malformed, or dynamic lock rows fail the build. Generated `gradle.lockfile`
-files must be reviewed and committed. The local `verify-all.sh` also validates the checked-in Gradle
-lock files and fails closed while they are absent. Source policy checks do not substitute the reviewed
-coordinate manifest for dependency lock state.
+files must be reviewed and committed. The source supply-chain governance checker validates the
+checked-in dependency policy and lock-state wiring; source policy checks do not substitute the
+reviewed coordinate manifest for dependency lock state.

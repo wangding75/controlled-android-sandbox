@@ -9,7 +9,7 @@ cd "$ROOT"
   git ls-files --cached --others --exclude-standard
 } | LC_ALL=C sort -u | while IFS= read -r path; do
   case "$path" in
-    verification/SOURCE_SHA256SUMS.txt|build/*|artifacts/*) continue ;;
+    verification/SOURCE_SHA256SUMS.txt|build/*|artifacts/*|reports/t57-r03/T57_R03_REPOSITORY_CLEANUP_REPORT.md) continue ;;
   esac
   [[ -f "$path" ]] && sha256sum "$path"
 done > "$TMP"

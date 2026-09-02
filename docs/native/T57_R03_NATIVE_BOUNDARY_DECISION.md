@@ -46,7 +46,8 @@ compatibility signals, not a CAS license to copy a closed implementation.
 CAS currently has **no** seccomp installer.
 
 Adding more libc hooks would improve `TRUSTED_COMPAT` coverage (chmod, xattr,
-getcwd) but would not change the hostile statement. T57-R02 already forbade
+getcwd) but would not change the hostile statement. The earlier design baseline
+already forbade
 that substitution. This campaign repeats the prohibition.
 
 Option B is the only `ISOLATED_HOSTILE` direction that an ordinary APK can
@@ -145,63 +146,11 @@ Later campaigns, only after P0A-02 evidence:
 
 ---
 
-# P0A-02 POC Findings
+# Historical POC scope
 
-Campaign: `T57-R03-P0A-02`
-Status: recorded after isolated-process RD measurement
-Maturity: `RD_BASELINE_NATIVE_ENFORCEMENT_POC`
-VA Pro equivalent: `NOT_PROVEN`
-
-This section is additive. It does not rewrite the P0A-01 decision above.
-
-Process under test: host debug-only `NativeEnforcementIsolatedService`
-(`android:isolatedProcess="true"`). This is an Android OS primitive
-feasibility probe. It is **not** CAS guest runtime production wiring.
-`KI-R03-NATIVE-010` is unchanged.
-
-RD session: `artifacts/capability-audit/native-enforcement/20260817T073257Z`
-
-Host UID `10193` vs isolated UID `99024`. Distinct isolated UID assigned.
-
-## Filesystem
-
-- `BROKER_FS_CAPABILITY`: `PROVEN_ON_RD`
-- Conclusion: `PROVEN`
-- Direct libc `open`, `syscall(SYS_openat)`, and raw `syscall` of the
-  host-private sentinel failed in the isolated UID (ENOENT / EPERM).
-  This is kernel UID / SELinux, not a PLT hook.
-- Broker-mediated opaque capability read returned the session token.
-- Path guess / capability mismatch / session mismatch were denied.
-
-## Network
-
-- `BROKER_NET_CAPABILITY`: `PARTIAL/NOT_ENFORCED`
-- Conclusion: `PARTIAL`
-- Direct libc / syscall / raw `socket`+`connect` to the session loopback
-  server all returned `DIRECT_ALLOWED`.
-- Broker-mediated request also succeeded.
-- Option B by isolated process alone is **not** a network hostile boundary
-  on this ordinary APK. `KI-R03-NATIVE-ENF-001`.
-
-## Seccomp
-
-- Fixture-only classic BPF filter on `getppid` → `SECCOMP_RET_ERRNO|EPERM`.
-- Conclusion: `FEASIBLE`
-- x86_64 isolated host process: `SECCOMP_FILTER_FEASIBLE`
-  (`prctl` 0, filter_rc 0, filtered getppid errno EPERM, process stayed alive).
-- x86 isolated fixture32 process: `SECCOMP_FILTER_FEASIBLE` (same pattern).
-- arm64 / armeabi-v7a compiled, `UNVERIFIED_RUNTIME` on this RD device.
-- Feasible on a dedicated test process is **not** VA-555 implemented.
-
-## Architecture next step
-
-**Case B.** FS direct denied + Net direct allowed + Broker works +
-Seccomp feasible.
-
-- Option B is proven for filesystem capability isolation on ordinary APK.
-- Network must be split: Android isolated-UID net policy, Broker-only
-  network architecture, and possible privileged enforcement.
-- Option C is fixture-level feasible hardening, not a product seccomp mode.
-- Option D/E remain `REQUIRES_PRIVILEGE`.
-- Next: P0A-03 must not claim hostile boundary complete. Split Network
-  Boundary before any production isolated-hostile rollout.
+The isolated-process proof-of-concept and its raw session evidence were
+development inputs to this decision. They are intentionally not retained as
+repository artifacts or as a production compatibility claim. The current
+trusted/isolated boundary decision and its remaining gaps are recorded above;
+the active native source enforcement fixture remains under
+`verification/native-enforcement/`.

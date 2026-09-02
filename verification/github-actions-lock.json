@@ -13,11 +13,6 @@
       "sha": "03ad4de0992f5dab5e18fcb136590ce7c4a0ac95",
       "version": "v5.6.0",
       "releaseUrl": "https://github.com/actions/setup-java/releases/tag/v5.6.0"
-    },
-    "actions/upload-artifact": {
-      "sha": "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
-      "version": "v7.0.1",
-      "releaseUrl": "https://github.com/actions/upload-artifact/releases/tag/v7.0.1"
     }
   },
   "java": {

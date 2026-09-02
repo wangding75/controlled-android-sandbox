@@ -76,7 +76,7 @@ for token in ('INativeCompanionArtifactService', 'ParcelFileDescriptor.open',
     if token not in client:
         errors.append(f'Companion runtime client is missing {token}')
 if 'NATIVE_COMPANION_CROSS_WIDTH_EXECUTION_NOT_WIRED' in runtime:
-    errors.append('Runtime still contains the pre-M5 cross-width execution blocker')
+    errors.append('Runtime still contains the pre-cross-width execution blocker')
 for token in ('nativeCompanion.prepare', 'nativeCompanion.launchActivity',
               'nativeCompanion.invokeComponent', 'nativeCompanion.stopGuest'):
     if token not in runtime:

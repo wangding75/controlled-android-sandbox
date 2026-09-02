@@ -32,20 +32,18 @@ jobs:
             gradle/verification-metadata.xml
             gradle/reviewed-dependency-coordinates.json
       - name: Verify source supply-chain policy
-        run: python3 scripts/check-m5-t19-1-u-supply-chain-governance.py
+        run: python3 scripts/check-supply-chain-governance.py
       - name: Generate and verify Gradle dependency lock state
         run: |
           ./gradlew --no-daemon --dependency-verification=strict resolveAndLockAll --write-locks
           python3 tools/gradle_lock_state.py verify --require-clean
       - name: Verify Gradle dependency supply chain
         run: ./gradlew --no-daemon --dependency-verification=strict help
-      - name: Verify source, contracts, host runtimes and native boundaries
-        run: ./scripts/verify-all.sh | tee verification/ci-source-gates.txt
-      - name: Preserve verification log
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: source-gates-${{ github.run_id }}
-          path: verification/ci-source-gates.txt
-          if-no-files-found: warn
-          retention-days: 14
+      - name: Verify current source architecture and contracts
+        run: |
+          python3 scripts/check-architecture.py
+          python3 scripts/check-contracts.py
+          python3 scripts/check-build-environment.py
+          python3 tools/baseline_manifest.py
+          python3 tools/reference_sources.py verify
+          python3 tools/static_android_compile.py

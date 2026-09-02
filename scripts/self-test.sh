@@ -7,10 +7,10 @@ mkdir -p "$BUILD/domain" "$BUILD/wrapper"
 
 mapfile -t DOMAIN_MAIN < <(find "$ROOT/sandbox-domain/src/main/java" -name '*.java' | sort)
 mapfile -t DOMAIN_TEST < <(find "$ROOT/sandbox-domain/src/testHarness/java" -name '*.java' | sort)
-javac --release 17 -d "$BUILD/domain" "${DOMAIN_MAIN[@]}" "${DOMAIN_TEST[@]}"
+javac --release 17 -encoding UTF-8 -d "$BUILD/domain" "${DOMAIN_MAIN[@]}" "${DOMAIN_TEST[@]}"
 java -cp "$BUILD/domain" com.warden.controlledsandbox.domain.SelfTest
 
-javac --release 17 -d "$BUILD/wrapper" "$ROOT/tools/wrapper-src/org/gradle/wrapper/GradleWrapperMain.java"
+javac --release 17 -encoding UTF-8 -d "$BUILD/wrapper" "$ROOT/tools/wrapper-src/org/gradle/wrapper/GradleWrapperMain.java"
 jar --create --file "$BUILD/gradle-wrapper.jar" -C "$BUILD/wrapper" .
 
 python3 - "$ROOT" <<'PYSELFTEST'
@@ -19,7 +19,7 @@ import sys, xml.etree.ElementTree as ET
 root=Path(sys.argv[1])
 for p in root.rglob('*.xml'):
     if 'build/' not in str(p): ET.parse(p)
-required=['settings.gradle','app/build.gradle','sandbox-runtime/src/main/AndroidManifest.xml','docs/CLEAN_ROOM_POLICY.md','docs/BASELINE.md','build-environment.lock.json','.gitattributes']
+required=['settings.gradle','app/build.gradle','sandbox-runtime/src/main/AndroidManifest.xml','docs/CLEAN_ROOM_POLICY.md','docs/ARCHITECTURE.md','docs/SOURCE_PROVENANCE.md','build-environment.lock.json','.gitattributes']
 for rel in required:
     if not (root/rel).is_file(): raise SystemExit('missing '+rel)
 debug_manifest=ET.parse(root/'app/src/debug/AndroidManifest.xml').getroot()

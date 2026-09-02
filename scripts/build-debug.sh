@@ -2,4 +2,6 @@
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
-./scripts/build-device-test-apks.sh --online
+python3 scripts/check-build-environment.py --android
+./scripts/check-wrapper-bootstrap.sh
+./gradlew --no-daemon assembleDebug

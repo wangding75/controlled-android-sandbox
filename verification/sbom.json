@@ -28,7 +28,7 @@
       "gradleProjectPath": ":app",
       "version": "0.5.19.1-source",
       "license": "Apache-2.0",
-      "fileCount": 178,
+      "fileCount": 185,
       "languages": [
         "Gradle",
         "Java",
@@ -37,7 +37,7 @@
         "pro",
         "txt"
       ],
-      "sourceDigestSha256": "ca4d1bd2396720e6c085d1e8d677ec950a76617654377f99d4c17a14c69c92c1"
+      "sourceDigestSha256": "91d4938ef2c36eca211ec86af4b7f1c7864c714ba89ca99ca9a1796d5d2867d2"
     },
     {
       "type": "library",
@@ -52,7 +52,7 @@
         "Java",
         "lockfile"
       ],
-      "sourceDigestSha256": "abffcf0c9558bb7c1f770afefe7c996cf6333944c55ebdbe3b01d90a3f9703fb"
+      "sourceDigestSha256": "70549ce6a39df51370a8573333827bf8184e4e9cad156e19b00bfd1f9c81b75e"
     },
     {
       "type": "library",
@@ -69,7 +69,7 @@
         "XML",
         "lockfile"
       ],
-      "sourceDigestSha256": "4e53eab6fb515dd209d44a29f5f7d6f174080f96b94c7707da95b3a587b985eb"
+      "sourceDigestSha256": "a08419fc14b098dd712d53cd7405a319a65a3958b518a89554d8725c294d49b9"
     },
     {
       "type": "library",
@@ -84,7 +84,7 @@
         "Java",
         "lockfile"
       ],
-      "sourceDigestSha256": "037fbb918b195daa307207c99161285bc3be87a8811019d8469b30804cc2b836"
+      "sourceDigestSha256": "ebc89024f147c768eb1ee17c45364f8e68df377d86d5f4a5108fe6df1315d215"
     },
     {
       "type": "library",
@@ -93,14 +93,14 @@
       "gradleProjectPath": ":sandbox-runtime",
       "version": "0.5.19.1-source",
       "license": "Apache-2.0",
-      "fileCount": 2494,
+      "fileCount": 2502,
       "languages": [
         "Gradle",
         "Java",
         "XML",
         "lockfile"
       ],
-      "sourceDigestSha256": "08a9a55d4e4bfc3dd081aa411a7f8abe63d331e403347abcbb597ff65084f68e"
+      "sourceDigestSha256": "664d0617bd4f0bfc1c6c752a0426b48623c974ce2992161f4c2542bcdbdbfe38"
     },
     {
       "type": "library",
@@ -116,7 +116,7 @@
         "XML",
         "lockfile"
       ],
-      "sourceDigestSha256": "95afd2663e212bed151fe1078575867bc1309199604f86aa2135b4d23107c975"
+      "sourceDigestSha256": "968ebdccc4467954a2e9929701e89a08e3bae41e59eca805bb4c7aead6fe580b"
     },
     {
       "type": "application",
@@ -134,7 +134,7 @@
         "lockfile",
         "txt"
       ],
-      "sourceDigestSha256": "536fcfc6627dd2ba3b944689bafa1e3fa80038b2ce4297b1176290c7a61fcd59"
+      "sourceDigestSha256": "c22448581c4c051c57c26caf0eb4103f6b30731e2c06c071f688bb65a09e4696"
     },
     {
       "type": "application",
@@ -149,7 +149,7 @@
         "XML",
         "lockfile"
       ],
-      "sourceDigestSha256": "174723e3d6c478b876d366911e768b3f4c5998bf1cdb4beecd71f51149c0cf79"
+      "sourceDigestSha256": "7cc85e5496b114c120b3348fb12850413562c833f586df28d680c55ba9c32b4b"
     },
     {
       "type": "application",
@@ -231,7 +231,7 @@
         "lockfile",
         "txt"
       ],
-      "sourceDigestSha256": "458be3f2ab06b6295f294758312ea9abc7d24e48bf608fa62f7a9af2e7087784"
+      "sourceDigestSha256": "43f407c28dd39c246ed033cafff1e391c8a5bb620793888402aea9972bd711d1"
     },
     {
       "type": "application",
@@ -249,7 +249,7 @@
         "lockfile",
         "txt"
       ],
-      "sourceDigestSha256": "b23532527b861e4ca3cfedac243837e1d659e748c229f9f6485ad33f7228c1fe"
+      "sourceDigestSha256": "76dcdb24a71a56353e969419078206d67a13880294393dcbcbf2b96b556cc874"
     }
   ],
   "externalRuntimeDependencies": [

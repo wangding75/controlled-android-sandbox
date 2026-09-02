@@ -18,7 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 RUNNER = ROOT / "tools/static_android_compile.py"
 EXECUTION_RECEIPT = ROOT / "build/static-android-compile/verification/static-android-test-execution.json"
-REPORT = ROOT / "build/verification/m5-t19-critical-test-ownership.json"
+REPORT = ROOT / "build/verification/critical-test-ownership.json"
 
 
 @dataclass(frozen=True)

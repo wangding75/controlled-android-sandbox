@@ -185,7 +185,7 @@ final class MediaCommunicationInvocationInterceptor {
         if (containsAny(name, "arenavigationrepeatsoundeffectsenabled",
                 "isnavigationrepeatsoundeffectsenabled")) {
             // API32 ViewRootImpl.<init> queries this while WindowManagerGlobal.addView
-            // constructs the root. NewBlackBox IAudioServiceProxy passes unknown audio
+            // constructs the root. A reference IAudioService proxy passes unknown audio
             // methods through; throwing here leaves Guest Stub windows=[] / reportedDrawn=false.
             return Decision.handled(booleanValue(method.getReturnType(), false));
         }

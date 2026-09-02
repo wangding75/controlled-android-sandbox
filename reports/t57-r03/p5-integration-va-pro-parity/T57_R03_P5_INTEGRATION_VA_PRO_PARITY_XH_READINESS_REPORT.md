@@ -79,17 +79,16 @@ as test-infrastructure evidence, not converted into a runtime PASS.
 
 | Target | Result | Evidence |
 |---|---|---|
-| API35 `T57_R03_API35_x86_64` | Basic install/launch, scale, Service, Provider, PendingIntent and session-fencing gates pass; independent ActivityResult rerun passes; full A01 task matrix is `PARTIAL` because its semantic/evidence gates are timing-sensitive | `build/t57-rd-evidence/p5-api35-activity-result-final`; `artifacts/capability-audit/a01-acceptance/20260821T015439Z/evidence.json` |
-| API36 `T57_R03_API36_x86_64` | Basic install/launch, scale, Service, Provider, PendingIntent and session-fencing gates pass; independent ActivityResult rerun passes; full A01 task matrix is `PARTIAL` because its semantic/evidence gates are timing-sensitive | `build/t57-rd-evidence/p5-api36-activity-result-final`; `artifacts/capability-audit/a01-acceptance/20260821T015439Z/evidence.json` |
+| API35 `T57_R03_API35_x86_64` | Basic install/launch, scale, Service, Provider, PendingIntent and session-fencing gates pass; independent ActivityResult rerun passes; full A01 task matrix is `PARTIAL` because its semantic/evidence gates are timing-sensitive | Generated local evidence; not retained in the source tree |
+| API36 `T57_R03_API36_x86_64` | Basic install/launch, scale, Service, Provider, PendingIntent and session-fencing gates pass; independent ActivityResult rerun passes; full A01 task matrix is `PARTIAL` because its semantic/evidence gates are timing-sensitive | Generated local evidence; not retained in the source tree |
 
 The independent API35/API36 ActivityResult runs produced `LAUNCH_PASS`, parent create/start,
 child finish, and `FRAMEWORK_PROBE_ACTIVITY_RESULT_PASS`, with no FATAL/ANR marker.
 
 ### A01 full acceptance runner
 
-The required multi-API runner was executed against API32/API35/API36 and wrote:
-
-`artifacts/capability-audit/a01-acceptance/20260821T015439Z/evidence.json`
+The required multi-API runner was executed against API32/API35/API36 and wrote
+local evidence that is not retained in the source tree.
 
 It returned `OVERALL_PASS=False`. This is not hidden: API32/35/36 basic launch, scale, Service,
 Provider, PendingIntent and session-fencing results were PASS, while the remaining failures were
@@ -226,7 +225,7 @@ Command:
 python tools/capability/run_local_capability_audit.py --all
 ```
 
-Latest evidence: `artifacts/capability-audit/all/20260821T021739Z`
+Latest audit output was generated locally and is not retained in the source tree.
 
 Result: 42 total; 29 `PASS`; 13 registered `KNOWN_ISSUE`; 0 `EXPECTED_WARNING`; 0
 `NEW_REGRESSION`; 13 diagnostic failures, all classified by the existing audit policy. The

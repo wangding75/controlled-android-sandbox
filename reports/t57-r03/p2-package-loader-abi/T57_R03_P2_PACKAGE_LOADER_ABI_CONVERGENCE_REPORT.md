@@ -233,7 +233,7 @@ gap evidence only; no OEM or P3/P4 campaign was started.
 |---|---|
 | `python tools/static_android_compile.py` | PASS |
 | `python tools/android_gradle_build_gate.py verify --timeout-seconds 1200` | PASS Android Gradle/AIDL/CMake/APK build gate |
-| `python tools/capability/run_local_capability_audit.py --all` | Diagnostic exit 1 because 13 pre-existing `KNOWN_ISSUE` gates; `NEW_REGRESSION=0`, total 42, PASS 29, KNOWN_ISSUE 13, FAIL 13, UNVERIFIED 0. Evidence: `artifacts/capability-audit/all/20260820T160749Z`. |
+| `python tools/capability/run_local_capability_audit.py --all` | Diagnostic exit 1 because 13 pre-existing `KNOWN_ISSUE` gates; `NEW_REGRESSION=0`, total 42, PASS 29, KNOWN_ISSUE 13, FAIL 13, UNVERIFIED 0. Raw audit output is generated locally and is not retained in the source tree. |
 | `git diff --check` | PASS |
 
 The audit's known issues remain outside this P2 production campaign: architecture-size debt,

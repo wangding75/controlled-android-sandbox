@@ -27,19 +27,6 @@ class CampaignInfraTests(unittest.TestCase):
         self.assertEqual(validate_campaign_infra.validate_corpus(), [])
         self.assertEqual(validate_campaign_infra.validate_gates_and_schema(), [])
 
-    def test_c0_t04_fact_reconciliation(self) -> None:
-        from reconcile_cas_va_pro import reconcile
-
-        result = reconcile()
-        self.assertEqual(result["status"], "PASS", result["errors"])
-        self.assertEqual(result["counts"]["capabilities"], 14)
-        self.assertEqual(result["counts"]["corpus_entries"], 83)
-        self.assertEqual(
-            result["counts"]["corpus_scope_classification"],
-            {"IN_SCOPE": 51, "OUT_OF_SCOPE": 3, "DUPLICATE": 0,
-             "NEEDS_FIXTURE": 28, "PROVEN": 1},
-        )
-
     def test_fourteen_capabilities(self) -> None:
         self.assertEqual(len(REQUIRED_CAPABILITY_IDS), 14)
 
@@ -101,9 +88,9 @@ class CampaignInfraTests(unittest.TestCase):
 
         selected = select_gates("native", False)
         ids = [gate["id"] for gate in selected]
-        self.assertIn("native-boundary-matrix", ids)
-        self.assertIn("native-file-hooks", ids)
-        self.assertIn("native-enforcement-poc", ids)
+        self.assertIn("native-boundary", ids)
+        self.assertIn("native-hostile-profile", ids)
+        self.assertIn("native-abi-companion", ids)
         self.assertTrue(all("native_loader_jni_io" in (gate.get("capabilities") or []) for gate in selected))
 
     def test_native_enforcement_alias(self) -> None:
@@ -111,18 +98,9 @@ class CampaignInfraTests(unittest.TestCase):
 
         selected = select_gates("native-enforcement", False)
         ids = [gate["id"] for gate in selected]
-        self.assertIn("native-enforcement-poc", ids)
-
-    def test_native_enforcement_rd_dry_run(self) -> None:
-        completed = subprocess.run(
-            [sys.executable, str(HERE / "run_native_enforcement_rd.py"), "--dry-run"],
-            cwd=ROOT,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
-        self.assertIn("native-enforcement", completed.stdout)
+        self.assertIn("native-boundary", ids)
+        self.assertIn("native-hostile-profile", ids)
+        self.assertIn("native-abi-companion", ids)
 
     def test_audit_requires_declared_issue_evidence(self) -> None:
         from run_local_capability_audit import classify_gate

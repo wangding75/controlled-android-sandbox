@@ -85,8 +85,9 @@ behavior, P3 native/procfs/FD/process identity behavior, and Activity FIX03 were
 
 ## SystemService capability matrix
 
-The machine-readable matrix is
-[`verification/t57-r03-p4-systemservice-coverage-matrix.json`](../../../verification/t57-r03-p4-systemservice-coverage-matrix.json).
+The current machine-readable matrices are
+[`T57_R03_BINDER_INTERCEPTION_MATRIX.yaml`](../../../docs/system/T57_R03_BINDER_INTERCEPTION_MATRIX.yaml)
+and [`T57_R03_SYSTEM_SERVICE_STATE_MATRIX.yaml`](../../../docs/system/T57_R03_SYSTEM_SERVICE_STATE_MATRIX.yaml).
 All rows below are semantic status, not hook-existence status.
 
 | Service/domain | Status | Ownership and identity | Callback/lifecycle result |
@@ -190,8 +191,8 @@ The scope is the basic boundary, not Google Play implementation.
 
 ## VA / NBB comparison
 
-The local source comparison is
-[`docs/comparisons/T57_R03_P4_VA_NBB_COMPARISON.md`](../../../docs/comparisons/T57_R03_P4_VA_NBB_COMPARISON.md).
+The reference baseline is retained under `ref/`; the current comparison boundary is summarized in
+[`docs/VA_NBB_REFERENCE_BASELINE.md`](../../../docs/VA_NBB_REFERENCE_BASELINE.md).
 
 The VA references include `VActivityManagerService`, `VPackageManagerService`,
 `VAccountManagerService`, ServiceManager mirrors, and WebView/provider helpers. The NBB references
@@ -257,7 +258,7 @@ Command:
 python tools/capability/run_local_capability_audit.py --all
 ```
 
-Evidence: `artifacts/capability-audit/all/20260821T001226Z/summary.md`
+Raw audit output was generated locally and is not retained in the source tree.
 
 Result: 42 total; 29 `PASS`, 13 pre-registered `KNOWN_ISSUE`, 0 `EXPECTED_WARNING`, 0
 `NEW_REGRESSION`, 13 diagnostic `FAIL` entries all classified as those existing known issues.
@@ -356,8 +357,8 @@ API35: DEFERRED_DEVICE_EVIDENCE
 API36: DEFERRED_DEVICE_EVIDENCE
 API37: DEFERRED_API37
 
-VA_REFERENCE: source comparison committed in docs/comparisons/T57_R03_P4_VA_NBB_COMPARISON.md
-NBB_REFERENCE: source comparison committed in docs/comparisons/T57_R03_P4_VA_NBB_COMPARISON.md
+VA_REFERENCE: ref/ upstream baseline, summarized by docs/VA_NBB_REFERENCE_BASELINE.md
+NBB_REFERENCE: ref/ upstream baseline, summarized by docs/VA_NBB_REFERENCE_BASELINE.md
 
 VA_PRO_GAP_CLOSED: shared semantic identity contract; Guest account/WebView negative boundaries; fail-closed GMS gate; P1/P2/P3 regression result
 VA_PRO_GAP_PARTIAL: SystemService matrix; Account authenticator sessions; WebView Chromium behavior; GMS basic package/Binder boundary

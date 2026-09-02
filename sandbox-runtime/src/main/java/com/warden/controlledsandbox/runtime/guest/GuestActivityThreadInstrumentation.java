@@ -396,7 +396,7 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
                     route.intent, route.taskId);
             Bundle frameworkEvidence = ActivityFieldBridge.promoteFrameworkRecord(activity, session,
                     route.component, route.intent);
-            // NewBlackBox AppInstrumentation.checkActivity() → ContextCompat.fix() before onCreate.
+            // A reference AppInstrumentation.checkActivity() → ContextCompat.fix() before onCreate.
             ActivityFieldBridge.fixFrameworkWindowIdentity(activity);
             emitActivityRecordMapping(activity, route, route.token, route.activityToken,
                     frameworkEvidence);

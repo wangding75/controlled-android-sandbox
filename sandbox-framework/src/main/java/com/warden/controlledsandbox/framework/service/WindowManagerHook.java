@@ -9,7 +9,7 @@ public final class WindowManagerHook {
     public static AutoCloseable install(GuestIdentity identity) throws Exception {
         AutoCloseable hook = ReflectiveServiceHook.staticField("android.view.WindowManagerGlobal",
                 "sWindowManagerService", "getWindowManagerService", identity, "window");
-        // NewBlackBox IWindowManagerProxy.inject() drops the cached IWindowManager so the next
+        // A reference IWindowManager proxy drops the cached IWindowManager so the next
         // openSession goes through the hooked manager. Drop a pre-hook sWindowSession the same way;
         // otherwise the first addView uses an unhooked session and WMS never sees host packageName.
         try {

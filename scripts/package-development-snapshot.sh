@@ -6,7 +6,10 @@ if [[ -n $(git status --short --untracked-files=all) ]]; then
   echo 'Development snapshot requires a clean Git worktree' >&2
   exit 30
 fi
-./scripts/verify-all.sh
+./scripts/self-test.sh
+python3 scripts/check-architecture.py
+python3 scripts/check-contracts.py
+python3 tools/reference_sources.py verify
 SHORT=$(git rev-parse --short=12 HEAD)
 OUT=${1:-"$ROOT/build/controlled-sandbox-development-$SHORT.zip"}
 mkdir -p "$(dirname "$OUT")"

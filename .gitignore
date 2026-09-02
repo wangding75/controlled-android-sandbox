@@ -1,4 +1,5 @@
 .gradle/
+.gradle-*/
 .idea/
 **/build/
 local.properties
@@ -6,80 +7,34 @@ local.properties
 captures/
 .externalNativeBuild/
 .cxx/
-.gradle-reproducible/
-.gradle-user/
-.gradle-user-home/
-$d/
-caches/
-/android/
-/daemon/
-/native/
-/notifications/
 __pycache__/
 *.py[cod]
 
-# Local verification working logs (published separately as release artifacts)
-verification/*-working.txt
-
-# Local M5 APK validation outputs; published evidence stays outside the repository.
-artifacts/m5-device-lab-build/
-artifacts/m5-device-lab-rd-*/
-artifacts/m5-device-test-build/
-
-# Capability campaign runtime evidence. Registries stay in Git; raw audit/RD output does not.
-artifacts/capability-audit/
-
-# C4-R04 live device lanes retain raw screenshots/logs locally; tracked summaries and
-# artifact indexes under the lane root are the durable review evidence.
-verification/catch-up/C4-R04/live-smoke/
-verification/catch-up/C4-R04/live-smoke-fixed/live-r03/
-
-# C4-R05 RD child lanes retain large raw logs/screenshots and copied runtime
-# state locally. JSON summaries, command records, case contracts and artifact
-# indexes are the durable review evidence. This applies to formal, continued,
-# targeted-repro and pressure lane names alike.
-verification/catch-up/C4-R05/**/*.txt
-verification/catch-up/C4-R05/**/*.png
-verification/catch-up/C4-R05/**/*.log
-verification/catch-up/C4-R05/**/*.lastgood
-verification/catch-up/C4-R05/**/*.checkpoint
-verification/catch-up/C4-R05/**/*.registry
-
-# Superseded C4-R05 continuation/repro lanes are retained as local raw evidence; the
-# clean-commit formal lanes (for example formal-two-round-20260828) are tracked explicitly.
-verification/catch-up/C4-R05/closure-*/
-verification/catch-up/C4-R05/continuation-*/
-verification/catch-up/C4-R05/dual-user-continuation-preflight-*.json
-verification/catch-up/C4-R05/formal-dual-user-retest-*/
-verification/catch-up/C4-R05/formal-preflight-device-unavailable-*.json
-verification/catch-up/C4-R05/repro-*/
-
-# Interrupted and targeted C4-R05 lanes retain raw JSON/log bundles locally; curated
-# summaries, first-failure contracts and classification documents are force-added when
-# they form the durable review evidence for a task receipt.
-verification/catch-up/C4-R05/formal-two-round-20260830-receiver-fix/
-verification/catch-up/C4-R05/readiness-publication-fix-20260831/
-verification/catch-up/C4-R05/formal-two-round-20260831-publication-race-fix/
-verification/catch-up/C4-R05/recovery-prewarm-rollback-targeted-20260831/
-verification/catch-up/C4-R05/recovery-prewarm-rollback-targeted-20260831-v2/
-verification/catch-up/C4-R05/formal-two-round-20260831-prewarm-rollback-v2/
-verification/catch-up/C4-R05/formal-two-round-20260901-hot-barrier/
-verification/catch-up/C4-R05/rebootstrap-regression-20260901/
-verification/catch-up/C4-R05/formal-two-round-20260901-rebootstrap-*/
-verification/catch-up/C4-R05/formal-two-round-20260901-process-tree-fix-v1/
-verification/catch-up/C4-R05/formal-two-round-20260902-timeout12h-v1/
-
-# C4-TEMP-01 dynamic latency runs retain raw device logs, dumpsys, screenshots and
-# copied package state locally; the curated classification and artifact index at the
-# TEMP-01 root are the durable review evidence.
-/verification/catch-up/C4-TEMP-01/quark-latency/20*/
-
-# C4-TEMP-01 raw 2026-08-30 dynamic runs retain copied APKs and device dumps locally;
-# curated benchmark/classification files at the lane root are the durable evidence.
-/verification/catch-up/C4-TEMP-01/fixture-*-20260830*/
-/verification/catch-up/C4-TEMP-01/quark-*-20260830*/
-
+# Local packaging and capability-run output.
 _delivery/
+artifacts/
+verification/catch-up/
+
+# Transient verification/device output.
+verification/*-working.txt
+**/logcat/
+**/*logcat*.txt
+**/screenshots/
+**/*screenshot*.png
+**/device-dumps/
+**/rerun/
+**/retry/
+**/repro/
+**/continuation/
+**/checkpoint/
+**/*.checkpoint
+**/*.lastgood
+**/*.registry
+
+# Bundles are ignored only inside generated evidence/package directories.
+artifacts/**/*.bundle
+verification/catch-up/**/*.bundle
+_delivery/**/*.bundle
 
 # javac emits transient @arg files in the repository root for long source lists.
 javac.*.args

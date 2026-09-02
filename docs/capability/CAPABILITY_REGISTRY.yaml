@@ -23,7 +23,7 @@ rules:
   - Native hostile/direct-syscall/raw-SVC/custom-loader is not PASS.
   - compileSdk/targetSdk must not be treated as API matrix evidence.
 baseline_commit: 76d164795294b676a7cd9a2b20bbd829c5cd5ae3
-authoritative_handoff: docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
+authoritative_handoff: docs/ARCHITECTURE.md
 capabilities:
   - id: activity_framework
     title: Activity / task framework ownership
@@ -39,14 +39,12 @@ capabilities:
     va_pro_equivalent: NOT_PROVEN
     last_verified_commit: 222211efebad3c4adfc66804d32e5c3e60e8f3dd
     evidence:
-      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
-      - docs/runtime/T57_R02_REAL_PATH_TEST_MATRIX.md
-      - docs/T57_R02_VA_PRO_OPTIMIZATION_EVIDENCE.md
+      - docs/ARCHITECTURE.md
+      - docs/package/T57_R03_MANIFEST_SURFACE_MATRIX.yaml
+      - reports/t57-r03/p5-integration-va-pro-parity/T57_R03_P5_INTEGRATION_VA_PRO_PARITY_XH_READINESS_REPORT.md
       - tools/device/t57_rd_framework_transport_probe.ps1
-      - docs/review/T57_R03_P4_FIX01_A_ACTIVITY_STUB_ARCHITECTURE.md
-      - docs/review/T57_R03_P4_FIX01_I_ANDROID_REVALIDATION.md
-      - scripts/check-activity-task-virtualization.py
-      - verification/catch-up/C0-T03/README.md
+      - scripts/check-architecture.py
+      - tools/static_android_compile.py
     known_gaps:
       - Normal path is framework-owned ActivityThread/LoadedApk; GuestComponentRuntime remains an isolated/OEM fallback.
       - Dedicated launch-mode/task-field fixture is still pending.
@@ -65,13 +63,12 @@ capabilities:
     va_pro_equivalent: NOT_PROVEN
     last_verified_commit: 222211efebad3c4adfc66804d32e5c3e60e8f3dd
     evidence:
-      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
-      - docs/T57_R02_VA_PRO_OPTIMIZATION_EVIDENCE.md
-      - tools/device/t57_rd_service_real_path.ps1
-      - tools/device/t57_rd_framework_foreground_service_probe.ps1
-      - scripts/check-service-lifecycle.py
-      - docs/review/T57_R03_P1_00_P0_EVIDENCE_AND_CLASSLOADER_CLOSURE.md
-      - verification/catch-up/C0-T03/README.md
+      - docs/ARCHITECTURE.md
+      - docs/system/T57_R03_BINDER_INTERCEPTION_MATRIX.yaml
+      - reports/t57-r03/p5-integration-va-pro-parity/T57_R03_P5_INTEGRATION_VA_PRO_PARITY_XH_READINESS_REPORT.md
+      - scripts/check-architecture.py
+      - scripts/check-contracts.py
+      - tools/static_android_compile.py
     known_gaps:
       - Isolated/OEM fallback still uses GuestComponentRuntime.
       - JobService ANR/unbind and API 17 startService package-name checks remain VA commercial signals, not CAS proof.
@@ -89,9 +86,11 @@ capabilities:
     va_pro_equivalent: NOT_PROVEN
     last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
     evidence:
-      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
-      - docs/T57_R02_VA_PRO_OPTIMIZATION_EVIDENCE.md
+      - docs/ARCHITECTURE.md
+      - docs/runtime/T57_R03_CLASSLOADER_MATRIX.yaml
+      - reports/t57-r03/p2-package-loader-abi/T57_R03_P2_PACKAGE_LOADER_ABI_CONVERGENCE_REPORT.md
       - tools/device/t57_rd_framework_transport_probe.ps1
+      - tools/static_android_compile.py
     known_gaps:
       - Fallback bootstrap must still be proven not to double-create Application/components.
       - API 33-36 ActivityThread bindApplication differences are unverified.
@@ -109,12 +108,11 @@ capabilities:
     va_pro_equivalent: NOT_PROVEN
     last_verified_commit: c8324fb4091fa081feb1c2bf056038cb0b08a54d
     evidence:
-      - docs/runtime/T57_R02_REAL_PATH_TEST_MATRIX.md
-      - docs/runtime/T57_R02_P1_FIX_MATRIX.md
-      - tools/device/t57_rd_pending_intent_real_path.ps1
-      - scripts/check-pending-intent-lifecycle.py
-      - docs/review/T57_R03_P4_FIX01_D_SYSTEM_HOLDER_PI.md
-      - artifacts/capability-audit/fix01d/20260818T044548Z/evidence.json
+      - docs/ARCHITECTURE.md
+      - docs/system/T57_R03_BINDER_INTERCEPTION_MATRIX.yaml
+      - reports/t57-r03/p5-integration-va-pro-parity/T57_R03_P5_INTEGRATION_VA_PRO_PARITY_XH_READINESS_REPORT.md
+      - scripts/check-contracts.py
+      - tools/static_android_compile.py
     known_gaps:
       - Guest receiver file after cold bind was not observed; alarm relay + new :guestN is the death proof.
       - Mutable/immutable/one-shot/cancel/update matrix is incomplete.
@@ -132,8 +130,10 @@ capabilities:
     va_pro_equivalent: NOT_PROVEN
     last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
     evidence:
-      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
+      - docs/package/T57_R03_MANIFEST_SURFACE_MATRIX.yaml
+      - scripts/check-package-boundaries.py
       - scripts/check-package-query-resolve.py
+      - tools/static_android_compile.py
     known_gaps:
       - Split/dynamic-feature and some OEM manifest extensions remain unproven.
   - id: virtual_pms_package_visibility
@@ -150,10 +150,10 @@ capabilities:
     va_pro_equivalent: NOT_PROVEN
     last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
     evidence:
-      - docs/runtime/T57_R02_RD_TEST_ACCEPTANCE.md
+      - docs/package/T57_R03_VIRTUAL_PMS_SURFACE_MATRIX.yaml
+      - reports/t57-r03/p2-package-loader-abi/T57_R03_P2_PACKAGE_LOADER_ABI_CONVERGENCE_REPORT.md
       - scripts/check-virtual-package-state.py
       - scripts/check-package-query-resolve.py
-      - docs/review/T57_M10_DISCOVERED_ISSUES_20260817.md
     known_gaps:
       - VirtualPackageMetadata exceeds the 1800-line source-closure threshold.
       - HOST_PACKAGE_HIDDEN token vs HiddenPackageResultMapper needs reproduction.
@@ -172,10 +172,10 @@ capabilities:
     va_pro_equivalent: NOT_PROVEN
     last_verified_commit: 222211efebad3c4adfc66804d32e5c3e60e8f3dd
     evidence:
-      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
-      - scripts/check-m5-t6-isolated-process.py
-      - artifacts/capability-audit/p1-00/20260817T093213Z/ordinary_slots.json
-      - verification/catch-up/C0-T03/README.md
+      - docs/ARCHITECTURE.md
+      - scripts/check-guest-boundary.py
+      - tools/device/t57_rd_framework_transport_probe.ps1
+      - tools/static_android_compile.py
     known_gaps:
       - Production contract is 64 ordinary + 16 isolated; some tests still assume 8 ordinary slots.
       - Isolated live high-slot start is fail-closed on UNTRUSTED_RUNTIME_PEER_UID.
@@ -193,9 +193,11 @@ capabilities:
     va_pro_equivalent: NOT_PROVEN
     last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
     evidence:
-      - docs/runtime/T57_R02_REAL_PATH_TEST_MATRIX.md
-      - tools/device/t57_rd_provider_real_path.ps1
+      - docs/ARCHITECTURE.md
+      - docs/system/T57_R03_BINDER_INTERCEPTION_MATRIX.yaml
+      - reports/t57-r03/p5-integration-va-pro-parity/T57_R03_P5_INTEGRATION_VA_PRO_PARITY_XH_READINESS_REPORT.md
       - tools/device/t57_rd_framework_transport_probe.ps1
+      - tools/static_android_compile.py
     known_gaps:
       - Large CursorWindow, persistable URI grant revoke, FD leak, and ANR pressure remain open.
   - id: classloader
@@ -212,9 +214,10 @@ capabilities:
     va_pro_equivalent: NOT_PROVEN
     last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
     evidence:
-      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
       - docs/runtime/T57_R03_CLASSLOADER_MATRIX.yaml
-      - docs/review/T57_R03_P1_00_P0_EVIDENCE_AND_CLASSLOADER_CLOSURE.md
+      - docs/package/T57_R03_MANIFEST_SURFACE_MATRIX.yaml
+      - scripts/check-split-install-sessions.py
+      - tools/static_android_compile.py
     known_gaps:
       - Split APK, plugin same-name libraries, relocation, and linker namespace isolation are unproven.
   - id: native_loader_jni_io
@@ -231,39 +234,16 @@ capabilities:
     va_pro_equivalent: NOT_PROVEN
     last_verified_commit: 372fc11a9548184e568de213c4c8264f7bf39771
     evidence:
-      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
-      - docs/T57_R02_VA_PRO_OPTIMIZATION_EVIDENCE.md
+      - docs/ARCHITECTURE.md
       - docs/native/T57_R03_NATIVE_BOUNDARY_THREAT_MODEL.md
       - docs/native/T57_R03_NATIVE_BOUNDARY_MATRIX.yaml
       - docs/native/T57_R03_NATIVE_BOUNDARY_DECISION.md
-      - docs/native/T57_R03_NATIVE_ENFORCEMENT_POC_MATRIX.yaml
-      - scripts/check-native-file-hooks.py
-      - scripts/check-m5-t19-1-a-native-trust-boundary.py
       - scripts/check-native-boundary-matrix.py
-      - scripts/check-native-enforcement-poc.py
-      - docs/review/C3_T01_NATIVE_CORPUS_DESIGN.md
-      - scripts/check-c3-t01-native-corpus.py
-      - verification/catch-up/C3-T01/c3-t01-rd-summary.json
-      - verification/catch-up/C3-T01/c3-t01-local-verification.json
-      - docs/review/C3_T03_ABI_16KB_NATIVE_MEDIA_DESIGN.md
-      - scripts/check-c3-t03-abi-elf.py
+      - docs/native/T57_R03_NATIVE_ENFORCEMENT_OPTIONS.md
+      - scripts/check-native-hostile-profile.py
+      - scripts/check-native-abi-companion.py
       - tools/static_android_compile.py
-      - tools/capability/run_c3_t03_rd.py
-      - verification/catch-up/C3-T03/c3-t03-abi-report.json
-      - verification/catch-up/C3-T03/c3-t03-rd-summary.json
-      - verification/catch-up/C3-T03/c3-t03-local-verification.json
-      - verification/catch-up/C3-T03/c3-t03-environment-block.json
-      - docs/review/C3_T04_HOSTILE_NATIVE_ISOLATION_DESIGN.md
-      - scripts/check-c3-t04-hostile-isolation.py
-      - tools/capability/run_c3_t04_rd.py
-      - verification/catch-up/C3-T04/c3-t04-rd-summary.json
-      - verification/catch-up/C3-T04/c3-t04-local-verification.json
-      - docs/review/C3_T05_SECCOMP_USER_NOTIFY_ADR.md
-      - docs/review/C3_T06_ART_XPOSED_EXTENSION_ADR.md
-      - docs/review/C4_T01_SX_DEPENDENCY_FREEZE_DESIGN.md
-      - verification/catch-up/C4-T01/c4-t01-freeze.json
-      - docs/review/C4_T02_SX_CAS_SDK_ADAPTER_DESIGN.md
-      - verification/catch-up/C4-T02/c4-t02-engine-mapping.json
+      - verification/native-enforcement/enforcement_native.cpp
     hostile_fs_boundary_rd: PASS
     hostile_network_boundary_rd: PASS
     seccomp_filter_feasibility_rd: PASS
@@ -288,10 +268,10 @@ capabilities:
     va_pro_equivalent: NOT_PROVEN
     last_verified_commit: 222211efebad3c4adfc66804d32e5c3e60e8f3dd
     evidence:
-      - docs/T57_R02_VA_PRO_OPTIMIZATION_EVIDENCE.md
-      - tools/device/t57_rd_recovery_probe.ps1
-      - scripts/check-m5-t19-1-c-rebind-timeout-recovery.py
-      - verification/catch-up/C0-T03/README.md
+      - docs/ARCHITECTURE.md
+      - reports/t57-r03/p5-integration-va-pro-parity/T57_R03_P5_INTEGRATION_VA_PRO_PARITY_XH_READINESS_REPORT.md
+      - scripts/check-pre-device-runtime-hardening.py
+      - tools/static_android_compile.py
     known_gaps:
       - SIGSEGV, native abort, ANR, LMK, reboot restore, and late-callback matrices remain open.
   - id: package_lifecycle_clear_delete_reinstall
@@ -308,19 +288,12 @@ capabilities:
     va_pro_equivalent: NOT_PROVEN
     last_verified_commit: 222211efebad3c4adfc66804d32e5c3e60e8f3dd
     evidence:
-      - docs/runtime/T57_R02_REAL_PATH_TEST_MATRIX.md
-      - tools/device/t57_rd_lifecycle_probe.ps1
+      - docs/package/T57_R03_MANIFEST_SURFACE_MATRIX.yaml
+      - docs/package/T57_R03_VIRTUAL_PMS_SURFACE_MATRIX.yaml
       - scripts/check-package-lifecycle-transaction.py
-      - verification/catch-up/C0-T03/README.md
-      - docs/review/C4_T02_SX_CAS_SDK_ADAPTER_DESIGN.md
-      - scripts/check-c4-t02-sx-adapter.py
-      - verification/catch-up/C4-T02/c4-t02-engine-mapping.json
-      - docs/review/C4_T03_SX_DATA_MIGRATION_DESIGN.md
-      - scripts/check-c4-t03-sx-migration.py
-      - docs/review/C4_T04_CAS_ONLY_RUNTIME_DESIGN.md
-      - scripts/check-c4-t04-cas-only-runtime.py
-      - docs/review/C4_T05_SX_BUSINESS_DESIGN.md
-      - scripts/check-c4-t05-sx-business.py
+      - scripts/check-apk-revision-binding.py
+      - scripts/check-split-install-sessions.py
+      - tools/static_android_compile.py
     known_gaps:
       - Upgrade, rollback, clone, reset-identity, and in-flight Provider/Service/Job/Alarm transactions remain open.
   - id: system_service_virtualization
@@ -337,17 +310,13 @@ capabilities:
     va_pro_equivalent: NOT_PROVEN
     last_verified_commit: 2f31db3089d53a0136ea76a2d6191e0ec216dae0
     evidence:
-      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
-      - scripts/check-binder-system-services.py
-      - scripts/check-system-services-broker-split.py
-      - docs/review/T57_R03_P4_FIX01_E_SYSTEM_SERVICE_SURFACE.md
-      - docs/review/C2_T01_SYSTEM_SERVICE_METHOD_CATALOG.md
-      - docs/review/C2_T07_APPLICATION_ENVIRONMENT_LONG_TAIL_DESIGN.md
-      - scripts/check-c2-t07-application-environment.py
-      - tools/capability/run_c2_t07_rd.py
-      - verification/catch-up/C2-T07/c2-t07-rd-summary.json
-      - verification/catch-up/C2-T07/c2-t07-local-verification.json
-      - verification/catch-up/C2-T07/c1-full-regression
+      - docs/ARCHITECTURE.md
+      - docs/system/T57_R03_BINDER_INTERCEPTION_MATRIX.yaml
+      - docs/system/T57_R03_SYSTEM_SERVICE_STATE_MATRIX.yaml
+      - reports/t57-r03/p4-systemservice-gms-webview/T57_R03_P4_SYSTEMSERVICE_GMS_WEBVIEW_CONVERGENCE_REPORT.md
+      - scripts/check-capability-proxy-broker-split.py
+      - scripts/check-ports-dispatchers.py
+      - tools/static_android_compile.py
     known_gaps:
       - OEM manager transaction and callback variants are untested.
       - Account listeners are virtual-only, not host AccountManager callbacks.
@@ -367,9 +336,9 @@ capabilities:
     va_pro_equivalent: NOT_PROVEN
     last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
     evidence:
-      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
-      - docs/oem-compat/T55_FINAL_CAPABILITY_MATRIX.md
-      - docs/product/T56_XIAOMI_DEVICE_RESOLUTION.md
+      - docs/compat/T57_R03_ANDROID_OEM_MATRIX.yaml
+      - docs/capability/VA_PRO_COMPATIBILITY_CORPUS.yaml
+      - reports/t57-r03/p4-systemservice-gms-webview/T57_R03_P4_SYSTEMSERVICE_GMS_WEBVIEW_CONVERGENCE_REPORT.md
     known_gaps:
       - API 33-36 device/emulator matrix has not been executed in T57.
       - Historical Xiaomi/T54-T56 evidence is not an OEM_COMMERCIAL_MATRIX PASS.

@@ -23,7 +23,7 @@
     "dependencyVerificationMode": "strict",
     "reviewRequiredForUpdates": true
   },
-  "importedFor": "M5-T19.1-U",
+  "importedFor": "source-supply-chain-governance",
   "importedOn": "2026-08-02",
   "rootPluginChecksums": {
     "coordinate": "com.android.tools.build:gradle:8.11.1",

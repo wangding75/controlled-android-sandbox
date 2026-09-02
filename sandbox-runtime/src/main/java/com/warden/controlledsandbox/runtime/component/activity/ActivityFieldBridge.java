@@ -841,7 +841,7 @@ public final class ActivityFieldBridge {
     }
 
     /**
-     * NewBlackBox {@code ContextCompat.fix} + {@code IWindowSessionProxy.addToDisplay} contract
+     * Reference {@code ContextCompat.fix} + {@code IWindowSessionProxy.addToDisplay} contract
      * for the framework objects WMS actually reads. Guest-visible
      * {@code GuestContext.getOpPackageName()} stays the Guest package (C2-T02); only the
      * WindowManagerImpl {@code ContextImpl} and {@code LayoutParams.packageName} present the
@@ -1021,7 +1021,7 @@ public final class ActivityFieldBridge {
             }
             Object record = findActivityClientRecord(activity);
             if (record != null) setOptionalBoolean(record, "hideForNow", false);
-            // NewBlackBox uses the Activity/PhoneWindow WindowManagerImpl (mParentWindow set).
+            // The reference path uses the Activity/PhoneWindow WindowManagerImpl (mParentWindow set).
             // The Host application WindowManager has no parent PhoneWindow and cannot attach
             // TYPE_BASE_APPLICATION to the Stub ActivityRecord.
             android.view.WindowManager windowManager = activity.getWindowManager();
@@ -1098,7 +1098,7 @@ public final class ActivityFieldBridge {
     }
 
     /**
-     * NewBlackBox {@code ContextCompat.fix}: rewrite ContextImpl {@code mBasePackageName},
+     * Reference {@code ContextCompat.fix}: rewrite ContextImpl {@code mBasePackageName},
      * {@code mOpPackageName} and AttributionSource uid/package to the Host. Never rewrite
      * {@code GuestContext} itself — Guest code must still observe Guest {@code getOpPackageName()}.
      */

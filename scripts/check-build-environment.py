@@ -150,7 +150,7 @@ def main() -> int:
             fail(f"deviceLabBuild {artifact_id} Gradle task is not module-scoped")
         if not item.get("requiredNativeLibraries"):
             fail(f"deviceLabBuild {artifact_id} native library requirement is empty")
-    if lab_build.get("outputDirectory") != "artifacts/m5-device-lab-build":
+    if lab_build.get("outputDirectory") != "build/device-lab-build":
         fail("deviceLabBuild output directory is not frozen")
 
     lab = lock.get("deviceLab", {})

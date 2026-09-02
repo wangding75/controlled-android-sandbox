@@ -1,1 +1,0 @@
-fix(continuation): select latest task receipt
