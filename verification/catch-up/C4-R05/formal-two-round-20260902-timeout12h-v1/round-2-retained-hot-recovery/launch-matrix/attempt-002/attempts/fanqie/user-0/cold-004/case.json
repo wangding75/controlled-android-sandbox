@@ -1,0 +1,240 @@
+{
+  "task": "C4-R03",
+  "target": "fanqie",
+  "package": "com.dragon.read",
+  "user": 0,
+  "mode": "cold",
+  "iteration": 4,
+  "requestId": "82ed7754c0af4a80a5ed1e3d290a64a0",
+  "operationId": "82ed7754c0af4a80a5ed1e3d290a64a0-launch",
+  "runnerOperationId": "c4-r03-fanqie-u0-cold-4-a2-82ed7754c0",
+  "attempt": 2,
+  "retryBudget": 0,
+  "automaticRetryPerformed": false,
+  "retryable": false,
+  "startedAt": "2026-09-02T03:34:27.141569+00:00",
+  "completedAt": "2026-09-02T03:35:40.899270+00:00",
+  "elapsedMs": 73758,
+  "readinessElapsedMs": null,
+  "commandResult": {
+    "status": "FAIL",
+    "returncode": 1,
+    "result": {
+      "command": "launch",
+      "package": "com.dragon.read",
+      "virtualUserId": 0,
+      "trustNativeGuest": true,
+      "requestId": "82ed7754c0af4a80a5ed1e3d290a64a0",
+      "operationId": "82ed7754c0af4a80a5ed1e3d290a64a0-launch",
+      "startedAt": 1788320076914,
+      "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+      "status": "FAIL",
+      "errorType": "java.lang.IllegalStateException",
+      "errorMessage": "launch failed: status=FAILED, errorType=java.util.concurrent.TimeoutException, errorMessage=null"
+    },
+    "start_stdout": "Starting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 822\nWaitTime: 824\nComplete\n",
+    "start_stderr": "",
+    "host_teardown": {
+      "activity_present": false,
+      "window_present": false,
+      "activity_rows": [],
+      "window_rows": [],
+      "activity_returncode": 0,
+      "window_returncode": 0
+    }
+  },
+  "setup": {
+    "kind": "cold-stop",
+    "requestId": "6c1ce2c78057400d80f6c0b526de36eb",
+    "result": {
+      "status": "PASS",
+      "returncode": 0,
+      "result": {
+        "command": "stop",
+        "package": "com.dragon.read",
+        "virtualUserId": 0,
+        "trustNativeGuest": true,
+        "requestId": "6c1ce2c78057400d80f6c0b526de36eb",
+        "operationId": "6c1ce2c78057400d80f6c0b526de36eb-launch",
+        "startedAt": 1788320066459,
+        "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+        "operation": {
+          "status": "STOPPED",
+          "errorType": "",
+          "errorMessage": "",
+          "sessionId": "",
+          "generation": 0,
+          "processSlot": -1,
+          "platformPid": 0
+        },
+        "status": "PASS"
+      },
+      "start_stdout": "Starting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 1410\nWaitTime: 1414\nComplete\n",
+      "start_stderr": "",
+      "host_teardown": {
+        "activity_present": false,
+        "window_present": false,
+        "activity_rows": [],
+        "window_rows": [],
+        "activity_returncode": 0,
+        "window_returncode": 0
+      }
+    },
+    "attempt": 2,
+    "retryBudget": 0,
+    "automaticRetryPerformed": false
+  },
+  "operation": {},
+  "device": {
+    "guestWindowState": {
+      "resumed_guest_stub_count": 0,
+      "windows_empty": false,
+      "reported_drawn_false": false,
+      "has_visible_false": false,
+      "drawn": false
+    },
+    "surfaceNonEmpty": true,
+    "screenshot": {
+      "width": 1080,
+      "height": 1920,
+      "sha256": "3fd4dd1fd19091ed0c115ee910240134d78370d6f2e0e37730033a669595f1a3",
+      "nonTransparent": true,
+      "nonBlackFraction": 0.992913,
+      "nonBlack": true,
+      "uniform": false
+    },
+    "fatalMarkers": [],
+    "historicalFatalMarkers": [],
+    "visualContentAttempts": [
+      {
+        "elapsedMs": 83726,
+        "quality": {
+          "width": 1080,
+          "height": 1920,
+          "sha256": "3fd4dd1fd19091ed0c115ee910240134d78370d6f2e0e37730033a669595f1a3",
+          "nonTransparent": true,
+          "nonBlackFraction": 0.992913,
+          "nonBlack": true,
+          "uniform": false
+        }
+      }
+    ]
+  },
+  "errorClassification": "LAUNCH_RESULT_NOT_PASS",
+  "firstAttemptFailure": false,
+  "failureDetected": true,
+  "artifacts": "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R05\\formal-two-round-20260902-timeout12h-v1\\round-2-retained-hot-recovery\\launch-matrix\\attempt-002\\attempts\\fanqie\\user-0\\cold-004",
+  "resume": {
+    "kind": "MANUAL_RESUME_AFTER_RESTART",
+    "resumeTarget": "quark",
+    "resumeUser": 0,
+    "resumeIteration": 9,
+    "resumeMode": "cold",
+    "attempt": 2,
+    "retryBudget": 0,
+    "automaticRetryPerformed": false,
+    "previousLane": "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R05\\formal-two-round-20260902-timeout12h-v1\\round-2-retained-hot-recovery\\launch-matrix",
+    "note": "The prior first-failure evidence remains authoritative; this lane is a separately recorded post-restart observation.",
+    "postRestartRebootstrap": {
+      "path": "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R05\\formal-two-round-20260902-timeout12h-v1\\round-2-retained-hot-recovery\\launch-matrix\\attempt-002\\post-restart-rebootstrap\\quark\\user-0\\post-restart-rebootstrap.json",
+      "status": "PASS",
+      "requestId": "c4-r03-rebootstrap-u0-fe441ee552ed4e8ba4f1a6dcf607a68a",
+      "operationId": "c4-r03-rebootstrap-u0-fe441ee552ed4e8ba4f1a6dcf607a68a-launch"
+    }
+  },
+  "firstFailureFullSnapshot": {
+    "captured_at": "2026-09-02T03:35:50.879392+00:00",
+    "screenshot": {
+      "returncode": 0,
+      "bytes": 1843868,
+      "sha256": "89446dfe6747f57d65ed81cd1b9f2232e3a4c48df05f7438d804e27aa58167aa"
+    },
+    "probes": {
+      "logcat.txt": {
+        "returncode": 0
+      },
+      "logcat-critical.txt": {
+        "returncode": 0
+      },
+      "activity-activities.txt": {
+        "returncode": 0
+      },
+      "activity-processes.txt": {
+        "returncode": 0
+      },
+      "application-exit-info.txt": {
+        "returncode": 0
+      },
+      "window-windows.txt": {
+        "returncode": 0
+      },
+      "surface-list.txt": {
+        "returncode": 0
+      },
+      "surface-dump.txt": {
+        "returncode": 0
+      },
+      "processes.txt": {
+        "returncode": 0
+      },
+      "host-package.txt": {
+        "returncode": 0
+      },
+      "target-package.txt": {
+        "returncode": 0
+      },
+      "device-getprop.txt": {
+        "returncode": 0
+      },
+      "adb-devices.txt": {
+        "returncode": 0
+      },
+      "host-files.txt": {
+        "returncode": 0
+      }
+    },
+    "transactions": {
+      "files/debug-command-result.json": {
+        "returncode": 0,
+        "bytes": 480,
+        "storedPath": "tx\\1990720c9a-debug-command-result.json"
+      },
+      "files/sandbox-catalog.json": {
+        "returncode": 0,
+        "bytes": 43658,
+        "storedPath": "tx\\9c7b976727-sandbox-catalog.json"
+      },
+      "files/sandbox-catalog.json.lastgood": {
+        "returncode": 0,
+        "bytes": 43658,
+        "storedPath": "tx\\dd8e4ee3cc-sandbox-catalog.json.lastgood"
+      },
+      "files/package-lifecycle-transactions.json": {
+        "returncode": 0,
+        "bytes": 1942,
+        "storedPath": "tx\\089b0c2232-package-lifecycle-transactions.json"
+      },
+      "files/package-lifecycle-transactions.json.lastgood": {
+        "returncode": 0,
+        "bytes": 1942,
+        "storedPath": "tx\\f645766360-package-lifecycle-transactions.json.lastgood"
+      },
+      "files/runtime/activity-tasks.checkpoint": {
+        "returncode": 0,
+        "bytes": 6933,
+        "storedPath": "tx\\5feeae5d8b-runtime__activity-tasks.checkpoint"
+      },
+      "files/runtime/virtual-uids.registry": {
+        "returncode": 0,
+        "bytes": 179,
+        "storedPath": "tx\\4fbde4f036-runtime__virtual-uids.registry"
+      }
+    }
+  },
+  "postEvidenceLogcatReset": {
+    "returncode": 0,
+    "stdout": "",
+    "stderr": "",
+    "scope": "AFTER_CASE_EVIDENCE"
+  }
+}
