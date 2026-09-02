@@ -4010,3 +4010,15 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
 - **实现与验证**：编排器、单元测试和说明文件待提交为本次批次调整变更；在重新启动
   R05 前必须通过 `python -m unittest scripts/test_c4_r05_orchestrator.py`、静态检查、
   提交推送和续接预检。正式两轮输出不重跑，按现有 durable evidence 续接。
+
+### C4-R05：重启前 clean-worktree 首次失败与证据提交（2026-09-02 13:27）
+
+- **首次失败**：续接预检本身 PASS，但它更新了已跟踪的
+  `verification/catch-up/C0-T01/continuation-preflight.json`；随后 R05 在证据捕获前因
+  `worktree dirty` 立即退出。该事件发生在设备测试前，不构成产品/设备失败，也没有
+  进行无依据重试。
+- **证据**：原始差异和命令错误由
+  `docs/review/C4_R05_RERUN_CLEAN_WORKTREE_PREFLIGHT_FAILURE_20260902.md` 记录；更新后
+  的预检快照随本进度提交保存。
+- **恢复条件**：提交并推送新的预检快照，确认工作区干净且 local/remote HEAD 一致，
+  再从现有 formal durable evidence 续接 R05，并使用新的 `c1-c2-c4` → SX 批次。
