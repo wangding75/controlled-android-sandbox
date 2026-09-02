@@ -2,11 +2,13 @@
 """Run the C4-R03 matrix with the approved RD LOW_MEMORY continuation policy.
 
 The ordinary C4-R03 runner remains fail-fast and keeps every first failure authoritative.
-This wrapper adds only the user-approved environment exception: when the failed launch has
-explicit host-process ``ApplicationExitInfo`` reason ``LOW_MEMORY``, restart the dynamically
-resolved MuMu instance, rebootstrap the new Host/Guest owner once, and invoke a separately
-recorded manual continuation from that exact target/user/iteration/mode.  Any other first
-failure is returned unchanged and stops the lane.
+This wrapper adds the user-approved environment exception: when the failed launch has explicit
+host-process ``ApplicationExitInfo`` reason ``LOW_MEMORY``, record the event, restart the
+dynamically resolved MuMu instance, rebootstrap the new Host/Guest owner, and invoke a
+separately recorded continuation from that exact target/user/iteration/mode.  Host
+``LOW_MEMORY`` is non-blocking for this campaign and is not limited by an event count; the
+outer phase deadline still bounds the lane.  Any other first failure is returned unchanged
+and stops the lane.
 """
 
 from __future__ import annotations
@@ -147,8 +149,18 @@ def classify_low_memory(summary: dict[str, Any]) -> dict[str, Any] | None:
         "runnerClassification": blocked.get("classification"),
         "rowArtifacts": row.get("artifacts"),
         "evidence": matched,
-        "policy": "NON_BLOCKING_RESTART_AND_MANUAL_CONTINUATION",
+        "policy": "NON_BLOCKING_RECORD_RESTART_AND_CONTINUE_UNTIL_PHASE_DEADLINE",
     }
+
+
+def classify_low_memory_row(row: dict[str, Any]) -> dict[str, Any] | None:
+    """Classify one preserved case row without dropping earlier LOW_MEMORY observations."""
+    blocked_at = {
+        key: row.get(key)
+        for key in ("target", "user", "mode", "iteration", "classification")
+        if key in row
+    }
+    return classify_low_memory({"blockedAt": blocked_at, "rows": [row]})
 
 
 def environment_from_child(instance_name: str, child_dir: Path) -> dict[str, Any]:
@@ -358,12 +370,12 @@ def _attempt_sort_key(path: Path) -> tuple[int, str]:
 def reconstruct_interrupted_lane(args: argparse.Namespace, lane_dir: Path) -> dict[str, Any]:
     """Reconstruct every durable row across a host-truncated launch lane.
 
-    A host phase boundary can leave more than one child: the first child may contain the
-    explicit LOW_MEMORY failure and the one approved post-restart continuation may contain
-    the replacement observation.  Seeding only the newest child would erase that history and
-    could make the aggregate under-count or misclassify the lane.  Keep all case rows in
-    attempt order; ``aggregate`` later selects the latest terminal row per coordinate while
-    retaining the earlier rows under ``observations``.
+    A host phase boundary can leave more than one child: any child may contain an explicit
+    LOW_MEMORY failure and a later post-restart continuation may contain the replacement
+    observation.  Seeding only the newest child would erase that history and could make the
+    aggregate under-count or misclassify the lane.  Keep all case rows in attempt order;
+    ``aggregate`` later selects the latest terminal row per coordinate while retaining the
+    earlier rows under ``observations``.
     """
     attempt_dirs = sorted(
         (path for path in lane_dir.glob("attempt-*") if path.is_dir()),
@@ -454,7 +466,6 @@ def seed_existing_lane(args: argparse.Namespace, lane_dir: Path) -> dict[str, An
     rows = summary.get("rows") or []
     if not rows:
         raise SystemExit(f"seed lane has no completed case rows: {lane_dir}")
-    low_memory = classify_low_memory(summary)
     record = {
         "attempt": len(summary.get("sourceAttempts") or []),
         "startedAt": rows[0].get("startedAt") if isinstance(rows[0], dict) else "",
@@ -467,7 +478,10 @@ def seed_existing_lane(args: argparse.Namespace, lane_dir: Path) -> dict[str, An
         "seededExisting": True,
         "seededExistingLane": True,
         "sourceAttempts": summary.get("sourceAttempts") or [],
-        "seededLowMemoryEvents": [low_memory] if low_memory is not None else [],
+        "seededLowMemoryEvents": [
+            event for event in (classify_low_memory_row(row) for row in rows)
+            if event is not None
+        ],
         "note": (
             "All durable case.json rows across the prior attempts are retained. The missing "
             "host-phase summary represents a bounded session interruption, not a test pass."
@@ -513,6 +527,8 @@ def aggregate(args: argparse.Namespace, children: list[dict[str, Any]],
             "retryBudget": 0,
             "automaticRetries": 0,
             "lowMemoryRecoveryContinuations": len(low_memory_events),
+            "lowMemoryPolicy": "NON_BLOCKING_RECORD_RESTART_AND_CONTINUE_UNTIL_PHASE_DEADLINE",
+            "lowMemoryRecoveryCountLimited": False,
             "firstLowMemoryFailureRemainsAuthoritative": True,
         },
         "nonBlockingLowMemory": low_memory_events,
@@ -609,18 +625,11 @@ def main() -> int:
             break
         low_memory["attempt"] = attempt
         low_memory["childOutput"] = child.get("output")
-        if low_memory_events:
-            # The R05 exception is exactly one dynamic restart plus one independent
-            # continuation.  A second host LOW_MEMORY is a new failure, not a retry budget
-            # that can be silently extended by this wrapper.
-            low_memory["policyDecision"] = "STOP_LOW_MEMORY_RESTART_BUDGET_EXHAUSTED"
-            terminal_failure = {
-                "attempt": attempt,
-                "classification": "LOW_MEMORY_RESTART_BUDGET_EXHAUSTED",
-                "lowMemory": low_memory,
-                "previousRecoveries": low_memory_events,
-            }
-            break
+        # MuMu/RD host memory pressure is an allowed environment boundary for this campaign.
+        # Keep every original failed row and restart dynamically; this is not a hidden launch
+        # retry.  The enclosing R05 phase timeout remains the only count-independent bound.
+        low_memory["recoveryOrdinal"] = len(low_memory_events) + 1
+        low_memory["policyDecision"] = "NON_BLOCKING_RECORD_RESTART_AND_CONTINUE"
         recovery_dir = args.output / "low-memory-recovery" / f"event-{len(low_memory_events) + 1:03d}"
         low_memory["restart"] = restart_mumu(args.instance_name, child_dir, recovery_dir)
         low_memory_events.append(low_memory)

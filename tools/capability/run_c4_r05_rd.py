@@ -846,6 +846,7 @@ def main() -> int:
     output = args.output if args.output.is_absolute() else ROOT / args.output
     output.mkdir(parents=True, exist_ok=True)
     continuation: dict[str, Any] | None = None
+    existing_launch_continuations: dict[int, dict[str, Any]] = {}
     report: dict[str, Any] = {
         "schemaVersion": 1,
         "task": TASK_ID,
@@ -895,8 +896,13 @@ def main() -> int:
             continuation = launch_continuation(
                 output / "round-1-clean-install-cold" / "launch-matrix",
                 args.targets, args.users, args.loops)
+            existing_launch_continuations[1] = continuation
+            round_two_lane = output / "round-2-retained-hot-recovery" / "launch-matrix"
+            if round_two_lane.is_dir():
+                existing_launch_continuations[2] = launch_continuation(
+                    round_two_lane, args.targets, args.users, args.loops)
             report["continuedFromExistingOutput"] = str(output.resolve())
-            report["continuation"] = continuation
+            report["continuation"] = existing_launch_continuations
             report["priorBuild"] = prior_build
         else:
             build = run_command(
@@ -914,7 +920,8 @@ def main() -> int:
             round_report: dict[str, Any] = {"round": index, "name": round_name,
                                             "status": "IN_PROGRESS", "startedAt": now_iso()}
             report["rounds"].append(round_report)
-            if continuation is not None and index == 1:
+            existing_round_continuation = existing_launch_continuations.get(index)
+            if existing_round_continuation is not None:
                 prepare_path = round_output / "prepare.json"
                 if not prepare_path.is_file():
                     raise PhaseFailure("continuation", "existing prepare evidence is missing",
@@ -945,7 +952,7 @@ def main() -> int:
                     phase_timeout_seconds=args.phase_timeout_seconds)["summary"]
             launch_result = run_launch_matrix(
                 args.instance_name, args.loops, args.users, args.targets, round_output, output,
-                continuation=continuation if index == 1 else None,
+                continuation=existing_round_continuation,
                 phase_timeout_seconds=args.phase_timeout_seconds)
             round_report["launchMatrix"] = launch_result["summary"]
             if launch_result.get("hostPhaseContinuations"):
