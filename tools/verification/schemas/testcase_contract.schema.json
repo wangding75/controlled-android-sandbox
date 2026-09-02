@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://controlled-android-sandbox.local/verification/testcase-contract.schema.json",
+  "title": "Unified Android verification testcase contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "testcase_id", "capability", "description", "device", "api_level", "abi",
+    "page_size", "virtual_user", "guest_package", "package_revision", "precondition",
+    "operation", "expected", "actual", "result", "failure_class", "duration_ms",
+    "artifacts", "first_attempt", "retry_attempt", "final_classification"
+  ],
+  "properties": {
+    "testcase_id": {"type": "string", "minLength": 1},
+    "capability": {"type": "string", "minLength": 1},
+    "description": {"type": "string"},
+    "device": {"type": "object"},
+    "api_level": {"type": ["integer", "null"]},
+    "abi": {"type": "string"},
+    "page_size": {"type": ["integer", "null"]},
+    "virtual_user": {"type": "integer", "minimum": 0},
+    "guest_package": {"type": "string"},
+    "package_revision": {"type": "string"},
+    "precondition": {"type": "string"},
+    "operation": {"type": "string"},
+    "expected": {},
+    "actual": {},
+    "result": {
+      "type": "string",
+      "enum": ["PASS", "FAIL", "SKIP", "BLOCKED_ENV", "UNSUPPORTED_PLATFORM"]
+    },
+    "failure_class": {
+      "type": ["string", "null"],
+      "enum": ["PRODUCT_DEFECT", "HARNESS_DEFECT", "ENVIRONMENT", "EXPECTED_LIMITATION", "UNSUPPORTED_PLATFORM", null]
+    },
+    "duration_ms": {"type": "integer", "minimum": 0},
+    "artifacts": {"type": "array", "items": {"type": "string"}},
+    "first_attempt": {"type": ["object", "null"]},
+    "retry_attempt": {"type": ["object", "null"]},
+    "final_classification": {
+      "type": ["string", "null"],
+      "enum": ["PRODUCT_DEFECT", "HARNESS_DEFECT", "ENVIRONMENT", "EXPECTED_LIMITATION", "UNSUPPORTED_PLATFORM", null]
+    }
+  }
+}

@@ -110,10 +110,21 @@ def discover_instances(root: Path) -> list[dict[str, Any]]:
     return instances
 
 
-def run_adb(adb: Path, args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
-    result = subprocess.run(
-        [str(adb), *args], text=True, capture_output=True, errors="replace", timeout=60
-    )
+def run_adb(
+    adb: Path,
+    args: list[str],
+    *,
+    check: bool = True,
+    timeout: float = 60,
+    text: bool = True,
+) -> subprocess.CompletedProcess[Any]:
+    process_args: dict[str, Any] = {
+        "capture_output": True,
+        "timeout": timeout,
+    }
+    if text:
+        process_args.update({"text": True, "encoding": "utf-8", "errors": "replace"})
+    result = subprocess.run([str(adb), *args], **process_args)
     if check and result.returncode != 0:
         detail = (result.stderr or result.stdout).strip()
         raise ResolutionError(f"adb {' '.join(args)} failed ({result.returncode}): {detail}")

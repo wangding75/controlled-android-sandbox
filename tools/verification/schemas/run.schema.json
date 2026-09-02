@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://controlled-android-sandbox.local/verification/run.schema.json",
+  "title": "Unified Android verification run envelope",
+  "type": "object",
+  "required": ["run_id", "start_head", "final_head", "branch", "device_metadata", "testcases", "summary"],
+  "properties": {
+    "run_id": {"type": "string", "minLength": 1},
+    "start_head": {"type": "string", "minLength": 7},
+    "final_head": {"type": "string"},
+    "branch": {"type": "string"},
+    "device_metadata": {"type": "object"},
+    "testcases": {"type": "array", "items": {"$ref": "testcase_contract.schema.json"}},
+    "summary": {"type": "object"},
+    "evidence_root": {"type": "string"}
+  }
+}
