@@ -150,8 +150,9 @@ continuation 处理。两次 case 均为 attempt=1、retry budget=0、无隐藏�
   `blocks_current_campaign: false`；它记录宿主机性能导致的 Host `LOW_MEMORY`，不再按
   事件次数阻断本次矩阵。既有 `KI-R03-053/054/057/058/059/061/062/063/064/065/066/067/068`
   和 `KI-R03-060` 不擅自关闭。
-- 本次无新的实现修复；被测 timeout 实现提交为
-  `14a6f38bf6fa1132998227f2bb34cf813071cf35`，本轮运行/预检基线为
+- 本次策略实现提交为
+  `cd7cdf3dc0fafc8a4fafbe67db1aacaf77d465fe`；被测 timeout 实现提交为
+  `14a6f38bf6fa1132998227f2bb34cf813071cf35`，本轮原始运行/预检基线为
   `0b78ea9fd4fbfafe2ff1608a9f56466b3b3d0b0d`。
 - 证据、Known Issue 和进度回执分别固化在本文件、`docs/review/KNOWN_ISSUES.yaml`、
   `docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md`；提交 SHA 与远端核验结果
@@ -161,3 +162,21 @@ continuation 处理。两次 case 均为 attempt=1、retry budget=0、无隐藏�
   `LOW_MEMORY` 失败、恢复失败、坐标缺失或 phase deadline 到期仍然停止。
 - 下一任务为当前 `C4-R05` 矩阵续接（`IN_PROGRESS`）；`C5-T01..T04` 继续
   `NOT_APPLICABLE`，在完整验收前不前移 `C6-T01`。
+
+## 8. 策略切换后的续接预检
+
+- `2026-09-02 09:49:30 +08:00` 的续接预检第一次失败，错误为动态 ADB connection
+  `error: closed`；原始记录见
+  `verification/catch-up/C4-R05/continuation-preflight-failure-20260902-094930.md`。
+- 保存证据后通过动态 `RD测试` 实例执行 MuMu restart，manager returncode=0；boot 从
+  `3e612f4b-d8e0-4333-b5e1-71697f5944b7` 变为
+  `754f6e00-da46-426d-857e-4bce363cad10`，restart 证据见
+  `verification/catch-up/C4-R05/continuation-preflight-recovery-20260902-094930/restart.json`。
+- 恢复后续接预检 PASS，机器可继续执行；当前矩阵从 Quark `user0/cold-009` 精确坐标
+  续接。预检输出见
+  `verification/catch-up/C4-R05/continuation-preflight-nonblocking-20260902.json`。
+
+本次策略/证据/进度提交均已推送：策略实现提交为
+`cd7cdf3dc0fafc8a4fafbe67db1aacaf77d465fe`，证据与进度提交为
+`f342503d928e95abba2defd259e80695c4c11618`；当前报告的补充更新将在续接启动前单独
+提交并完成远端核验。
