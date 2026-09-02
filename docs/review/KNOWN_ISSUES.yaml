@@ -2086,3 +2086,46 @@ issues:
       terminates the complete timed-out child process tree and records the termination before
       considering a durable-lane continuation. A fresh clean-commit formal run must pass before
       this issue or C4-R05 can close.
+
+  - issue_id: KI-R03-069
+    title: C4-R05 formal launch repeats Host LOW_MEMORY under host performance pressure
+    capability: activity_framework
+    classification: ENVIRONMENT_BLOCKED
+    severity: HIGH
+    status: RECORDED
+    discovered_by: C4-R05 formal two-round 2026-09-02
+    evidence:
+      - verification/catch-up/C4-R05/20260902-formal-second-low-memory-blocked.md
+      - verification/catch-up/C4-R05/formal-two-round-20260902-timeout12h-v1/summary.json
+      - verification/catch-up/C4-R05/formal-two-round-20260902-timeout12h-v1/round-2-retained-hot-recovery/launch-matrix/attempt-001/attempts/quark/user-0/cold-009/case.json
+      - verification/catch-up/C4-R05/formal-two-round-20260902-timeout12h-v1/round-2-retained-hot-recovery/launch-matrix/attempt-001/attempts/quark/user-0/cold-009/first-failure-full/application-exit-info.txt
+      - verification/catch-up/C4-R05/formal-two-round-20260902-timeout12h-v1/round-2-retained-hot-recovery/launch-matrix/attempt-001/attempts/quark/user-0/cold-009/first-failure-full/logcat.txt
+      - verification/catch-up/C4-R05/formal-two-round-20260902-timeout12h-v1/round-2-retained-hot-recovery/launch-matrix/attempt-001/attempts/quark/user-0/cold-009/first-failure-full/window-windows.txt
+      - verification/catch-up/C4-R05/formal-two-round-20260902-timeout12h-v1/round-2-retained-hot-recovery/launch-matrix/attempt-001/attempts/quark/user-0/cold-009/first-failure-full/surface-dump.txt
+      - tools/capability/run_c4_r03_low_memory_continuation.py
+      - docs/review/C4_R05_HOST_PHASE_TIMEOUT_BUDGET_20260902.md
+    match_patterns:
+      - LOW_MEMORY
+      - RD_ENVIRONMENT_RESOLUTION_BLOCKED
+      - debug-command-result timeout
+      - com.warden.controlledsandbox.debug
+      - com.mumu.acc
+      - com.quark.browser
+    blocks_current_campaign: false
+    follow_up_required: true
+    follow_up_task: C4-R05 formal matrix completion with LOW_MEMORY recorded as non-blocking
+    acceptance: NOT_FIXED
+    fix_policy: RECORD_HOST_LOW_MEMORY_RESTART_AND_CONTINUE_UNTIL_PHASE_DEADLINE
+    notes: >
+      In the 2026-09-02 12-hour formal lane, round-1 already recorded and recovered from a
+      Fanqie/user1/hot-005 Host LOW_MEMORY event. Round-2 then reached Quark user0 cold-009:
+      request e4f0057e1f6c400b9796eddfd76ee870, attempt=1, retryBudget=0,
+      automaticRetryPerformed=false, retryable=false. Host
+      com.warden.controlledsandbox.debug PID 24780 has ApplicationExitInfo reason
+      LOW_MEMORY at 09:26:06.458, and logcat records Host death/WIN DEATH; the result collector
+      later timed out with no debug-command-result. Guest Window/Surface/screenshot observations
+      were captured but do not replace a request-scoped terminal result. Per the campaign
+      decision for host-performance pressure, this event is recorded as non-blocking and the
+      matrix continues after dynamic MuMu restart/rebootstrap. It is not evidence of a
+      Quark-specific defect. Ordinary non-LOW_MEMORY failures, restart failures, missing
+      coordinates, and phase deadline expiry remain fail-closed.

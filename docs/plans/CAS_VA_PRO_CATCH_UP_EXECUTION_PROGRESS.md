@@ -1,13 +1,13 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：2.0
-更新时间：2026-09-01 13:26（Asia/Shanghai）
+更新时间：2026-09-02 09:48（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
-当前阶段：`C4`（IN_PROGRESS，REOPENED，R05 正在处理 post-LOW_MEMORY 新 boot 恢复边界）
-当前任务：`C4-R05`
-下一任务：`C4-R05`
+当前阶段：`C4`（IN_PROGRESS，R05 按宿主机性能策略记录 LOW_MEMORY 并继续矩阵）
+当前任务：`C4-R05`（IN_PROGRESS）
+下一任务：`C4-R05`（从 Quark user0/cold-009 续接）
 最后完成任务：`C4-TEMP-01`
 
 ## 1. 使用规则
@@ -26,7 +26,7 @@
 | C1 组件/包/进程 | DONE | 双用户、50 轮与任务书规定压力 | §5 C1-GATE |
 | C2 系统服务/F2-F5 | DONE | SX/XH 调用面 L3，P0/P1 无 NOT_PROVEN | §5 C2-T07 |
 | C3 Native/ABI/隔离 | IN_PROGRESS | trusted/hostile 闭环，条件项有决策 | §5 C3-T01 |
-| C4 SX 迁移 | IN_PROGRESS | C4-R01..R05；真实首帧、添加矩阵和 30 分钟双用户压力 | §5 C4-R05 post-restart recovery（2026-09-01） |
+| C4 SX 迁移 | IN_PROGRESS | C4-R01..R05；真实首帧、添加矩阵和 30 分钟双用户压力；Host LOW_MEMORY 仅记录并续接 | §5 C4-R05 LOW_MEMORY continuation（2026-09-02） |
 | C5 XH 支持 | NOT_APPLICABLE | 用户决定跳过，不阻塞 C6/C7 | §5 PLAN-20260824-C4-REOPEN |
 | C6 API/ABI 矩阵 | PENDING | 声明组合均有 Android Matrix 证据 | - |
 | C7 OEM/发布 | PENDING | 商业矩阵与 VA PRO scope 总验收 | - |
@@ -69,7 +69,7 @@
 | C4-R03 | 启动 readiness 与窗口合同 | DONE | C4-R01 | `d8797c89` | §5 C4-R03（用户批准残余风险豁免） |
 | C4-R04 | C4 fail-closed 验收编排 | DONE | C4-R02,C4-R03 | `1d9b83d54c13d2a758752281dbc492859d8bd05d` | §5 C4-R04 |
 | C4-TEMP-01 | CAS 导入/克隆/添加/启动耗时根因与修复 | DONE | C4-R04；完成后解除 C4-R05 临时阻断 | `7c0c819a58513f89e91ec0fb44cdc05a151e2c32` | §5 C4-TEMP-01 修复完成（2026-08-30） |
-| C4-R05 | MuMu RD 正式重验与关门 | IN_PROGRESS | C4-R04,C4-TEMP-01 | `898dc4d53c2e723d56522ec273c88dc120545559`（恢复修复开始基线） | §5 C4-R05 post-restart recovery（2026-09-01） |
+| C4-R05 | MuMu RD 正式重验与关门 | IN_PROGRESS | C4-R04,C4-TEMP-01 | `0b78ea9fd4fbfafe2ff1608a9f56466b3b3d0b0d`（12h formal baseline） | §5 C4-R05 LOW_MEMORY continuation（2026-09-02） |
 | C5-T01 | 原始 XH 产品能力契约 | NOT_APPLICABLE | C2,C3 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T02 | XH CAS Host/SDK 集成 | NOT_APPLICABLE | C5-T01,C4-T02 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T03 | 原始 XH/DingTalk 验收 | NOT_APPLICABLE | C5-T02,C4 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
@@ -83,8 +83,9 @@
 
 ## 4. 阻断项
 
-当前 C4 阶段阻断：`KI-R03-053`、`KI-R03-054`、`KI-R03-057`、`KI-R03-058`、`KI-R03-059`、`KI-R03-061`、`KI-R03-062`、
-`KI-R03-063`、`KI-R03-064`、`KI-R03-065`、`KI-R03-066`；
+当前 C4 阶段已有记录项：`KI-R03-053`、`KI-R03-054`、`KI-R03-057`、`KI-R03-058`、`KI-R03-059`、`KI-R03-061`、`KI-R03-062`、
+`KI-R03-063`、`KI-R03-064`、`KI-R03-065`、`KI-R03-066`、`KI-R03-069`；其中
+`KI-R03-069` 为宿主机性能导致的非阻断 `LOW_MEMORY` 记录，不因事件次数阻断本次矩阵。
 `KI-R03-060` 为已接受但仍开放的强制回归项。原 `aapt2` 供应链缺口已按官方 Google Maven 字节比对修复，严格 Gradle 与
 M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均已 `FIXED`，
 两者 `blocks_current_campaign: false`。C0-T02 的锁定构建已连续两轮成功并完成哈希一致性核验。
@@ -3809,3 +3810,67 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
 - **下一步**：本段回执提交并推送后，从新 clean commit 启动两轮 C4-R05 formal acceptance；
   首次非允许环境例外失败立即保留证据并停止，所有阶段通过后才执行回归和 30 分钟双用户
   短测。当前 C4-R05 未达到 DONE，C6-T01 不前移。
+
+### C4-R05：12 小时 formal lane 第二次 Host LOW_MEMORY 证据与续接（2026-09-02 09:31）
+
+- **任务 ID / 当前状态**：`C4-R05 / IN_PROGRESS`。本条保留当前 12 小时 formal lane 的
+  原始失败证据；按宿主机性能策略，C4 保持 `IN_PROGRESS`，不得把部分 round-2 结果写成
+  PASS，也不得提前进入 `C6-T01`。
+- **起止时间与基线**：12 小时基线于 `2026-09-02 02:29:06 +08:00` 启动，续接外层进程
+  于 `06:43:59` 启动，当前 launch child 于 `07:38:28` 启动；夸克 user0 cold-009
+  于 `09:25:28.868` 发出，`09:27:07.963` 失败，`09:27:09.033` 完成首失败快照。
+  被测基线为 `0b78ea9fd4fbfafe2ff1608a9f56466b3b3d0b0d`，分支和远端均为
+  `feature/t57-r03-va-pro-capability-campaign` / `origin`，Git 身份为
+  `OpenAI <openai@users.noreply.github.com>`。
+- **执行环境**：MuMu `RD测试` 动态解析 index=1、API=32、型号 `22041211A`、ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`、Android ID `398eea33120cd887`、
+  boot `3e612f4b-d8e0-4333-b5e1-71697f5944b7`；resolved serial 只在快照中记录。
+  夸克实际为 `com.quark.browser` version `10.10.5.1080`/code `1080`、base
+  revision/APK SHA-256 `2cb38172da5da4aee03826da0feccb77ff0391ee7356f1562052ddc1fae9ecb3`、
+  ABI `arm64-v8a`。
+- **当前阻断首失败证据**：request=`e4f0057e1f6c400b9796eddfd76ee870`、
+  operation=`e4f0057e1f6c400b9796eddfd76ee870-launch`、runner operation=
+  `c4-r03-quark-u0-cold-9-e4f0057e1f`、attempt=1、retryBudget=0、
+  `automaticRetryPerformed=false`、`retryable=false`；case 99,095 ms 后以
+  `RD_ENVIRONMENT_RESOLUTION_BLOCKED: debug-command-result timeout` 返回 code 1。
+  Host `com.warden.controlledsandbox.debug` PID 24780 的 ApplicationExitInfo 在
+  `09:26:06.458` 明确为 reason `3 (LOW_MEMORY)`、PSS 117MB/RSS 184MB；logcat 同时
+  记录 Host process death、WIN DEATH，`com.mumu.acc` 随后退出。完整原始 bundle、
+  request/operation、日志、Activity/Window/Surface/process、截图、package/设备及
+  transaction 快照见 `verification/catch-up/C4-R05/20260902-formal-second-low-memory-blocked.md`
+  所引用的 cold-009 目录。
+- **现场边界**：Guest stub `drawn=true`、Window 非空、Surface 非空，截图非黑但
+  `debug-command-result` 缺失；这不能替代 request-scoped terminal result。无 FATAL/ANR
+  证据，transaction 快照显示生命周期 ACTIVE、catalog/lastgood 存在，未见新的 staging/
+  半发布 revision/孤儿实例。
+- **根因及分类**：`ENVIRONMENT_BLOCKED`，即 MuMu/RD Host process-owner 的
+  memory-pressure/LOW_MEMORY 终止使 CAS 结果采集失去 Host owner；没有证据把唯一根因
+  归给 Quark SDK、SX UI 或某个 CAS 方法，细分内存因果保持待验证。VA/NBB 对照仍为
+  `VActivityManagerService`/`ActivityStack`/`VirtualRuntime` 与
+  `BProcessManagerService`/`ActivityStack`/`BActivityThread` 的 process owner/death/rebind
+  边界；本次不添加包名分支、不扩大 cold 30s/hot 10s SLO、不引入重试。
+- **实现摘要与变更文件**：本次新增 Host `LOW_MEMORY` 非阻断策略：保留每次原始失败证据，
+  动态重启 MuMu/Host/Guest 并从精确坐标继续，事件次数不作为阻断条件；被测 12h timeout
+  实现提交 `14a6f38bf6fa1132998227f2bb34cf813071cf35`，策略实现提交
+  `cd7cdf3dc0fafc8a4fafbe67db1aacaf77d465fe`，本轮原始基线为 `0b78ea9f`。本回执新增
+  `verification/catch-up/C4-R05/20260902-formal-second-low-memory-blocked.md`，更新
+  `docs/review/KNOWN_ISSUES.yaml`（新增 `KI-R03-069`）和本账本；cold-009 原始证据
+  目录被保留并随证据提交固化。
+- **验收结果**：build、两轮 R04、round-1 R02/add/launch（500/500 terminal coordinate，
+  保留一次允许的 LOW_MEMORY 恢复）均通过；round-2 R02 add gate 137/137 通过，launch
+  在 216 条通过后于 Quark user0 cold-009 fail-closed，期望 500。到阻断点 round-2
+  fixture 100/100、DingTalk 100/100、夸克 16 条通过后失败，红果/番茄小说未进入；
+  C1/C2/C4/SX 回归及双用户 30 分钟短测未执行。具体命令、阶段 deadline、截图/哈希和
+  失败文件索引见独立阻断回执。
+- **重试/偏离/遗留风险**：round-1 与本次 round-2 均为 Host `LOW_MEMORY` 环境事件，
+  attempt=1、retry budget=0、无隐藏的 case 自动重试；保存证据后的 Ctrl+C 是旧策略停止，
+  现按新策略从精确坐标继续。每次事件仍单独记录 restart/rebootstrap 证据；普通非
+  `LOW_MEMORY` 失败、恢复失败、坐标缺失和 phase deadline 仍 fail-closed。遗留风险是
+  Host memory-pressure/process-owner、`com.mumu.acc` 联动退出及 Host death 后终态回收。
+- **Known Issues 与下一任务**：新增 `KI-R03-069`，状态 `RECORDED`、
+  `acceptance: NOT_FIXED`、`blocks_current_campaign: false`；既有 C4 高风险项和
+  `KI-R03-060` 均未关闭。C5-T01..T04 仍为 `NOT_APPLICABLE`；当前任务继续为
+  `C4-R05`，从 Quark user0/cold-009 续接，不前移 `C6-T01`。
+- **提交/推送**：策略实现提交 `cd7cdf3dc0fafc8a4fafbe67db1aacaf77d465fe` 已推送；本回执
+  文件、Known Issue、进度和选定原始失败 bundle 另形成独立证据/进度提交并推送。随后
+  从本坐标续接矩阵；回执提交 SHA、`git ls-remote`、工作区干净状态在提交后回填并核验。
