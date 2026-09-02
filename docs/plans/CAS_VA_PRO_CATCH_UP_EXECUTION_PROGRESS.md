@@ -3975,6 +3975,13 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   tools/capability/run_c4_r05_rd.py scripts/test_c4_r05_orchestrator.py`（PASS）、
   `python scripts/check-c4-r05-orchestrator.py`（PASS）、`git diff --check`（PASS）。
   新增回归覆盖“明确 TimeoutException 可续接/后续观察替换”和“泛化 timeout 不可误判”。
+- **续接预检证据**：策略提交后重新运行
+  `python scripts/verify-catch-up-continuation.py` 两次均 PASS；设备快照仍为 MuMu
+  `RD测试`、API 32、model `22041211A`、boot
+  `754f6e00-da46-426d-857e-4bce363cad10`，未发现 unexpected hard-coded serial。原始预检
+  结果和推送后复核分别保存在
+  `verification/catch-up/C4-R05/continuation-preflight-timeout-policy-20260902.json`、
+  `verification/catch-up/C4-R05/continuation-preflight-timeout-policy-pushed-20260902.json`。
 - **Known Issues**：`KI-R03-059` 仍为 `RECORDED`、`NOT_FIXED`、当前 formal gate 仍需
   通过；但当前这一类显式 TimeoutException 不再因首次出现立即阻断，改为最多 5 次
   有证据重试。原始 Fanqie 首失败报告新增策略附录，原始 full snapshot 保持不变。
