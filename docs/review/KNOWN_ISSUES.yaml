@@ -1662,12 +1662,19 @@ issues:
       Window evidence or FIRST_FRAME_DRAWN was correlated to the request. The process and a
       non-black screenshot remained present in the post-failure snapshot, but neither can replace
       the failed request-scoped terminal result. `dumpsys activity exit-info` records only explicit
-      USER REQUESTED cold-stop events and contains no Host LOW_MEMORY. This is therefore a real
-      non-LOW_MEMORY formal gate failure, not an event covered by KI-R03-069's non-blocking policy.
-      The observation proves the Guest prepare/Application.onCreate deadline boundary but does not
-      yet separate app/SDK startup work from a generic CAS Guest/broker delay; root cause remains
-      pending classification. No deadline extension, package-specific fix or retry is justified,
-      and C4-R05 remains blocked until this boundary is classified and a bounded regression passes.
+      USER REQUESTED cold-stop events and contains no Host LOW_MEMORY. This remains a real
+      non-LOW_MEMORY formal gate failure and is not a Host LOW_MEMORY event; however, on 2026-09-02
+      the user explicitly approved a separate performance policy for this exact launch/Guest
+      `TimeoutException` signature. The original observation remains authoritative and is
+      preserved unchanged, while the current formal lane may continue from this coordinate with
+      at most five explicit, independently evidenced retries. The policy does not apply to
+      generic `debug-command-result timeout`, phase/subprocess timeout, black screen, missing
+      Window/Surface/FIRST_FRAME_DRAWN, add failure, FATAL, ANR or any other non-timeout error;
+      those remain fail-closed. The observation proves the Guest prepare/Application.onCreate
+      deadline boundary but does not yet separate app/SDK startup work from a generic CAS
+      Guest/broker delay; root cause remains pending classification. This issue stays
+      RECORDED/NOT_FIXED and blocks final C4-R05 closure until the bounded retry lane reaches the
+      real terminal acceptance contract or the five-retry budget is exhausted.
 
   - issue_id: KI-R03-060
     title: DingTalk hot launch readiness exceeds SLO while MuMu reports device-not-responding LMK pressure
@@ -2127,6 +2134,7 @@ issues:
       - verification/catch-up/C4-R05/formal-two-round-20260902-timeout12h-v1/round-2-retained-hot-recovery/launch-matrix/attempt-001/attempts/quark/user-0/cold-009/first-failure-full/surface-dump.txt
       - tools/capability/run_c4_r03_low_memory_continuation.py
       - docs/review/C4_R05_HOST_PHASE_TIMEOUT_BUDGET_20260902.md
+      - docs/review/C4_R05_PERFORMANCE_TIMEOUT_RETRY_POLICY_20260902.md
     match_patterns:
       - LOW_MEMORY
       - RD_ENVIRONMENT_RESOLUTION_BLOCKED
@@ -2150,5 +2158,7 @@ issues:
       were captured but do not replace a request-scoped terminal result. Per the campaign
       decision for host-performance pressure, this event is recorded as non-blocking and the
       matrix continues after dynamic MuMu restart/rebootstrap. It is not evidence of a
-      Quark-specific defect. Ordinary non-LOW_MEMORY failures, restart failures, missing
-      coordinates, and phase deadline expiry remain fail-closed.
+      Quark-specific defect. A separate campaign policy now accepts only an explicit launch/Guest
+      TimeoutException as a host-performance exception with at most five independently evidenced
+      retries; ordinary non-LOW_MEMORY failures, generic collector/phase timeouts, restart
+      failures, missing coordinates, and phase deadline expiry remain fail-closed.

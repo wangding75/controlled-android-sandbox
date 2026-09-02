@@ -1,12 +1,12 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：2.0
-更新时间：2026-09-02 11:43（Asia/Shanghai）
+更新时间：2026-09-02 12:00（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
-当前阶段：`C4`（BLOCKED，R05 的 Host LOW_MEMORY 按宿主机性能策略记录并续接；当前存在非 LOW_MEMORY 启动超时阻断）
-当前任务：`C4-R05`（BLOCKED）
+当前阶段：`C4`（IN_PROGRESS，R05 的 Host LOW_MEMORY 按宿主机性能策略记录并续接；明确 launch/Guest TimeoutException 按最多 5 次重试续接；其他失败仍 fail-closed）
+当前任务：`C4-R05`（IN_PROGRESS）
 下一任务：`C4-R05`
 最后完成任务：`C4-TEMP-01`
 
@@ -26,7 +26,7 @@
 | C1 组件/包/进程 | DONE | 双用户、50 轮与任务书规定压力 | §5 C1-GATE |
 | C2 系统服务/F2-F5 | DONE | SX/XH 调用面 L3，P0/P1 无 NOT_PROVEN | §5 C2-T07 |
 | C3 Native/ABI/隔离 | IN_PROGRESS | trusted/hostile 闭环，条件项有决策 | §5 C3-T01 |
-| C4 SX 迁移 | BLOCKED | C4-R01..R05；真实首帧、添加矩阵和 30 分钟双用户压力；Host LOW_MEMORY 仅记录并续接；非 LOW_MEMORY 失败 fail-closed | §5 C4-R05 Fanqie cold-004 blocking evidence（2026-09-02） |
+| C4 SX 迁移 | IN_PROGRESS | C4-R01..R05；真实首帧、添加矩阵和 30 分钟双用户压力；Host LOW_MEMORY 仅记录并续接；明确 launch/Guest TimeoutException 最多 5 次重试；其他失败 fail-closed | §5 C4-R05 timeout continuation（2026-09-02） |
 | C5 XH 支持 | NOT_APPLICABLE | 用户决定跳过，不阻塞 C6/C7 | §5 PLAN-20260824-C4-REOPEN |
 | C6 API/ABI 矩阵 | PENDING | 声明组合均有 Android Matrix 证据 | - |
 | C7 OEM/发布 | PENDING | 商业矩阵与 VA PRO scope 总验收 | - |
@@ -69,7 +69,7 @@
 | C4-R03 | 启动 readiness 与窗口合同 | DONE | C4-R01 | `d8797c89` | §5 C4-R03（用户批准残余风险豁免） |
 | C4-R04 | C4 fail-closed 验收编排 | DONE | C4-R02,C4-R03 | `1d9b83d54c13d2a758752281dbc492859d8bd05d` | §5 C4-R04 |
 | C4-TEMP-01 | CAS 导入/克隆/添加/启动耗时根因与修复 | DONE | C4-R04；完成后解除 C4-R05 临时阻断 | `7c0c819a58513f89e91ec0fb44cdc05a151e2c32` | §5 C4-TEMP-01 修复完成（2026-08-30） |
-| C4-R05 | MuMu RD 正式重验与关门 | BLOCKED | C4-R04,C4-TEMP-01 | `29e4f72246e24f37430249c0a660ba23f2443249`（当前续接基线） | §5 C4-R05 Fanqie cold-004 blocking evidence（2026-09-02） |
+| C4-R05 | MuMu RD 正式重验与关门 | IN_PROGRESS | C4-R04,C4-TEMP-01 | `9cb1bc3f04365564761d3689ee0b6782a475d8f3`（timeout continuation policy） | §5 C4-R05 timeout continuation（2026-09-02） |
 | C5-T01 | 原始 XH 产品能力契约 | NOT_APPLICABLE | C2,C3 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T02 | XH CAS Host/SDK 集成 | NOT_APPLICABLE | C5-T01,C4-T02 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T03 | 原始 XH/DingTalk 验收 | NOT_APPLICABLE | C5-T02,C4 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
@@ -93,6 +93,9 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
 C5 已由用户明确排除；`KI-R03-057`、`KI-R03-058`、`KI-R03-059`、`KI-R03-060` 的未闭合矩阵/启动证据继续保留。
 按用户 2026-08-25 明确指令，C4-R03 以“行政 DONE、残余风险接受、Issue 后续回归”的例外方式关账并推进到
 C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶段已关闭。`KI-R03-060` 保持开放，后续回归为强制项。
+
+对 `KI-R03-059` 当前 formal occurrence，明确 launch/Guest `TimeoutException` 按用户批准的
+最多 5 次显式重试策略执行；只有预算耗尽或出现非该类型失败才形成当前阻断。
 
 ## 5. 任务回执
 
@@ -3944,3 +3947,42 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
 - **恢复条件与下一任务**：完成 App/SDK 与 CAS Guest/broker 边界分类并形成有证据修复或
   明确外部归属；在 clean commit 上重新通过该坐标及剩余两轮门禁后，才可恢复
   `C4-R05`。下一任务字段保持 `C4-R05`，不前移 `C6-T01`。
+
+### C4-R05：TimeoutException 性能异常有界续接（2026-09-02 12:00）
+
+- **任务 ID / 当前状态**：`C4-R05 / IN_PROGRESS`。上一条 11:34-11:43 的 Fanqie
+  `cold-004` 失败回执保留为历史首失败证据；本条依据用户最新决定恢复执行，不将历史
+  失败改写为 PASS，也不继续保留已被覆盖的 BLOCKED 当前状态。
+- **开始基线与提交**：续接策略开始前工作区干净，分支为
+  `feature/t57-r03-va-pro-capability-campaign`，本地与 `origin` 一致；实现/设计/测试
+  提交为 `9cb1bc3f04365564761d3689ee0b6782a475d8f3`，已推送。Git 身份为
+  `OpenAI <openai@users.noreply.github.com>`。
+- **用户批准的异常策略**：仅当失败 launch command result 明确包含
+  `java.util.concurrent.TimeoutException` 时，按宿主机性能限制允许同一精确坐标最多 5
+  次显式重试；每个 attempt 独立保存 request/operation、阶段时间、设备 boot、日志、
+  Activity/Window/Surface、进程、transaction 和截图证据。Host `LOW_MEMORY` 继续按
+  不限次数的动态 restart/rebootstrap 策略处理。泛化 `debug-command-result timeout`、
+  phase/subprocess timeout、黑屏、窗口/首帧缺失及其他错误不进入该预算，仍立即
+  fail-closed。
+- **实现与 VA/NBB 边界**：新增
+  `PERFORMANCE_TIMEOUT_RETRY_BUDGET = 5`、显式 command-result classifier、跨 durable
+  lane 的 timeout 事件 seed 和同坐标续接；不修改生产 readiness SLO、首帧定义或商业
+  样本门槛。沿用 R03/R05 既有 CAS GuestContentProvider/broker/readiness 与
+  VA/NBB process owner、token、Window identity、package/lifecycle 对照；本次只改变
+  宿主机性能异常的编排策略，不采纳固定 sleep、扩大 deadline 或包名分支。
+- **验证结果**：`python -m unittest scripts/test_c4_r05_orchestrator.py -v`（12/12
+  PASS）、`python -m py_compile tools/capability/run_c4_r03_low_memory_continuation.py
+  tools/capability/run_c4_r05_rd.py scripts/test_c4_r05_orchestrator.py`（PASS）、
+  `python scripts/check-c4-r05-orchestrator.py`（PASS）、`git diff --check`（PASS）。
+  新增回归覆盖“明确 TimeoutException 可续接/后续观察替换”和“泛化 timeout 不可误判”。
+- **Known Issues**：`KI-R03-059` 仍为 `RECORDED`、`NOT_FIXED`、当前 formal gate 仍需
+  通过；但当前这一类显式 TimeoutException 不再因首次出现立即阻断，改为最多 5 次
+  有证据重试。原始 Fanqie 首失败报告新增策略附录，原始 full snapshot 保持不变。
+- **当前验收坐标与下一步**：正式输出保持
+  `verification/catch-up/C4-R05/formal-two-round-20260902-timeout12h-v1/`；从 round-2
+  retained/hot/recovery 的 Fanqie `user0/cold-004` 精确坐标续接，优先观察 bounded
+  timeout retry 事件，然后完成 round-2 剩余矩阵、回归和双用户短测。未达到全部门禁前
+  不标记 DONE，不前移 `C6-T01`。
+- **推送/远端验证**：实现提交已推送，进度与 Known Issues 将以独立回执提交推送；本
+  条完成后必须再次执行续接预检并核对工作区干净、local/remote HEAD 一致，然后继续
+  当前正式矩阵。
