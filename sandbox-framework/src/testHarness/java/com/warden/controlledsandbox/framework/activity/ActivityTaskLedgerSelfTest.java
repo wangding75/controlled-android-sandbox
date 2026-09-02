@@ -32,6 +32,7 @@ public final class ActivityTaskLedgerSelfTest {
         testLaunchFlagValidationMatrix();
         testResetTaskIfNeededContract();
         testExternalLauncherTaskReusePreflight();
+        testSingleActivityLauncherTaskReusePreflight();
         testCrossPackageAffinityAndReparenting();
         testDocumentLaunchModes();
         testFinishMoveBackAndRevisionCleanup();
@@ -182,6 +183,27 @@ public final class ActivityTaskLedgerSelfTest {
         check(restored.findLauncherTaskReuse(
                 0, "guest.example", "revision-1", "Launcher", "guest.example") == null,
                 "detached restored task must not be reused before Host rebind");
+    }
+
+    private static void testSingleActivityLauncherTaskReusePreflight() {
+        ActivityTaskLedger ledger = new ActivityTaskLedger();
+        LaunchDecision root = ledger.launch(new LaunchRequest(
+                new ActivityIdentity(0, "guest.example", "Launcher"),
+                "guest.example", LaunchMode.STANDARD, LaunchFlags.NEW_TASK, null,
+                "guest.example", 1, "route-single-launcher", "", -1,
+                "revision-1", DocumentLaunchMode.NONE, "", "", "", 0));
+        ledger.transition(root.activityToken(), LifecycleState.CREATED);
+        ledger.transition(root.activityToken(), LifecycleState.STARTED);
+        ledger.transition(root.activityToken(), LifecycleState.RESUMED);
+
+        ActivityTaskLedger.LauncherTaskReuse reuse = ledger.findLauncherTaskReuse(
+                0, "guest.example", "revision-1", "Launcher", "guest.example");
+        check(reuse != null && reuse.taskId() == root.taskId()
+                        && reuse.root().token().equals(root.activityToken())
+                        && reuse.top().token().equals(root.activityToken()),
+                "a live one-Activity launcher task must be reusable with the same root/top token");
+        check(ledger.activityCount() == 1 && ledger.taskCount() == 1,
+                "single-Activity launcher preflight must not mutate the virtual task");
     }
 
     private static void testCrossPackageAffinityAndReparenting() {

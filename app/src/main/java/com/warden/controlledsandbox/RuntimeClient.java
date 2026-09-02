@@ -10,6 +10,8 @@ import com.warden.controlledsandbox.contract.PackageServiceResult;
 import com.warden.controlledsandbox.contract.RuntimeStatusRequest;
 import com.warden.controlledsandbox.contract.RuntimeStatusResult;
 import com.warden.controlledsandbox.contract.RuntimeOperationRequest;
+import com.warden.controlledsandbox.contract.RuntimeStatusSnapshot;
+import com.warden.controlledsandbox.contract.VirtualComponentSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPackageProjectionSnapshot;
 import com.warden.controlledsandbox.domain.protocol.RuntimeProtocol;
@@ -143,11 +145,29 @@ final class RuntimeClient implements AutoCloseable {
     }
     Bundle launchComponent(SandboxRecord record, int virtualUserId, String component,
                            Bundle intentExtras) throws Exception {
+        return launchComponent(record, virtualUserId, component, intentExtras, false);
+    }
+    Bundle launchComponent(SandboxRecord record, int virtualUserId, String component,
+                           Bundle intentExtras, boolean awaitReadiness) throws Exception {
+        return launchComponent(record, virtualUserId, component, intentExtras,
+                awaitReadiness, false);
+    }
+    Bundle launchComponentAwaitingActivityCreated(SandboxRecord record, int virtualUserId,
+                                                  String component, Bundle intentExtras)
+            throws Exception {
+        return launchComponent(record, virtualUserId, component, intentExtras,
+                false, true);
+    }
+    private Bundle launchComponent(SandboxRecord record, int virtualUserId, String component,
+                                   Bundle intentExtras, boolean awaitReadiness,
+                                   boolean awaitActivityCreated) throws Exception {
         if (component == null || component.trim().isEmpty()) {
             throw new IllegalArgumentException("activity component is required");
         }
         Bundle request = request(record, virtualUserId, record.launchProcess);
         request.putString(RuntimeKeys.COMPONENT_CLASS, component.trim());
+        request.putBoolean(RuntimeKeys.LAUNCH_AWAIT_READINESS, awaitReadiness);
+        request.putBoolean(RuntimeKeys.LAUNCH_AWAIT_ACTIVITY_CREATED, awaitActivityCreated);
         if (intentExtras != null && !intentExtras.isEmpty()) {
             Bundle copiedExtras = new Bundle(intentExtras);
             // Keep the RD-only Host-task hint in the broker envelope. It is a launch-policy
@@ -164,6 +184,25 @@ final class RuntimeClient implements AutoCloseable {
         return companionRoute(record)
                 ? nativeCompanion.launchActivity(record, virtualUserId, request)
                 : execute(RuntimeOperationRequest.LAUNCH_ACTIVITY, request);
+    }
+
+    /** Waits for the virtual Activity ledger to observe a launched Activity finishing. */
+    boolean awaitActivityCountAtMost(int maxActivityCount, long timeoutMs) throws Exception {
+        if (maxActivityCount < 0) {
+            throw new IllegalArgumentException("maxActivityCount must be non-negative");
+        }
+        long deadline = android.os.SystemClock.elapsedRealtime() + Math.max(1L, timeoutMs);
+        while (true) {
+            RuntimeStatusResult current = status();
+            RuntimeStatusSnapshot snapshot = current.snapshot();
+            if (current.successful() && snapshot != null
+                    && snapshot.activityCount() <= maxActivityCount) {
+                return true;
+            }
+            long remaining = deadline - android.os.SystemClock.elapsedRealtime();
+            if (remaining <= 0L) return false;
+            Thread.sleep(Math.min(100L, remaining));
+        }
     }
     Bundle startService(SandboxRecord record) throws Exception { return startService(record, 0); }
     Bundle startService(SandboxRecord record, int virtualUserId) throws Exception {
@@ -216,8 +255,16 @@ final class RuntimeClient implements AutoCloseable {
                 exemptionReason == null ? "" : exemptionReason);
         request.putLong(RuntimeKeys.SERVICE_FOREGROUND_PROMOTION_TIMEOUT_MS,
                 promotionTimeoutMs);
+        // A zero type means that the caller omitted the type, not that the Guest service has no
+        // manifest declaration.  Carry the authoritative virtual manifest value on the initial
+        // framework-start route.  The Guest ActivityThread bridge reconstructs its lifecycle
+        // callbacks from this route, so resolving it only during Service.startForeground() is
+        // too late: START_BEGIN would already have created the Broker record with type zero.
+        int effectiveDeclaredTypeMask = declaredTypeMask == 0
+                ? declaredForegroundServiceType(request, record.serviceClass)
+                : declaredTypeMask;
         request.putInt(RuntimeKeys.SERVICE_FOREGROUND_DECLARED_TYPE_MASK,
-                declaredTypeMask);
+                effectiveDeclaredTypeMask);
         return invoke(record, virtualUserId, request);
     }
     Bundle stopServiceStartId(SandboxRecord record, int virtualUserId, int startId) throws Exception {
@@ -334,6 +381,19 @@ final class RuntimeClient implements AutoCloseable {
         request.putString(ComponentOperations.ACTION, action == null ? "" : action);
         request.putString(ComponentOperations.AUTHORITY, authority == null ? "" : authority);
         return request;
+    }
+
+    private static int declaredForegroundServiceType(Bundle request, String component) {
+        if (request == null || component == null || component.trim().isEmpty()) return 0;
+        request.setClassLoader(VirtualPackageStateSnapshot.class.getClassLoader());
+        VirtualPackageStateSnapshot packageState = request.getParcelable(RuntimeKeys.PACKAGE_STATE);
+        if (packageState == null) return 0;
+        for (VirtualComponentSnapshot candidate : packageState.components()) {
+            if ("SERVICE".equals(candidate.type()) && component.equals(candidate.className())) {
+                return candidate.foregroundServiceType();
+            }
+        }
+        return 0;
     }
 
     private boolean companionRoute(SandboxRecord record) {

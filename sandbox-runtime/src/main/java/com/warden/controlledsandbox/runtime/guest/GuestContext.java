@@ -196,10 +196,15 @@ public final class GuestContext extends GuestHostOperationDenyContext {
 
     void installServiceFrameworkBridge(GuestActivityThreadServiceBridge bridge) {
         serviceFrameworkBridge = bridge;
+        // The Service transport belongs to the Guest process, while Android can derive multiple
+        // Context views for one Activity/Application. Keep the process-owned bridge in shared
+        // state so a derived Context cannot silently fall back to the manual Service map.
+        sharedState.serviceFrameworkBridge = bridge;
     }
 
     GuestActivityThreadServiceBridge serviceFrameworkBridge() {
-        return serviceFrameworkBridge;
+        GuestActivityThreadServiceBridge local = serviceFrameworkBridge;
+        return local == null ? sharedState.serviceFrameworkBridge : local;
     }
 
     /** Prevents ordinary Guest code from unwrapping this Context into the host Context. */
@@ -926,6 +931,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         final GuestDynamicReceiverRegistry dynamicReceivers = new GuestDynamicReceiverRegistry();
         final GuestMainThreadDispatcher mainThread;
         volatile Application application;
+        volatile GuestActivityThreadServiceBridge serviceFrameworkBridge;
         SharedState(GuestCapabilityGate capabilityGate, ClassLoader classLoader) {
             this.capabilityGate = capabilityGate;
             this.mainThread = new GuestMainThreadDispatcher(classLoader);

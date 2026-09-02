@@ -249,13 +249,11 @@ public final class GuestComponentRuntime {
                         request.getBoolean(RuntimeKeys.FRAMEWORK_SERVICE_FOREGROUND, false));
             }
             case ComponentOperations.STOP_SERVICE -> stopServiceThroughFramework(componentClass, request);
-            case ComponentOperations.STOP_SERVICE_START_ID -> stopServiceStartId(componentClass,
-                    request.getInt(RuntimeKeys.SERVICE_START_ID, -1));
+            case ComponentOperations.STOP_SERVICE_START_ID -> stopServiceStartId(componentClass, request);
             case ComponentOperations.SET_SERVICE_FOREGROUND -> setServiceForeground(componentClass, request);
             case ComponentOperations.BIND_SERVICE -> bindService(componentClass,
                     required(request, RuntimeKeys.CONNECTION_ID), request);
-            case ComponentOperations.UNBIND_SERVICE -> unbindService(componentClass,
-                    required(request, RuntimeKeys.CONNECTION_ID));
+            case ComponentOperations.UNBIND_SERVICE -> unbindService(componentClass, request);
             default -> throw new IllegalArgumentException("Unknown Service operation: " + operation);
         };
     }
@@ -558,6 +556,14 @@ public final class GuestComponentRuntime {
         return out;
     }
 
+    private Bundle stopServiceStartId(String className, Bundle request) throws Exception {
+        GuestActivityThreadServiceBridge framework = session.context.serviceFrameworkBridge();
+        if (framework != null && !session.spec.isolatedProcess) {
+            return framework.stopStartIdForBroker(request, className);
+        }
+        return stopServiceStartId(className, request.getInt(RuntimeKeys.SERVICE_START_ID, -1));
+    }
+
     private Bundle stopServiceStartId(String className, int startId) {
         if (startId < 1) throw new IllegalArgumentException("serviceStartId must be positive");
         ServiceRecord record = services.get(className);
@@ -611,6 +617,10 @@ public final class GuestComponentRuntime {
     }
 
     private Bundle bindService(String className, String connectionId, Bundle request) throws Exception {
+        GuestActivityThreadServiceBridge framework = session.context.serviceFrameworkBridge();
+        if (framework != null && !session.spec.isolatedProcess) {
+            return framework.bindForBroker(request, className);
+        }
         ServiceRecord record = getOrCreateService(className);
         if (record.connections.containsKey(connectionId)) throw new IllegalStateException("DUPLICATE_SERVICE_CONNECTION");
         Intent intent = com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec.decode(request);
@@ -636,6 +646,14 @@ public final class GuestComponentRuntime {
         if (binder != null) out.putBinder(RuntimeKeys.BINDER, binder);
         RuntimeEventLog.event("GUEST_SERVICE_BIND", out);
         return out;
+    }
+
+    private Bundle unbindService(String className, Bundle request) throws Exception {
+        GuestActivityThreadServiceBridge framework = session.context.serviceFrameworkBridge();
+        if (framework != null && !session.spec.isolatedProcess) {
+            return framework.unbindForBroker(request, className);
+        }
+        return unbindService(className, required(request, RuntimeKeys.CONNECTION_ID));
     }
 
     private Bundle unbindService(String className, String connectionId) {

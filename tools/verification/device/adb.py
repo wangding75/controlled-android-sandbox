@@ -128,6 +128,20 @@ class AdbDevice:
     def force_stop(self, package: str) -> AdbCommandResult:
         return self.shell(["am", "force-stop", package], timeout_sec=30.0)
 
+    def wait_for_package_stopped(self, package: str, timeout_sec: float = 15.0) -> bool:
+        """Wait until the exact base package PID disappears from the device."""
+        if not package or not package.strip():
+            raise ValueError("package is required")
+        deadline = time.monotonic() + max(0.0, timeout_sec)
+        while True:
+            probe = self.shell(["pidof", package.strip()], timeout_sec=30.0)
+            if not probe.timed_out and not probe.text().strip():
+                return True
+            remaining = deadline - time.monotonic()
+            if remaining <= 0.0:
+                return False
+            time.sleep(min(0.1, remaining))
+
     def start_activity(
         self,
         component: str,

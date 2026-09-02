@@ -372,8 +372,11 @@ public final class DebugCommandActivity extends Activity {
                 if (component.isEmpty()) {
                     throw new IllegalArgumentException("component extra is required");
                 }
-                operation = runtime.launchComponent(record, virtualUserId, component,
-                        componentIntentExtras(extras));
+                // Framework probes are non-visual Activities.  Keep the launch owner alive
+                // through the generic onCreate boundary, then let the probe markers establish
+                // its framework semantics; a first-frame gate is not applicable here.
+                operation = runtime.launchComponentAwaitingActivityCreated(record, virtualUserId,
+                        component, componentIntentExtras(extras));
                 requireStatus("launch-component", operation, "LAUNCH_PASS");
             } else if ("c3-t02-file-proc-network-fd".equals(command)) {
                 Bundle probeExtras = new Bundle();
@@ -1164,16 +1167,17 @@ public final class DebugCommandActivity extends Activity {
         out.putInt(RuntimeKeys.VIRTUAL_USER_ID, virtualUserId);
         for (int iteration = 1; iteration <= iterations; iteration++) {
             try {
+                int baselineActivityCount = runtime.status().snapshot().activityCount();
                 Bundle launch = runtime.launchComponent(record, virtualUserId,
-                        "com.warden.controlledsandbox.fixture.BroadcastCampaignActivity");
+                        "com.warden.controlledsandbox.fixture.BroadcastCampaignActivity",
+                        null, true);
                 requireStatus("broadcast-campaign-launch-" + iteration, launch, "LAUNCH_PASS");
-                // The Guest Activity logs the real API results. Keep the Host command alive long
-                // enough for ordered async completion and Activity teardown before the next round.
-                Thread.sleep(1_400L);
+                if (!runtime.awaitActivityCountAtMost(baselineActivityCount, 30_000L)) {
+                    throw new IllegalStateException("BROADCAST_ACTIVITY_FINISH_TIMEOUT");
+                }
             } finally {
                 runtime.stop(record, virtualUserId);
             }
-            Thread.sleep(200L);
         }
         return out;
     }

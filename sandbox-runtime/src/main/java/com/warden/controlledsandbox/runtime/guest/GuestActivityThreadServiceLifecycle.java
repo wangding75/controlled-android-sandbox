@@ -162,6 +162,84 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
         }
     }
 
+    /**
+     * Serves a Broker-side binding against the Service instance owned by ActivityThread.
+     *
+     * <p>RuntimeClient's lifecycle probe is not an Android {@link ServiceConnection}; it still
+     * must observe the same Service object as the framework callbacks.  Sending that operation
+     * through {@link GuestComponentRuntime}'s legacy map would create a second Service instance
+     * and split started/bound ownership.  Keep these leases in a separate filtered-Intent ledger
+     * so real AMS bindings remain independent while both paths share the framework Service object.</p>
+     */
+    Bundle bindForBroker(Bundle request, String guestClass) throws Exception {
+        Record record = requireRecordForBroker(guestClass);
+        String connectionId = required(request, RuntimeKeys.CONNECTION_ID);
+        if (record.brokerConnectionIntents.containsKey(connectionId)) {
+            throw new IllegalStateException("DUPLICATE_SERVICE_CONNECTION");
+        }
+        RuntimeIntentWireCodec.materializePayloadForBroker(request);
+        Intent intent = RuntimeIntentWireCodec.decode(request);
+        FrameworkServiceBindingLedger.Entry binding;
+        boolean rebound = false;
+        binding = record.brokerBindings.takePendingRebind(intent);
+        if (binding != null) {
+            record.service.onRebind(intent);
+            rebound = true;
+        } else {
+            binding = record.brokerBindings.bind(intent, record.service::onBind);
+        }
+        record.brokerConnectionIntents.put(connectionId, intent);
+        record.lastBinder = binding.binder();
+        Bundle out = frameworkResult(record, binding.binder() == null
+                ? "SERVICE_NULL_BINDING" : "SERVICE_BOUND");
+        out.putString(RuntimeKeys.CONNECTION_ID, connectionId);
+        out.putInt("connectionCount", record.brokerConnectionIntents.size());
+        out.putBoolean("rebound", rebound);
+        if (binding.binder() != null) out.putBinder(RuntimeKeys.BINDER, binding.binder());
+        RuntimeEventLog.event("GUEST_SERVICE_FRAMEWORK_BROKER_BOUND", out);
+        return out;
+    }
+
+    /** Releases one Broker-side binding without constructing a legacy Service record. */
+    Bundle unbindForBroker(Bundle request, String guestClass) throws Exception {
+        Record record = requireRecordForBroker(guestClass);
+        String connectionId = required(request, RuntimeKeys.CONNECTION_ID);
+        Intent intent = record.brokerConnectionIntents.get(connectionId);
+        if (intent == null) throw new IllegalArgumentException("UNKNOWN_SERVICE_CONNECTION");
+        FrameworkServiceBindingLedger.Entry binding = record.brokerBindings.find(intent);
+        if (binding == null) throw new IllegalStateException("FRAMEWORK_SERVICE_BINDING_MISSING");
+        boolean lastClient = binding.bindCount() <= 1;
+        boolean rebind = lastClient && record.service.onUnbind(intent);
+        FrameworkServiceBindingLedger.UnbindResult unbound =
+                record.brokerBindings.unbindAndReport(intent, rebind);
+        record.brokerConnectionIntents.remove(connectionId);
+        Bundle out = frameworkResult(record, "SERVICE_UNBOUND");
+        out.putString(RuntimeKeys.CONNECTION_ID, connectionId);
+        out.putInt("connectionCount", record.brokerConnectionIntents.size());
+        out.putBoolean("rebindRequested", unbound.rebindPending());
+        RuntimeEventLog.event("GUEST_SERVICE_FRAMEWORK_BROKER_UNBOUND", out);
+        return out;
+    }
+
+    /** Mirrors Service.stopSelfResult for Broker callers while preserving the framework owner. */
+    Bundle stopStartIdForBroker(Bundle request, String guestClass) throws Exception {
+        Record record = requireRecordForBroker(guestClass);
+        int startId = request.getInt(RuntimeKeys.SERVICE_START_ID, -1);
+        if (startId < 1) throw new IllegalArgumentException("serviceStartId must be positive");
+        boolean stopped = startId == record.lastStartId;
+        if (stopped && !record.service.stopSelfResult(startId)) {
+            throw new IllegalStateException("FRAMEWORK_SERVICE_STOP_START_ID_REJECTED");
+        }
+        Bundle out = frameworkResult(record, stopped
+                ? "SERVICE_STOPPED_BY_START_ID" : "SERVICE_START_ID_STALE");
+        out.putInt(RuntimeKeys.SERVICE_START_ID, startId);
+        out.putInt(RuntimeKeys.SERVICE_LAST_START_ID, record.lastStartId);
+        out.putBoolean(RuntimeKeys.SERVICE_STOPPED_BY_START_ID, stopped);
+        out.putInt("connectionCount", record.brokerConnectionIntents.size());
+        RuntimeEventLog.event("GUEST_SERVICE_FRAMEWORK_BROKER_STOP_START_ID", out);
+        return out;
+    }
+
     @Override public void close() {
         if (closed) return;
         closed = true;
@@ -179,6 +257,8 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
                     com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
                 }
                 record.bindings.clear();
+                record.brokerBindings.clear();
+                record.brokerConnectionIntents.clear();
                 mapRemove(servicesData, record.token);
                 mapRemove(services, record.token);
             }
@@ -382,6 +462,8 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
         Intent intent = recovery && !redelivered
                 ? null : decodeGuestIntent((Intent) field(data, "args"));
         if (!taskRemoved && !recovery) {
+            record.lastStartId = startId;
+            record.startCount++;
             // Service.onStartCommand may synchronously call startForeground.  Register the
             // virtual started record first, then commit the callback's restart mode below.
             recordFrameworkEvent(record, route,
@@ -430,7 +512,8 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
         request.putString(RuntimeKeys.COMPONENT_CLASS, record.className);
         request.putString(RuntimeKeys.TARGET_PACKAGE_NAME, session.spec.packageName);
         request.putBoolean(RuntimeKeys.FRAMEWORK_SERVICE_OWNED, true);
-        if (ComponentOperations.FRAMEWORK_SERVICE_EVENT_START.equals(event)) {
+        if (ComponentOperations.FRAMEWORK_SERVICE_EVENT_START.equals(event)
+                || ComponentOperations.FRAMEWORK_SERVICE_EVENT_START_BEGIN.equals(event)) {
             request.putInt(RuntimeKeys.SERVICE_START_ID, startId);
             request.putInt(RuntimeKeys.SERVICE_START_RESULT, startResult);
         }
@@ -505,6 +588,8 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
             synchronized (records) { records.remove(token); }
             foregroundTransport.clear(token);
             record.bindings.clear();
+            record.brokerBindings.clear();
+            record.brokerConnectionIntents.clear();
             mapRemove(servicesData, token);
             mapRemove(services, token);
             record.service.onDestroy();
@@ -527,6 +612,47 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
         StopWaiter waiter;
         synchronized (stopWaiters) { waiter = stopWaiters.remove(guestClass); }
         if (waiter != null) waiter.done.countDown();
+    }
+
+    private Record requireRecordForBroker(String guestClass) {
+        if (closed) throw new IllegalStateException("GUEST_SERVICE_FRAMEWORK_BRIDGE_CLOSED");
+        Record selected = null;
+        synchronized (records) {
+            for (Record candidate : records.values()) {
+                if (!candidate.className.equals(guestClass)) continue;
+                if (selected == null || candidate.lastStartId > selected.lastStartId) {
+                    selected = candidate;
+                }
+            }
+        }
+        if (selected == null) {
+            throw new IllegalStateException("FRAMEWORK_SERVICE_RECORD_MISSING:" + guestClass);
+        }
+        return selected;
+    }
+
+    private static Bundle frameworkResult(Record record, String status) {
+        Bundle out = new Bundle();
+        out.putString(RuntimeKeys.STATUS, status);
+        out.putBoolean(RuntimeKeys.FRAMEWORK_SERVICE_OWNED, true);
+        out.putString(RuntimeKeys.COMPONENT_CLASS, record.className);
+        // Keep the process-local framework record observable on every Broker-side probe.  The
+        // framework callback is authoritative for these counters; returning them here also lets
+        // a stale-start-id query cross the Guest/Broker boundary without depending on a second
+        // manual Service record being present in the Guest component runtime.
+        out.putInt(RuntimeKeys.SERVICE_START_COUNT, record.startCount);
+        out.putInt(RuntimeKeys.SERVICE_LAST_START_ID, record.lastStartId);
+        out.putInt(RuntimeKeys.SERVICE_CONNECTION_COUNT,
+                record.brokerConnectionIntents.size());
+        return out;
+    }
+
+    private static String required(Bundle request, String key) {
+        String value = request == null ? "" : request.getString(key, "");
+        if (value == null || value.trim().isEmpty()) {
+            throw new IllegalArgumentException(key + " is required");
+        }
+        return value;
     }
     private Intent createIntent(Object data) {
         return (Intent) field(data, "intent");
@@ -822,6 +948,10 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
         final ComponentName stub;
         final Bundle routeRequest;
         final FrameworkServiceBindingLedger bindings = new FrameworkServiceBindingLedger();
+        final FrameworkServiceBindingLedger brokerBindings = new FrameworkServiceBindingLedger();
+        final Map<String, Intent> brokerConnectionIntents = new HashMap<>();
+        int lastStartId;
+        int startCount;
         IBinder lastBinder;
         Record(IBinder token, Service service, String className, ServiceInfo info,
                ComponentName stub, Bundle routeRequest) {

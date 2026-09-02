@@ -45,6 +45,17 @@ public final class GuestLaunchGateSelfTest {
         require(GuestLaunchGate.LAUNCH_PASS.equals(GuestLaunchGate.evaluate(pass)),
                 "CREATED+RESUMED+window is LAUNCH_PASS");
 
+        GuestLaunchObservation semantic = new GuestLaunchObservation("semantic", "guest.Probe");
+        Bundle semanticCreated = new Bundle(created);
+        semanticCreated.remove("windowAttached");
+        semantic.onActivityEvent(semanticCreated);
+        require(semantic.awaitActivityCreated(10L),
+                "CREATED releases the semantic launch boundary");
+        GuestLaunchEvidence semanticEvidence = semantic.close();
+        require(GuestLaunchGate.LAUNCH_PASS.equals(
+                        GuestLaunchGate.evaluateActivityCreated(semanticEvidence)),
+                "onCreate completion is a semantic launch pass without a window");
+
         GuestLaunchObservation taskHandoff = new GuestLaunchObservation(
                 "root-token", "guest.Launch", "root-request", "root-operation");
         Bundle rootReady = new Bundle();
@@ -90,6 +101,33 @@ public final class GuestLaunchGateSelfTest {
         reusedActivity.onActivityEvent(reusedFrame);
         require(GuestLaunchGate.LAUNCH_PASS.equals(GuestLaunchGate.evaluate(reusedActivity.close())),
                 "same Activity token keeps creation correlation across a new delivery");
+
+        GuestLaunchObservation warmTaskFront = new GuestLaunchObservation(
+                "warm-token", "guest.Main", "warm-request", "warm-operation");
+        warmTaskFront.expectNewIntentDelivery();
+        Bundle staleResume = new Bundle();
+        staleResume.putString(RuntimeKeys.ACTIVITY_EVENT, "RESUMED");
+        staleResume.putString(RuntimeKeys.ACTIVITY_TOKEN, "warm-token");
+        staleResume.putString(RuntimeKeys.REQUEST_ID, "old-request");
+        staleResume.putString(RuntimeKeys.OPERATION_ID, "old-operation");
+        staleResume.putBoolean("windowAttached", true);
+        warmTaskFront.onActivityEvent(staleResume);
+        Bundle warmIntent = new Bundle();
+        warmIntent.putString(RuntimeKeys.ACTIVITY_EVENT, "NEW_INTENT");
+        warmIntent.putString(RuntimeKeys.ACTIVITY_TOKEN, "warm-token");
+        warmIntent.putString(RuntimeKeys.REQUEST_ID, "warm-request");
+        warmIntent.putString(RuntimeKeys.OPERATION_ID, "warm-operation");
+        warmIntent.putBoolean("activityResumed", true);
+        warmTaskFront.onActivityEvent(warmIntent);
+        Bundle warmResumed = new Bundle(warmIntent);
+        warmResumed.putString(RuntimeKeys.ACTIVITY_EVENT, "RESUMED");
+        warmResumed.putBoolean("windowAttached", true);
+        warmTaskFront.onActivityEvent(warmResumed);
+        Bundle warmFrame = new Bundle(warmResumed);
+        warmFrame.putString(RuntimeKeys.ACTIVITY_EVENT, "FIRST_FRAME_DRAWN");
+        warmTaskFront.onActivityEvent(warmFrame);
+        require(GuestLaunchGate.LAUNCH_PASS.equals(GuestLaunchGate.evaluate(warmTaskFront.close())),
+                "stale resume before warm onNewIntent is ignored");
 
         GuestLaunchObservation delayedWindow = new GuestLaunchObservation("tok", "guest.Main");
         Bundle createdOnly = new Bundle();

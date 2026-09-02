@@ -305,8 +305,35 @@ public abstract class StubActivityBase extends Activity {
                 return;
             }
             logActivityRecordMapping(token, activityToken, virtualTaskId);
-            if (controller != null) controller.newIntent(
-                    com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec.decode(route));
+            Intent decoded = com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec.decode(route);
+            if (controller != null) controller.newIntent(decoded);
+            // A launcher task reuse creates a new route for the existing Activity record. Keep
+            // ordinary singleTop/CLEAR_TOP callbacks correlated with the original Activity
+            // identity, but publish the launcher delivery's request identity so a newly-created
+            // readiness observer can prove this warm launch without weakening its correlation
+            // gate.
+            boolean launcherTaskReuse = route.getBoolean(RuntimeKeys.LAUNCHER_TASK_REUSE, false);
+            if (launcherTaskReuse) {
+                requestId = value(route.getString(RuntimeKeys.REQUEST_ID, requestId));
+                operationId = value(route.getString(RuntimeKeys.OPERATION_ID, operationId));
+                // A reused physical Stub must produce a fresh frame witness for this route.  The
+                // old draw listener is tied to the previous launch and otherwise turns a warm
+                // re-open into a false pass or leaves the observer without a listener.
+                firstFrameListenerInstalled = false;
+                firstFrameReported = false;
+            }
+            Bundle details = new Bundle();
+            details.putString(RuntimeKeys.ROUTE_TOKEN, token);
+            details.putBoolean("activityResumed", hostStage >= 3 && !isFinishing());
+            details.putBoolean("windowCreated", getWindow() != null
+                    && getWindow().getDecorView() != null);
+            details.putBoolean("firstFrameDrawn", firstFrameReported);
+            details.putBoolean("frameworkOwnedActivity", true);
+            details.putBoolean(RuntimeKeys.LAUNCHER_TASK_REUSE, launcherTaskReuse);
+            details.putString(RuntimeKeys.ACTIVITY_ACTION,
+                    route.getString(RuntimeKeys.ACTIVITY_ACTION, "DELIVERED_NEW_INTENT"));
+            enqueueActivityEvent("NEW_INTENT", details);
+            if (launcherTaskReuse) observeWindowOwnership();
         });
     }
 

@@ -47,6 +47,12 @@ final class RuntimeActivityLaunchCoordinator {
         String operationId = routedRequest.getString(RuntimeKeys.OPERATION_ID, "").trim();
         if (operationId.isEmpty()) operationId = requestId + "-launch";
         boolean awaitReadiness = routedRequest.getBoolean(RuntimeKeys.LAUNCH_AWAIT_READINESS, false);
+        boolean awaitActivityCreated = routedRequest.getBoolean(
+                RuntimeKeys.LAUNCH_AWAIT_ACTIVITY_CREATED, false);
+        if (awaitReadiness && awaitActivityCreated) {
+            return RuntimeBrokerService.failure("LAUNCH_OBSERVATION_MODE_CONFLICT",
+                    "Visual readiness and semantic Activity creation cannot be awaited together");
+        }
         LaunchDeadline deadline = LaunchDeadline.start(routedRequest);
         deadline.attach(routedRequest);
         routedRequest.putString(RuntimeKeys.REQUEST_ID, requestId);
@@ -160,6 +166,8 @@ final class RuntimeActivityLaunchCoordinator {
             int taskId = transaction.getInt(RuntimeKeys.TASK_ID, 0);
             int callerTaskId = routedRequest.getInt(RuntimeKeys.CALLER_TASK_ID, 0);
             boolean nestedLaunch = callerTaskId > 0;
+            boolean launcherReuseRequested = routedRequest.getBoolean(
+                    RuntimeKeys.LAUNCHER_TASK_REUSE, false);
             String taskKey = taskObservationKey(session, taskId);
             String callerTaskKey = taskObservationKey(session, callerTaskId);
             issuedRouteToken = transaction.getString(RuntimeKeys.ROUTE_TOKEN, "");
@@ -214,6 +222,7 @@ final class RuntimeActivityLaunchCoordinator {
                     launch.getComponent() == null ? "" : launch.getComponent().getClassName());
             physicalEvidence.putInt(RuntimeKeys.HOST_ACTIVITY_FLAGS, hostFlags);
             physicalEvidence.putBoolean(RuntimeKeys.ACTIVITY_FRAMEWORK_HOST, frameworkHost);
+            physicalEvidence.putBoolean(RuntimeKeys.LAUNCHER_TASK_REUSE, launcherReuseRequested);
             RuntimeEventLog.event("ATMS_ACTIVITY_LAUNCH_REQUEST", physicalEvidence);
             if (frameworkHost) {
                 // ActivityThread Instrumentation launches (for example an app's synchronous
@@ -272,6 +281,7 @@ final class RuntimeActivityLaunchCoordinator {
                             requestId, operationId,
                                     routedRequest.getLong(RuntimeKeys.LAUNCH_ACCEPTED_AT_ELAPSED_MS,
                                     acceptedAtElapsedMs));
+                    if (launcherReuseRequested) observation.expectNewIntentDelivery();
                     if (!sessionId.isEmpty()) owner.launchObservations.put(sessionId, observation);
                     owner.launchObservations.put(requestId, observation);
                     owner.launchObservations.put(activityToken, observation);
@@ -301,6 +311,7 @@ final class RuntimeActivityLaunchCoordinator {
                 launchStage(requestId, operationId, "HOST_START_BEGIN",
                         elapsedSince(acceptedAtElapsedMs), transaction);
                 try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.HOST_START_ACTIVITY)) {
+                    if (launcherReuseRequested) moveExistingHostTaskToFront(launch);
                     owner.startActivity(launch);
                 }
                 launchStage(requestId, operationId, "HOST_START_RETURN",
@@ -327,8 +338,64 @@ final class RuntimeActivityLaunchCoordinator {
             if (observation == null) {
                 return owner.sessionBundle(session, GuestLaunchGate.LAUNCH_PENDING);
             }
+            if (awaitActivityCreated) {
+                try {
+                    long remaining = deadline.remainingMs();
+                    if (remaining <= 0L) throw new IllegalStateException("LAUNCH_DEADLINE_EXCEEDED");
+                    observation.awaitActivityCreated(remaining);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+                GuestLaunchEvidence evidence = observation.close();
+                removeObservationMappings(observation);
+                String gate = GuestLaunchGate.evaluateActivityCreated(evidence);
+                // The physical Activity token is stable across warm singleTop reuse.  It cannot
+                // identify this launch's readiness result: a later observeLaunch() would read
+                // the previous launch's terminal bundle before the new onNewIntent callback.
+                // Keep the physical token in the lifecycle correlation map, but make the
+                // request id the one-shot observation capability for every launch.
+                String observationToken = requestId;
+                Bundle out = owner.sessionBundle(session, gate);
+                out.putAll(transaction);
+                out.putString(RuntimeKeys.STATUS, gate);
+                out.putBoolean(RuntimeKeys.LAUNCH_RUNTIME_ACCEPTED, true);
+                out.putBoolean(RuntimeKeys.LAUNCH_GUEST_PROCESS_READY, true);
+                out.putBoolean(RuntimeKeys.LAUNCH_ESSENTIAL_RUNTIME_READY, true);
+                out.putBoolean(RuntimeKeys.LAUNCH_START_ACTIVITY_ACCEPTED, true);
+                out.putBoolean(RuntimeKeys.LAUNCH_READINESS_PENDING, false);
+                out.putString("readinessStatus", "ACTIVITY_CREATED");
+                out.putString("launchMode", "SEMANTIC_ACTIVITY_CREATED");
+                out.putBoolean("launcherResolved", evidence.launcherResolved);
+                out.putBoolean("activityCreated", evidence.onCreateCompleted);
+                out.putBoolean("activityResumed", evidence.resumed);
+                out.putBoolean("windowEvidence", evidence.windowEvidence);
+                out.putBoolean("firstFrameDrawn", evidence.firstFrameDrawn);
+                out.putStringArrayList("launchTimeline", evidence.timeline);
+                out.putLong("launchReadinessElapsedMs",
+                        Math.max(0L, android.os.SystemClock.elapsedRealtime()
+                                - observation.acceptedAtElapsedMs()));
+                out.putLong(RuntimeKeys.LAUNCH_ACCEPTED_AT_ELAPSED_MS,
+                        observation.acceptedAtElapsedMs());
+                out.putString(RuntimeKeys.REQUEST_ID, requestId);
+                out.putString(RuntimeKeys.OPERATION_ID, operationId);
+                out.putInt(RuntimeKeys.ATTEMPT, 1);
+                out.putInt(RuntimeKeys.RETRY_BUDGET, 0);
+                out.putBoolean(RuntimeKeys.AUTOMATIC_RETRY_PERFORMED, false);
+                out.putInt("fatalCount", evidence.fatalCount);
+                out.putInt("anrCount", evidence.anrCount);
+                out.putString(RuntimeKeys.LAUNCH_OBSERVATION_TOKEN, observationToken);
+                if (GuestLaunchGate.LAUNCH_FAILED.equals(gate)) {
+                    out.putString(RuntimeKeys.ERROR_TYPE, "ACTIVITY_CREATION_GATE_FAILED");
+                    out.putString(RuntimeKeys.ERROR_MESSAGE, evidence.failure.isEmpty()
+                            ? "guest Activity onCreate completion not confirmed" : evidence.failure);
+                }
+                LaunchDeadline.annotate(out, routedRequest);
+                owner.publishLaunchReadiness(observationToken, out);
+                perf.close();
+                return out;
+            }
             if (!awaitReadiness) {
-                String observationToken = activityToken.isEmpty() ? requestId : activityToken;
+                String observationToken = requestId;
                 scheduleReadinessObservation(observation, session, transaction, observationToken,
                         component, requestId, operationId);
                 Bundle accepted = owner.sessionBundle(session, GuestLaunchGate.LAUNCH_ACCEPTED);
@@ -390,9 +457,8 @@ final class RuntimeActivityLaunchCoordinator {
                 out.putString(RuntimeKeys.ERROR_MESSAGE, evidence.failure.isEmpty()
                         ? "guest Activity create/resume/window not confirmed" : evidence.failure);
             }
-            out.putString(RuntimeKeys.LAUNCH_OBSERVATION_TOKEN,
-                    activityToken.isEmpty() ? requestId : activityToken);
-            owner.publishLaunchReadiness(activityToken.isEmpty() ? requestId : activityToken, out);
+            out.putString(RuntimeKeys.LAUNCH_OBSERVATION_TOKEN, requestId);
+            owner.publishLaunchReadiness(requestId, out);
             perf.close();
             return out;
         } catch (Throwable error) {
@@ -573,6 +639,41 @@ final class RuntimeActivityLaunchCoordinator {
             for (Object item : list) if (item instanceof String string) strings.add(string);
             target.putStringArrayListExtra(key, strings);
         }
+    }
+
+    /**
+     * A Guest task is deliberately a separate Host task.  When the debug controller is the
+     * foreground task, NEW_TASK|SINGLE_TOP otherwise matches the controller task by the Host
+     * package affinity and never reaches the existing Guest Stub.  Select the app-owned task
+     * whose top physical component is the virtual task's recorded Stub before asking ATMS to
+     * deliver the reuse Intent.
+     */
+    private void moveExistingHostTaskToFront(Intent launch) {
+        if (launch == null || launch.getComponent() == null) return;
+        Object service = owner.getSystemService(android.content.Context.ACTIVITY_SERVICE);
+        if (!(service instanceof android.app.ActivityManager manager)) return;
+        try {
+            for (android.app.ActivityManager.AppTask appTask : manager.getAppTasks()) {
+                android.app.ActivityManager.RecentTaskInfo info = appTask.getTaskInfo();
+                if (info == null
+                        || (!sameComponent(info.topActivity, launch.getComponent())
+                        && !sameComponent(info.baseActivity, launch.getComponent()))) continue;
+                appTask.moveToFront();
+                Bundle details = new Bundle();
+                details.putInt("hostTaskId", info.id);
+                details.putString(RuntimeKeys.PHYSICAL_ACTIVITY_COMPONENT,
+                        launch.getComponent().getClassName());
+                RuntimeEventLog.event("ATMS_ACTIVITY_TASK_REUSE", details);
+                return;
+            }
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            android.util.Log.w("CS_BROKER_LAUNCH", "HOST_TASK_REUSE_MOVE_FAILED", error);
+        }
+    }
+
+    private static boolean sameComponent(ComponentName left, ComponentName right) {
+        return left != null && right != null && left.equals(right);
     }
 
     private static int hostActivityLaunchFlags(Bundle transaction, boolean frameworkHost) {

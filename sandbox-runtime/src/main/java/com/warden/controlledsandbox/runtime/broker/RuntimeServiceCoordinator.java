@@ -159,6 +159,11 @@ public final class RuntimeServiceCoordinator implements ServiceMetricsSource {
     @Override public int recordCount() { return runtime.recordCount(); }
     public List<ServiceRuntimeRegistry.Snapshot> snapshot() { return runtime.snapshot(); }
 
+    public boolean isFrameworkOwned(GuestSession session, String component) {
+        ServiceRuntimeRegistry.Snapshot snapshot = runtime.find(session, component);
+        return snapshot != null && snapshot.frameworkOwned();
+    }
+
     public synchronized int activeConnectionLeases() { return connections.size(); }
 
     public void close() {

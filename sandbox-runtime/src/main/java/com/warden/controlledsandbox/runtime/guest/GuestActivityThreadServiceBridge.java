@@ -180,6 +180,21 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
         }
     }
 
+    Bundle bindForBroker(Bundle request, String guestClass) throws Exception {
+        if (closed) throw new IllegalStateException("GUEST_SERVICE_FRAMEWORK_BRIDGE_CLOSED");
+        return serviceLifecycle.bindForBroker(request, guestClass);
+    }
+
+    Bundle unbindForBroker(Bundle request, String guestClass) throws Exception {
+        if (closed) throw new IllegalStateException("GUEST_SERVICE_FRAMEWORK_BRIDGE_CLOSED");
+        return serviceLifecycle.unbindForBroker(request, guestClass);
+    }
+
+    Bundle stopStartIdForBroker(Bundle request, String guestClass) throws Exception {
+        if (closed) throw new IllegalStateException("GUEST_SERVICE_FRAMEWORK_BRIDGE_CLOSED");
+        return serviceLifecycle.stopStartIdForBroker(request, guestClass);
+    }
+
     boolean bind(Bundle request, String guestClass, ServiceConnection guestConnection,
                  int flags, Executor executor) {
         if (closed) throw new IllegalStateException("GUEST_SERVICE_FRAMEWORK_BRIDGE_CLOSED");

@@ -179,6 +179,9 @@ final class RuntimeComponentOperationCoordinator {
         if (ComponentOperations.FRAMEWORK_SERVICE_EVENT.equals(invocation.operation)) {
             return recordFrameworkServiceEvent(session, invocation.request);
         }
+        if (isFrameworkOwnedExternalServiceOperation(invocation)) {
+            invocation.request.putBoolean(RuntimeKeys.FRAMEWORK_SERVICE_OWNED, true);
+        }
         Bundle call = new Bundle(base);
         call.putAll(invocation.request);
         // Guest already owns the immutable package universe from PREPARE_GUEST. Keep the
@@ -498,6 +501,20 @@ final class RuntimeComponentOperationCoordinator {
         }
         return callGuest(invocation.session.processSlot(),
                 guest -> guestOperation(guest, RuntimeOperationRequest.INVOKE_COMPONENT, call));
+    }
+
+    private boolean isFrameworkOwnedExternalServiceOperation(ComponentInvocation invocation) {
+        if (!ComponentOperations.isServiceOperation(invocation.operation)
+                || ComponentOperations.START_SERVICE.equals(invocation.operation)
+                || ComponentOperations.START_FOREGROUND_SERVICE.equals(invocation.operation)
+                || ComponentOperations.ROUTE_FRAMEWORK_SERVICE.equals(invocation.operation)
+                || ComponentOperations.FRAMEWORK_SERVICE_EVENT.equals(invocation.operation)
+                || ComponentOperations.RECOVER_FRAMEWORK_SERVICE.equals(invocation.operation)) {
+            return false;
+        }
+        String component = invocation.request.getString(RuntimeKeys.COMPONENT_CLASS, "");
+        return !component.trim().isEmpty()
+                && serviceCoordinator.isFrameworkOwned(invocation.session, component);
     }
 
     private void validateBatchResult(ComponentInvocation invocation, Bundle result) {

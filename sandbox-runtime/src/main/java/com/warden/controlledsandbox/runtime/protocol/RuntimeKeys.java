@@ -198,6 +198,8 @@ public final class RuntimeKeys {
     public static final String LAUNCH_ACCEPTED_AT_ELAPSED_MS = "launchAcceptedAtElapsedMs";
     /** Opt-in for the compatibility launch API that waits for first-frame readiness. */
     public static final String LAUNCH_AWAIT_READINESS = "launchAwaitReadiness";
+    /** Opt-in for a semantic Activity launch result that waits through onCreate completion. */
+    public static final String LAUNCH_AWAIT_ACTIVITY_CREATED = "launchAwaitActivityCreated";
     /** Read-only ACTIVITY_EVENT request for querying the asynchronous launch observation. */
     public static final String LAUNCH_OBSERVE_ONLY = "launchObserveOnly";
     /** Opaque token returned by launch() and accepted by the observation query. */

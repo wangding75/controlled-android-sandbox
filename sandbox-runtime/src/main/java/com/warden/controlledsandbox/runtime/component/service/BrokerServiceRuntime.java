@@ -5,6 +5,8 @@ import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 
 import android.app.Service;
 import android.os.Bundle;
+import com.warden.controlledsandbox.contract.VirtualComponentSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.domain.component.service.ForegroundServiceStateMachine;
 import com.warden.controlledsandbox.domain.component.service.ServiceRuntimeRegistry;
 import com.warden.controlledsandbox.domain.port.Clock;
@@ -52,7 +54,7 @@ public final class BrokerServiceRuntime {
                             ForegroundServiceStateMachine.DEFAULT_PROMOTION_TIMEOUT_MS),
                     request.getBoolean(RuntimeKeys.SERVICE_FOREGROUND_BACKGROUND_ALLOWED, true),
                     request.getString(RuntimeKeys.SERVICE_FOREGROUND_EXEMPTION_REASON, ""),
-                    request.getInt(RuntimeKeys.SERVICE_FOREGROUND_DECLARED_TYPE_MASK, 0),
+                    effectiveDeclaredForegroundTypeMask(request, component),
                     frameworkOwned);
             case ComponentOperations.STOP_SERVICE -> {
                 if (registry.find(instance, component) != null) {
@@ -123,7 +125,7 @@ public final class BrokerServiceRuntime {
                         ForegroundServiceStateMachine.DEFAULT_PROMOTION_TIMEOUT_MS),
                 request.getBoolean(RuntimeKeys.SERVICE_FOREGROUND_BACKGROUND_ALLOWED, true),
                 request.getString(RuntimeKeys.SERVICE_FOREGROUND_EXEMPTION_REASON, ""),
-                 request.getInt(RuntimeKeys.SERVICE_FOREGROUND_DECLARED_TYPE_MASK, 0));
+                effectiveDeclaredForegroundTypeMask(request, component));
         rememberStartIntent(instanceId(session), component, request);
         addSnapshot(result, snapshot);
         return snapshot;
@@ -203,6 +205,10 @@ public final class BrokerServiceRuntime {
 
     public synchronized int recordCount() { return registry.snapshot().size(); }
     public synchronized List<ServiceRuntimeRegistry.Snapshot> snapshot() { return registry.snapshot(); }
+
+    public synchronized ServiceRuntimeRegistry.Snapshot find(GuestSession session, String component) {
+        return registry.find(instanceId(session), component);
+    }
 
     /** Returns a defensive copy of the last full wire Intent for START_REDELIVER_INTENT. */
     public synchronized Bundle recoveryIntent(ServiceRuntimeRegistry.Snapshot service) {
@@ -302,6 +308,22 @@ public final class BrokerServiceRuntime {
         result.putString(RuntimeKeys.SERVICE_FOREGROUND_EXEMPTION_REASON, foreground.exemptionReason());
         result.putString(RuntimeKeys.SERVICE_FOREGROUND_TERMINAL_REASON, foreground.terminalReason());
         result.putBoolean(RuntimeKeys.FRAMEWORK_SERVICE_OWNED, snapshot.frameworkOwned());
+    }
+
+    /** Resolve an omitted foreground type from the authoritative virtual manifest projection. */
+    private static int effectiveDeclaredForegroundTypeMask(Bundle request, String component) {
+        if (request == null) return 0;
+        int declared = request.getInt(RuntimeKeys.SERVICE_FOREGROUND_DECLARED_TYPE_MASK, 0);
+        if (declared != 0) return declared;
+        request.setClassLoader(VirtualPackageStateSnapshot.class.getClassLoader());
+        VirtualPackageStateSnapshot state = request.getParcelable(RuntimeKeys.PACKAGE_STATE);
+        if (state == null || component == null || component.trim().isEmpty()) return declared;
+        for (VirtualComponentSnapshot candidate : state.components()) {
+            if ("SERVICE".equals(candidate.type()) && component.equals(candidate.className())) {
+                return candidate.foregroundServiceType();
+            }
+        }
+        return declared;
     }
 
     public static String instanceId(GuestSession session) {

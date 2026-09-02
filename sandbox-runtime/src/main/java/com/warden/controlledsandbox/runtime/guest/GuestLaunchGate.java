@@ -32,6 +32,24 @@ public final class GuestLaunchGate {
         return LAUNCH_PASS;
     }
 
+    /**
+     * Evaluates the non-visual launch contract used by framework probes.  A probe Activity can
+     * complete all of its framework work from onCreate without ever owning a DecorView; that is
+     * still a real Activity launch, but it is not a first-frame launch.
+     */
+    public static String evaluateActivityCreated(GuestLaunchEvidence evidence) {
+        if (evidence == null || !evidence.prepared) return LAUNCH_FAILED;
+        if (evidence.fatalCount > 0 || evidence.anrCount > 0) return LAUNCH_FAILED;
+        if (!evidence.failure.isEmpty()) return LAUNCH_FAILED;
+        if (!evidence.launcherResolved || !evidence.targetClassLoaded
+                || !evidence.activityInstantiated || !evidence.activityAttached
+                || !evidence.onCreateCompleted) {
+            return evidence.observationCompleted ? LAUNCH_FAILED : LAUNCH_PENDING;
+        }
+        if (!evidence.observationCompleted) return LAUNCH_PENDING;
+        return LAUNCH_PASS;
+    }
+
     public static boolean isLaunchPass(String status) {
         return LAUNCH_PASS.equals(status);
     }

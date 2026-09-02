@@ -412,12 +412,12 @@ public final class ActivityTaskLedger {
                     || !task.affinity.equals(normalizedAffinity)
                     || task.documentTask
                     || task.hostTaskDetached
-                    || task.activities.size() < 2) {
+                    || task.activities.isEmpty()) {
                 continue;
             }
             ActivityTaskMutableActivity root = task.activities.get(0);
             ActivityTaskMutableActivity top = top(task);
-            if (top == null || top == root
+            if (top == null
                     || !root.identity.componentName().equals(normalizedLauncher)
                     || top.lifecycleState == LifecycleState.INITIALIZED
                     || top.lifecycleState == LifecycleState.DESTROYED) {
@@ -1577,9 +1577,8 @@ public final class ActivityTaskLedger {
             taskAffinity = requireText(taskAffinity, "taskAffinity");
             root = Objects.requireNonNull(root, "root");
             top = Objects.requireNonNull(top, "top");
-            if (root.token().equals(top.token())) {
-                throw new IllegalArgumentException("launcher reuse requires a distinct top Activity");
-            }
+            // A one-Activity launcher task legitimately has the same root and top record. A
+            // multi-Activity task returns its distinct live top record instead.
         }
     }
 

@@ -13,6 +13,7 @@ public final class GuestLaunchObservation {
     private final String activityToken;
     private final String componentClass;
     private final CountDownLatch done = new CountDownLatch(1);
+    private final CountDownLatch activityCreated = new CountDownLatch(1);
     private boolean prepared = true;
     private boolean launcherResolved;
     private boolean classLoaded;
@@ -32,6 +33,8 @@ public final class GuestLaunchObservation {
     private final String operationId;
     private final long acceptedAtElapsedMs;
     private final ArrayList<String> timeline = new ArrayList<>();
+    /** A task-front operation can resume the old Activity before ATMS delivers its new Intent. */
+    private boolean awaitingNewIntent;
     /** ActivityThread may replace the launcher Activity with the app's real top Activity. */
     private final Map<String, Correlation> activityCorrelations = new HashMap<>();
 
@@ -92,6 +95,16 @@ public final class GuestLaunchObservation {
         return normalizedToken.isEmpty() || activityCorrelations.containsKey(normalizedToken);
     }
 
+    /**
+     * Marks a warm task-front launch as waiting for the physical onNewIntent boundary.  The
+     * existing Activity may emit a stale RESUMED/window callback while its task is being brought
+     * forward; those callbacks are not evidence for the new launch and must not fail its
+     * request/operation correlation.
+     */
+    public synchronized void expectNewIntentDelivery() {
+        awaitingNewIntent = true;
+    }
+
     public synchronized void onActivityEvent(Bundle request) {
         if (request == null) return;
         String event = request.getString(RuntimeKeys.ACTIVITY_EVENT, "");
@@ -104,8 +117,15 @@ public final class GuestLaunchObservation {
         } else if (expected == null) {
             expected = new Correlation(requestId, operationId);
         }
-        if ((!expected.requestId.isEmpty() && !expected.requestId.equals(eventRequestId))
-                || (!expected.operationId.isEmpty() && !expected.operationId.equals(eventOperationId))) {
+        boolean correlationMismatch =
+                (!expected.requestId.isEmpty() && !expected.requestId.equals(eventRequestId))
+                || (!expected.operationId.isEmpty() && !expected.operationId.equals(eventOperationId));
+        if (correlationMismatch && awaitingNewIntent && !"NEW_INTENT".equals(event)
+                && activityToken.equals(eventActivityToken)) {
+            timeline.add("PRE_REUSE_" + event + "@" + android.os.SystemClock.elapsedRealtime());
+            return;
+        }
+        if (correlationMismatch) {
             failure = "LAUNCH_CORRELATION_MISMATCH";
         }
         String stage = "GUEST_READY".equals(event) ? "GUEST_READY"
@@ -140,6 +160,7 @@ public final class GuestLaunchObservation {
             classLoaded = true;
             instantiated = true;
         } else if ("NEW_INTENT".equals(event)) {
+            awaitingNewIntent = false;
             // Reopening a task can deliver the launcher Intent to an already-created Activity;
             // that path has no CREATED callback. Preserve the lifecycle facts that the callback
             // itself proves, while RESUMED/FIRST_FRAME_DRAWN remain independently required.
@@ -148,6 +169,7 @@ public final class GuestLaunchObservation {
             attached = true;
             created = true;
             if (request.getBoolean("activityResumed", false)) resumed = true;
+            if (request.getBoolean("firstFrameDrawn", false)) firstFrameDrawn = true;
         } else if ("FIRST_FRAME_DRAWN".equals(event)) {
             firstFrameDrawn = true;
             windowEvidence = true;
@@ -155,11 +177,17 @@ public final class GuestLaunchObservation {
             fatalCount++;
             failure = request.getString(RuntimeKeys.ERROR_MESSAGE, event);
         }
+        if (created || failedLocked()) activityCreated.countDown();
         if (failedLocked() || passedLocked()) finishLocked();
     }
 
     public boolean await(long timeoutMs) throws InterruptedException {
         return done.await(Math.max(1L, timeoutMs), TimeUnit.MILLISECONDS);
+    }
+
+    /** Waits for the semantic Activity lifecycle boundary without requiring a window or frame. */
+    public boolean awaitActivityCreated(long timeoutMs) throws InterruptedException {
+        return activityCreated.await(Math.max(1L, timeoutMs), TimeUnit.MILLISECONDS);
     }
 
     public synchronized GuestLaunchEvidence close() {
@@ -192,6 +220,7 @@ public final class GuestLaunchObservation {
 
     private void finishLocked() {
         if (done.getCount() == 0) return;
+        activityCreated.countDown();
         done.countDown();
     }
 

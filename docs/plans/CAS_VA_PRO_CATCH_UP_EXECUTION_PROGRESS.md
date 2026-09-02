@@ -1,14 +1,14 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：2.0
-更新时间：2026-09-02 18:39（Asia/Shanghai）
+更新时间：2026-09-02 22:50（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C6`（IN_PROGRESS；按用户明确指令提前进入 C6，C4-R05 正式关门及 C1/C2/C4 合并回归延后至完整回归处理）
-当前任务：`C6-T01`（IN_PROGRESS）
-下一任务：`C6-T01`
-最后完成任务：`C6-T01A`
+当前任务：`C6-T01`（IN_PROGRESS；`C6-T01A-R01` 已完成）
+下一任务：`C6-T01B`
+最后完成任务：`C6-T01A-R01`
 
 ## 1. 使用规则
 
@@ -76,6 +76,7 @@
 | C5-T04 | 可选 Xposed 模块验收 | NOT_APPLICABLE | C3-T06,C5-T01 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C6-T01 | API33-37 回归 | IN_PROGRESS（用户授权提前进入） | C4-R05（用户授权跳过当前依赖） | - | §5 C6-T01（2026-09-02） |
 | C6-T01A | Unified Android Verification Harness Foundation | DONE | C6-T01 | `6b03d5ca95f45d48bbcadab56fb0beddab3aa287` | §5 C6-T01A |
+| C6-T01A-R01 | API32 Core Smoke Defect Closure | DONE | C6-T01A | `HEAD`（本任务唯一提交；精确 SHA 见 §5 C6-T01A-R01 回执） | §5 C6-T01A-R01 |
 | C6-T02 | ARM/跨宽度/16KB | PENDING | C3-T03,C6-T01 | - | - |
 | C6-T03 | Android Matrix 发布门禁 | PENDING | C6-T01,C6-T02 | - | - |
 | C7-T01 | OEM 优先级与代表设备 | PENDING | C6 | - | - |
@@ -4095,3 +4096,44 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   implementation 与 receipt 按任务书两提交协议一起推送并验证。
 - **报告**：`reports/t57-r03/c6/C6_T01A_VERIFICATION_HARNESS_REPORT.md`。
 - **下一任务**：仍为 `C6-T01`；本轮不开始 `C6-T01B`，不执行 C6-T02。
+
+### C6-T01A-R01：API32 Core Smoke Defect Closure（2026-09-02）
+
+- **状态**：`DONE`；`RESULT=PASS`。父任务 `C6-T01` 继续为 `IN_PROGRESS`，本条只关闭
+  API32 Core Smoke 的六项失败，不启动 API33。
+- **开始基线**：`feature/t57-r03-va-pro-capability-campaign` @
+  `74508ab1db1ace0ac4a76302b0053beaffc9637a`；开始前工作区 clean。
+- **根因计数**：`ROOT_CAUSE_COUNT=4`；`SHARED_ROOT_CAUSE_COUNT=2`。共享根因为
+  `RC-02`（D02+D05：framework-owned component bridge/state ownership）和 `RC-03`
+  （D03+D06：Host controller task/teardown/result publication boundary）。
+- **六项最终分类**：D01 `PRODUCT_DEFECT`（Activity task projection/observation boundary）；
+  D02 `PRODUCT_DEFECT`（Service framework record/bridge/startId ownership）；D03
+  `HARNESS_DEFECT`（Host/Guest stopping state pollution）；D04 `HARNESS_DEFECT`（valid
+  `CURSOR_READY` was rejected by the assertion）；D05 `PRODUCT_DEFECT`（derived Guest
+  context lost the framework bridge）；D06 `OBSERVABILITY_DEFECT`（API32 stale controller
+  ActivityRecord prevented result publication）。计数为 PRODUCT=3、HARNESS=2、
+  OBSERVABILITY=1、FIXTURE=0、ENVIRONMENT=0。
+- **实现摘要**：统一 Activity warm-reuse 的物理 Host task fronting 与 request-scoped
+  `NEW_INTENT`/first-frame observation；统一 framework Service bridge、token ledger、
+  startId 和 FGS type；跨 Guest context 保留 bridge；为 debug controller 和 package
+  lifecycle 增加 scoped Host fencing、semantic completion 与 bounded package-stop；将
+  Provider 的显式合法终态纳入 harness contract。未改 fixture，未使用 package 特判、
+  延时掩盖 race、retry-as-PASS 或吞异常。
+- **VA/NBB 对照**：请求的本地 `ref/upstream/VirtualApp` 与
+  `ref/upstream/NewBlackbox` ref 不存在；已检查本地 CAS 历史及对应的 task/service/
+  receiver/provider/IntentSender/package-lifecycle ownership contract，未复制上游代码，
+  未恢复历史 runner。
+- **回归**：Harness `6/6 PASS`；`projects`、`assembleDebug`、Gradle `test` 均 PASS；
+  R8 `c6-t01a-rd-api32-20260902-r8` 在同一 RD/API32 环境完成 S01-S10，
+  `10 total / 10 PASS / 0 FAIL`；`FALSE_PASS_CHECK=PASS`。
+- **设备与证据**：MuMu `RD测试` / `127.0.0.1:16416` / Redmi `22041211A` / API32 /
+  `x86_64` / page size `4096`。完整原始证据仅保留在被忽略的
+  `out/verification/c6-t01a-rd-api32-20260902-r8/`；未将 logcat、screenshot、dumpsys、
+  raw trace、rerun directory 或 APK output 纳入 Git；`git diff --check` PASS，
+  `git ls-files out` 为空。
+- **实现提交 SHA**：`HEAD`（本任务全部修复、报告和账本随唯一提交落盘；精确 SHA 见
+  最终回执）。提交主题：`C6-T01A-R01: close API32 core smoke defects`。
+- **报告**：`reports/t57-r03/c6/C6_T01A_R01_API32_SMOKE_DEFECT_CLOSURE_REPORT.md`。
+- **剩余项**：D01-D06 无 unresolved API32 product defect；API33-37、真实 ARM64、16 KB
+  page-size 及更宽矩阵仍留给后续任务。
+- **下一任务**：`C6-T01B`；本条完成后停止，不自动开始 API33。

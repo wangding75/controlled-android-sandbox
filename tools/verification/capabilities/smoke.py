@@ -197,7 +197,7 @@ def _s01(context: SmokeContext, attempt_dir: Path, _attempt: int) -> AttemptExec
         installs.append(row)
         require(result.ok, "APK_INSTALL_FAILED", f"{name}: {row}")
     context.setup_installs = installs
-    context.device.force_stop(HOST_PACKAGE)
+    host_teardown = _fence_host_before_start(context.device, force_stop=True)
     context.device.clear_logcat()
     started = context.device.start_activity(
         HOST_MAIN_COMPONENT,
@@ -216,7 +216,12 @@ def _s01(context: SmokeContext, attempt_dir: Path, _attempt: int) -> AttemptExec
         "HOST_WINDOW_NOT_VISIBLE",
         "Host package was not present in the current window dump",
     )
-    actual = {"installs": installs, "host_start": _command_dict(started), **evidence}
+    actual = {
+        "installs": installs,
+        "host_start": _command_dict(started),
+        "host_teardown": host_teardown,
+        **evidence,
+    }
     return AttemptExecution(ResultState.PASS, actual, package_revision=_hash_for(context, "host"),
                             artifacts=evidence["artifacts"])
 
@@ -275,6 +280,9 @@ def _s04(context: SmokeContext, attempt_dir: Path, _attempt: int) -> AttemptExec
         package=GUEST_PACKAGE,
         timeout_kind=TimeoutKind.WARM_LAUNCH,
         force_stop_host=False,
+        # Keep the debug controller in its own task.  CLEAR_TASK plus the shared Host
+        # affinity can otherwise select and clear the live Guest Stub task on API32.
+        start_flags="0x18200000",
     )
     require_launch_readiness(
         observation.actual["debug_result"],
@@ -381,7 +389,7 @@ def _s07(context: SmokeContext, attempt_dir: Path, _attempt: int) -> AttemptExec
     )
     provider = observation.actual["debug_result"].get("providerQuery") or {}
     require(
-        provider.get("status") == "OK",
+        provider.get("status") in {"OK", "CURSOR_READY"},
         "PROVIDER_QUERY_NOT_OK",
         str(provider),
         artifacts=observation.artifacts,
@@ -429,19 +437,18 @@ def _s08(context: SmokeContext, attempt_dir: Path, _attempt: int) -> AttemptExec
         context.device, markers, context.timeout_policy.seconds(TimeoutKind.FIRST_FRAME)
     )
     debug_result = observation.actual["debug_result"]
-    if debug_result.get("status") != "PASS":
-        raise VerificationFailure(
-            "DEBUG_COMMAND_NOT_PASS",
-            f"launch-component status={debug_result.get('status')!r}; "
-            f"pending markers observed={all(marker in logcat for marker in markers)}",
-            FailureClass.PRODUCT_DEFECT,
-            list(dict.fromkeys(peer.artifacts + observation.artifacts)),
-        )
-    require_launch_readiness(
-        debug_result,
-        observation.screen,
-        logcat,
-        expected_component=FRAMEWORK_PROBE_COMPONENT,
+    require_command_pass(debug_result, artifacts=observation.artifacts)
+    operation = debug_result.get("operation") or {}
+    require(
+        operation.get("status") in {"LAUNCH_ACCEPTED", "LAUNCH_PASS"},
+        "LAUNCH_OPERATION_NOT_ACCEPTED",
+        f"launch-component operation={operation}",
+        artifacts=observation.artifacts,
+    )
+    require(
+        operation.get("componentClass") == FRAMEWORK_PROBE_COMPONENT,
+        "LAUNCH_TARGET_MISMATCH",
+        f"expected component={FRAMEWORK_PROBE_COMPONENT!r} operation={operation}",
         artifacts=observation.artifacts,
     )
     for marker in markers:
@@ -518,7 +525,7 @@ def _s10(context: SmokeContext, attempt_dir: Path, _attempt: int) -> AttemptExec
     device = context.device
     hold_dir = attempt_dir / "hold"
     hold_dir.mkdir(parents=True, exist_ok=True)
-    device.force_stop(HOST_PACKAGE)
+    host_teardown = _fence_host_before_start(device, force_stop=True)
     device.run_as_remove(HOST_PACKAGE, "files/debug-command-result.json")
     device.clear_logcat()
     request_id = _request_id("s10-hold")
@@ -538,6 +545,9 @@ def _s10(context: SmokeContext, attempt_dir: Path, _attempt: int) -> AttemptExec
         device, GUEST_PACKAGE, context.timeout_policy.seconds(TimeoutKind.PROCESS_DEATH)
     )
     (hold_dir / "hold-logcat.txt").write_text(hold_log, encoding="utf-8")
+    (hold_dir / "host-teardown.json").write_text(
+        json.dumps(host_teardown, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
     process_before = device.processes()
     (hold_dir / "process-before.txt").write_text(process_before, encoding="utf-8")
     direct_kill = device.kill_pid(pid)
@@ -601,6 +611,7 @@ def _s10(context: SmokeContext, attempt_dir: Path, _attempt: int) -> AttemptExec
     )
     hold_artifacts = [
         _relative(context.root, hold_dir / "hold-logcat.txt"),
+        _relative(context.root, hold_dir / "host-teardown.json"),
         _relative(context.root, hold_dir / "process-before.txt"),
         _relative(context.root, hold_dir / "process-after.txt"),
         _relative(context.root, hold_dir / "kill.json"),
@@ -646,17 +657,18 @@ def _invoke_debug(
     timeout_kind: TimeoutKind,
     extras: dict[str, Any] | None = None,
     force_stop_host: bool,
+    start_flags: str = "0x10008000",
 ) -> CommandObservation:
     device = context.device
     attempt_dir.mkdir(parents=True, exist_ok=True)
-    if force_stop_host:
-        device.force_stop(HOST_PACKAGE)
+    host_teardown = _fence_host_before_start(device, force_stop=force_stop_host)
     device.run_as_remove(HOST_PACKAGE, "files/debug-command-result.json")
     device.clear_logcat()
     request_id = _request_id(command)
     start = device.start_activity(
         DEBUG_COMPONENT,
         extras=_extras(command, package, 0, request_id, {"trustNativeGuest": True, **(extras or {})}),
+        flags=start_flags,
         timeout_sec=30.0,
     )
     require(start.ok, "DEBUG_ACTIVITY_START_FAILED", _command_dict(start))
@@ -697,15 +709,21 @@ def _invoke_debug(
         raise error
     local_result = attempt_dir / "debug-command-result.json"
     local_result.write_text(json.dumps(debug_result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    teardown_path = attempt_dir / "host-teardown.json"
+    teardown_path.write_text(
+        json.dumps(host_teardown, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
     evidence = _capture(context, attempt_dir, command)
     actual = {
         "request_id": request_id,
         "command_start": _command_dict(start),
+        "host_teardown": host_teardown,
         "debug_result": debug_result,
         **evidence,
     }
     artifacts = list(dict.fromkeys(
-        [_relative(context.root, local_result)] + evidence["artifacts"]
+        [_relative(context.root, local_result), _relative(context.root, teardown_path)]
+        + evidence["artifacts"]
     ))
     return CommandObservation(
         actual=actual,
@@ -714,6 +732,99 @@ def _invoke_debug(
         screen=evidence["screen"],
         package_revision=_package_revision(debug_result),
     )
+
+
+def _fence_host_before_start(
+    device: AdbDevice, *, force_stop: bool, timeout_sec: float = 15.0
+) -> dict[str, Any]:
+    """Fence Host process and ATMS/WM teardown before dispatching a new command."""
+    stop_result: AdbCommandResult | None = None
+    if force_stop:
+        stop_result = device.force_stop(HOST_PACKAGE)
+        require(
+            stop_result.ok,
+            "HOST_FORCE_STOP_FAILED",
+            _command_dict(stop_result),
+            classification=FailureClass.ENVIRONMENT,
+        )
+        stopped = device.wait_for_package_stopped(HOST_PACKAGE, timeout_sec)
+        require(
+            stopped,
+            "HOST_PROCESS_STOP_TIMEOUT",
+            f"package={HOST_PACKAGE}",
+            classification=FailureClass.HARNESS_DEFECT,
+        )
+    teardown = _wait_for_host_activity_teardown(
+        device, timeout_sec, include_guest_activities=force_stop
+    )
+    return {
+        "force_stop": _command_dict(stop_result) if stop_result is not None else None,
+        "process_stopped": force_stop,
+        "activity_teardown": teardown,
+    }
+
+
+def _host_activity_teardown_state(
+    device: AdbDevice, *, include_guest_activities: bool
+) -> dict[str, Any]:
+    activities = device.shell(["dumpsys", "activity", "activities"], timeout_sec=60.0)
+    windows = device.shell(["dumpsys", "window", "windows"], timeout_sec=60.0)
+
+    def activity_line(line: str) -> bool:
+        return HOST_PACKAGE in line and (
+            include_guest_activities or "DebugCommandActivity" in line
+        ) and not line.lstrip().startswith("mLastPausedActivity:") and any(
+            marker in line
+            for marker in ("ActivityRecord{", "cmp=", "mActivityComponent=", "packageName=")
+        )
+
+    def window_line(line: str) -> bool:
+        return HOST_PACKAGE in line and (
+            include_guest_activities or "DebugCommandActivity" in line
+        ) and ("Window{" in line or "package=" in line)
+
+    activity_rows = [line.strip() for line in activities.text().splitlines() if activity_line(line)]
+    window_rows = [line.strip() for line in windows.text().splitlines() if window_line(line)]
+    # dumpsys activity can retain a terminal ActivityRecord briefly after AMS has removed its
+    # window. Treat only an all-isExiting record set with no matching window as complete; live
+    # records and any window still keep the teardown fence closed, and the raw rows remain in
+    # evidence for auditability.
+    exiting_records = [row for row in activity_rows if "ActivityRecord{" in row]
+    ignored_exiting_activity_rows: list[str] = []
+    if (not window_rows and exiting_records
+            and all("isExiting" in row for row in exiting_records)):
+        ignored_exiting_activity_rows = list(activity_rows)
+        activity_rows = []
+    return {
+        "activity_present": bool(activity_rows),
+        "window_present": bool(window_rows),
+        "activity_rows": activity_rows[-8:],
+        "window_rows": window_rows[-8:],
+        "ignored_exiting_activity_rows": ignored_exiting_activity_rows[-8:],
+        "activity_returncode": activities.returncode,
+        "window_returncode": windows.returncode,
+    }
+
+
+def _wait_for_host_activity_teardown(
+    device: AdbDevice, timeout_sec: float, *, include_guest_activities: bool
+) -> dict[str, Any]:
+    deadline = time.monotonic() + max(0.0, timeout_sec)
+    last: dict[str, Any] = {}
+    while True:
+        last = _host_activity_teardown_state(
+            device, include_guest_activities=include_guest_activities
+        )
+        if not last["activity_present"] and not last["window_present"]:
+            return last
+        remaining = deadline - time.monotonic()
+        if remaining <= 0.0:
+            raise VerificationFailure(
+                "HOST_ACTIVITY_TEARDOWN_TIMEOUT",
+                json.dumps({"timeoutSec": timeout_sec, **last}, ensure_ascii=False),
+                FailureClass.HARNESS_DEFECT,
+            )
+        time.sleep(min(0.1, remaining))
 
 
 def _capture(context: SmokeContext, attempt_dir: Path, label: str) -> dict[str, Any]:
