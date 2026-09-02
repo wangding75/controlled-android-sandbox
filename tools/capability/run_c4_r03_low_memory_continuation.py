@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the C4-R03 matrix with the approved RD LOW_MEMORY continuation policy.
+"""Run the C4-R03 matrix with the approved RD continuation policies.
 
 The ordinary C4-R03 runner remains fail-fast and keeps every first failure authoritative.
 This wrapper adds the user-approved environment exception: when the failed launch has explicit
@@ -7,8 +7,10 @@ host-process ``ApplicationExitInfo`` reason ``LOW_MEMORY``, record the event, re
 dynamically resolved MuMu instance, rebootstrap the new Host/Guest owner, and invoke a
 separately recorded continuation from that exact target/user/iteration/mode.  Host
 ``LOW_MEMORY`` is non-blocking for this campaign and is not limited by an event count; the
-outer phase deadline still bounds the lane.  Any other first failure is returned unchanged
-and stops the lane.
+outer phase deadline still bounds the lane.  A concrete launch/Guest ``TimeoutException`` is
+also a performance-limited exception: preserve each full failure bundle and continue from the
+same coordinate with at most five explicit retries.  Generic collector/phase timeouts and all
+other first failures are returned unchanged and stop the lane.
 """
 
 from __future__ import annotations
@@ -40,6 +42,10 @@ DEFAULT_TARGETS = "fixture,dingtalk,quark,hongguo,fanqie"
 DEFAULT_USERS = "0,1"
 REASON_RE = re.compile(r"\bLOW_MEMORY\b", re.IGNORECASE)
 HOST_RE = re.compile(re.escape(HOST_PACKAGE), re.IGNORECASE)
+PERFORMANCE_TIMEOUT_RE = re.compile(
+    r"(?:java\.util\.concurrent\.)?TimeoutException\b", re.IGNORECASE,
+)
+PERFORMANCE_TIMEOUT_RETRY_BUDGET = 5
 RECOVERY_TIMEOUT_SECONDS = 300
 
 
@@ -161,6 +167,112 @@ def classify_low_memory_row(row: dict[str, Any]) -> dict[str, Any] | None:
         if key in row
     }
     return classify_low_memory({"blockedAt": blocked_at, "rows": [row]})
+
+
+def _timeout_result_evidence(row: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return explicit command-result TimeoutException fields, never generic log timeout text."""
+    command = row.get("commandResult")
+    if not isinstance(command, dict):
+        return []
+    if str(command.get("status") or "").upper() not in {"FAIL", "ERROR"}:
+        return []
+    result = command.get("result")
+    result = result if isinstance(result, dict) else {}
+    fields = (
+        ("commandResult.result.errorType", result.get("errorType")),
+        ("commandResult.result.errorMessage", result.get("errorMessage")),
+        ("commandResult.detail", command.get("detail")),
+    )
+    evidence: list[dict[str, Any]] = []
+    for field, value in fields:
+        text = str(value or "")
+        match = PERFORMANCE_TIMEOUT_RE.search(text)
+        if match:
+            evidence.append({"field": field, "value": text, "match": match.group(0)})
+    return evidence
+
+
+def classify_performance_timeout(summary: dict[str, Any]) -> dict[str, Any] | None:
+    """Classify only an explicit launch/Guest TimeoutException as a bounded retry boundary.
+
+    This deliberately does not classify ``debug-command-result timeout`` or a host-side
+    subprocess timeout.  Those are environment/phase boundaries and remain fail-closed under
+    their own policies.  The command result must identify a launch operation and the failed row
+    must already have been captured by the fail-fast R03 child.
+    """
+    row = failed_row(summary)
+    if row is None or not row.get("failureDetected"):
+        return None
+    evidence = _timeout_result_evidence(row)
+    if not evidence:
+        return None
+    result = (row.get("commandResult") or {}).get("result")
+    result = result if isinstance(result, dict) else {}
+    command_name = str(result.get("command") or "").lower()
+    if command_name not in {"", "launch"}:
+        return None
+    blocked = summary.get("blockedAt") or {}
+    return {
+        "classification": "PERFORMANCE_TIMEOUT",
+        "target": blocked.get("target"),
+        "user": blocked.get("user"),
+        "mode": blocked.get("mode"),
+        "iteration": blocked.get("iteration"),
+        "runnerClassification": blocked.get("classification"),
+        "requestId": row.get("requestId"),
+        "operationId": row.get("operationId"),
+        "runnerOperationId": row.get("runnerOperationId"),
+        "attempt": row.get("attempt"),
+        "rowArtifacts": row.get("artifacts"),
+        "evidence": evidence,
+        "policy": "NON_BLOCKING_RETRY_UP_TO_5_TIMES",
+        "retryBudget": PERFORMANCE_TIMEOUT_RETRY_BUDGET,
+    }
+
+
+def classify_performance_timeout_row(row: dict[str, Any]) -> dict[str, Any] | None:
+    """Classify one durable timeout row for continuation selection and seed reconstruction."""
+    blocked_at = {
+        key: row.get(key)
+        for key in ("target", "user", "mode", "iteration", "classification")
+        if key in row
+    }
+    return classify_performance_timeout({"blockedAt": blocked_at, "rows": [row]})
+
+
+def _coordinate_matches_event(event: dict[str, Any], wanted: tuple[str, int, int, str]) -> bool:
+    try:
+        return (
+            str(event.get("target", "")), int(event.get("user", -1)),
+            int(event.get("iteration", -1)), str(event.get("mode", "")),
+        ) == wanted
+    except (TypeError, ValueError):
+        return False
+
+
+def _seeded_performance_timeout_events(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Annotate durable timeout failures so a host interruption cannot reset the retry budget."""
+    seen: dict[tuple[str, int, int, str], int] = {}
+    events: list[dict[str, Any]] = []
+    for row in rows:
+        event = classify_performance_timeout_row(row)
+        if event is None:
+            continue
+        key = coordinate(row)
+        ordinal = seen.get(key, 0)
+        event.update({
+            "seeded": True,
+            "originalFailure": ordinal == 0,
+            "retryOrdinal": None if ordinal == 0 else ordinal,
+            "policyDecision": (
+                "SEEDED_ORIGINAL_TIMEOUT_OBSERVATION"
+                if ordinal == 0 else "SEEDED_TIMEOUT_RETRY_OBSERVATION"
+            ),
+            "sourceAttempt": row.get("attempt"),
+        })
+        events.append(event)
+        seen[key] = ordinal + 1
+    return events
 
 
 def environment_from_child(instance_name: str, child_dir: Path) -> dict[str, Any]:
@@ -454,6 +566,9 @@ def seed_existing_child(args: argparse.Namespace, child_dir: Path) -> dict[str, 
         "output": str(child_dir.resolve()),
         "summary": summary,
         "seededExisting": True,
+        "seededPerformanceTimeoutEvents": _seeded_performance_timeout_events(
+            [row for row in rows if isinstance(row, dict)]
+        ),
         "note": "Completed case.json rows are retained; the missing final summary represents a session interruption, not a test pass.",
     }
     write_json(args.output / "seed-existing-child.json", record)
@@ -482,6 +597,9 @@ def seed_existing_lane(args: argparse.Namespace, lane_dir: Path) -> dict[str, An
             event for event in (classify_low_memory_row(row) for row in rows)
             if event is not None
         ],
+        "seededPerformanceTimeoutEvents": _seeded_performance_timeout_events(
+            [row for row in rows if isinstance(row, dict)]
+        ),
         "note": (
             "All durable case.json rows across the prior attempts are retained. The missing "
             "host-phase summary represents a bounded session interruption, not a test pass."
@@ -492,7 +610,9 @@ def seed_existing_lane(args: argparse.Namespace, lane_dir: Path) -> dict[str, An
 
 
 def aggregate(args: argparse.Namespace, children: list[dict[str, Any]],
-              low_memory_events: list[dict[str, Any]], terminal_failure: dict[str, Any] | None) -> dict[str, Any]:
+              low_memory_events: list[dict[str, Any]],
+              performance_timeout_events: list[dict[str, Any]],
+              terminal_failure: dict[str, Any] | None) -> dict[str, Any]:
     terminal: dict[tuple[str, int, int, str], dict[str, Any]] = {}
     observations: list[dict[str, Any]] = []
     for child in children:
@@ -530,8 +650,18 @@ def aggregate(args: argparse.Namespace, children: list[dict[str, Any]],
             "lowMemoryPolicy": "NON_BLOCKING_RECORD_RESTART_AND_CONTINUE_UNTIL_PHASE_DEADLINE",
             "lowMemoryRecoveryCountLimited": False,
             "firstLowMemoryFailureRemainsAuthoritative": True,
+            "performanceTimeoutRetryBudget": PERFORMANCE_TIMEOUT_RETRY_BUDGET,
+            "performanceTimeoutPolicy": "NON_BLOCKING_RETRY_UP_TO_5_TIMES",
+            "performanceTimeoutRetries": sum(
+                1 for event in performance_timeout_events
+                if event.get("policyDecision") == "ACCEPT_TIMEOUT_AND_CONTINUE"
+                or event.get("policyDecision") == "SEEDED_TIMEOUT_RETRY_OBSERVATION"
+            ),
+            "performanceTimeoutRetryBudgetCounted": True,
+            "firstPerformanceTimeoutFailuresRemainAuthoritative": True,
         },
         "nonBlockingLowMemory": low_memory_events,
+        "nonBlockingPerformanceTimeouts": performance_timeout_events,
         "blockedAt": terminal_failure,
         "rows": rows,
         "observations": observations,
@@ -566,6 +696,7 @@ def main() -> int:
 
     children: list[dict[str, Any]] = []
     low_memory_events: list[dict[str, Any]] = []
+    performance_timeout_events: list[dict[str, Any]] = []
     resume: dict[str, Any] | None = None
     terminal_failure: dict[str, Any] | None = None
     attempt = 1
@@ -581,6 +712,9 @@ def main() -> int:
         if args.seed_existing_lane is not None:
             seeded = seed_existing_lane(args, seed)
             low_memory_events.extend(seeded.get("seededLowMemoryEvents") or [])
+            performance_timeout_events.extend(
+                seeded.get("seededPerformanceTimeoutEvents") or []
+            )
             resume_coordinate = (
                 getattr(args, "resume_target", ""), getattr(args, "resume_user", None),
                 getattr(args, "resume_iteration", None), getattr(args, "resume_mode", "")
@@ -592,6 +726,9 @@ def main() -> int:
             )
         else:
             seeded = seed_existing_child(args, seed)
+            performance_timeout_events.extend(
+                seeded.get("seededPerformanceTimeoutEvents") or []
+            )
         children.append(seeded)
         resume = {
             "target": args.resume_target,
@@ -623,63 +760,137 @@ def main() -> int:
         if int(child.get("returncode", 1)) == 0 and summary.get("status") == "PASS":
             break
         low_memory = classify_low_memory(summary)
-        if low_memory is None:
-            terminal_failure = {
-                "attempt": attempt,
-                "summaryStatus": summary.get("status", "MISSING"),
-                "returncode": child.get("returncode"),
-                "blockedAt": summary.get("blockedAt"),
-                "output": child.get("output"),
+        if low_memory is not None:
+            low_memory["attempt"] = attempt
+            low_memory["childOutput"] = child.get("output")
+            # MuMu/RD host memory pressure is an allowed environment boundary for this campaign.
+            # Keep every original failed row and restart dynamically; this is not a hidden launch
+            # retry.  The enclosing R05 phase timeout remains the only count-independent bound.
+            low_memory["recoveryOrdinal"] = len(low_memory_events) + 1
+            low_memory["policyDecision"] = "NON_BLOCKING_RECORD_RESTART_AND_CONTINUE"
+            recovery_dir = args.output / "low-memory-recovery" / f"event-{len(low_memory_events) + 1:03d}"
+            low_memory["restart"] = restart_mumu(args.instance_name, child_dir, recovery_dir)
+            low_memory_events.append(low_memory)
+            if low_memory["restart"].get("status") != "PASS":
+                terminal_failure = {
+                    "attempt": attempt,
+                    "classification": "LOW_MEMORY_RECOVERY_FAILED",
+                    "lowMemory": low_memory,
+                }
+                break
+            blocked = summary.get("blockedAt") or {}
+            resume = {
+                "target": blocked.get("target"),
+                "user": blocked.get("user"),
+                "iteration": blocked.get("iteration"),
+                "mode": blocked.get("mode"),
+                "previousLane": str(child_dir.resolve()),
             }
-            break
-        low_memory["attempt"] = attempt
-        low_memory["childOutput"] = child.get("output")
-        # MuMu/RD host memory pressure is an allowed environment boundary for this campaign.
-        # Keep every original failed row and restart dynamically; this is not a hidden launch
-        # retry.  The enclosing R05 phase timeout remains the only count-independent bound.
-        low_memory["recoveryOrdinal"] = len(low_memory_events) + 1
-        low_memory["policyDecision"] = "NON_BLOCKING_RECORD_RESTART_AND_CONTINUE"
-        recovery_dir = args.output / "low-memory-recovery" / f"event-{len(low_memory_events) + 1:03d}"
-        low_memory["restart"] = restart_mumu(args.instance_name, child_dir, recovery_dir)
-        low_memory_events.append(low_memory)
-        if low_memory["restart"].get("status") != "PASS":
-            terminal_failure = {
+            if not all(resume.get(key) not in (None, "") for key in ("target", "user", "iteration", "mode")):
+                terminal_failure = {
+                    "attempt": attempt,
+                    "classification": "LOW_MEMORY_RESUME_COORDINATE_MISSING",
+                    "lowMemory": low_memory,
+                }
+                break
+            attempt += 1
+            post_restart_rebootstrap = True
+            print(json.dumps({
+                "event": "LOW_MEMORY_NON_BLOCKING_RESTARTED",
                 "attempt": attempt,
-                "classification": "LOW_MEMORY_RECOVERY_FAILED",
-                "lowMemory": low_memory,
-            }
-            break
-        blocked = summary.get("blockedAt") or {}
-        resume = {
-            "target": blocked.get("target"),
-            "user": blocked.get("user"),
-            "iteration": blocked.get("iteration"),
-            "mode": blocked.get("mode"),
-            "previousLane": str(child_dir.resolve()),
-        }
-        if not all(resume.get(key) not in (None, "") for key in ("target", "user", "iteration", "mode")):
-            terminal_failure = {
-                "attempt": attempt,
-                "classification": "LOW_MEMORY_RESUME_COORDINATE_MISSING",
-                "lowMemory": low_memory,
-            }
-            break
-        attempt += 1
-        post_restart_rebootstrap = True
-        print(json.dumps({
-            "event": "LOW_MEMORY_NON_BLOCKING_RESTARTED",
-            "attempt": attempt,
-            "resume": resume,
-            "output": str(args.output),
-        }, ensure_ascii=False), flush=True)
+                "resume": resume,
+                "output": str(args.output),
+            }, ensure_ascii=False), flush=True)
+            continue
 
-    report = aggregate(args, children, low_memory_events, terminal_failure)
+        performance_timeout = classify_performance_timeout(summary)
+        if performance_timeout is not None:
+            blocked = summary.get("blockedAt") or {}
+            wanted = (
+                str(blocked.get("target", "")), int(blocked.get("user", -1)),
+                int(blocked.get("iteration", -1)), str(blocked.get("mode", "")),
+            )
+            prior_events = [
+                event for event in performance_timeout_events
+                if _coordinate_matches_event(event, wanted)
+            ]
+            prior_retry_count = sum(
+                1 for event in prior_events
+                if not bool(event.get("originalFailure"))
+            )
+            performance_timeout.update({
+                "attempt": attempt,
+                "childOutput": child.get("output"),
+                "originalFailure": not prior_events,
+                "retryOrdinal": prior_retry_count + 1,
+                "retryBudget": PERFORMANCE_TIMEOUT_RETRY_BUDGET,
+                "policyDecision": (
+                    "ACCEPT_TIMEOUT_AND_CONTINUE"
+                    if prior_retry_count < PERFORMANCE_TIMEOUT_RETRY_BUDGET
+                    else "TIMEOUT_RETRY_BUDGET_EXHAUSTED"
+                ),
+            })
+            performance_timeout_events.append(performance_timeout)
+            if prior_retry_count >= PERFORMANCE_TIMEOUT_RETRY_BUDGET:
+                terminal_failure = {
+                    "attempt": attempt,
+                    "classification": "PERFORMANCE_TIMEOUT_RETRY_BUDGET_EXHAUSTED",
+                    "summaryStatus": summary.get("status", "MISSING"),
+                    "returncode": child.get("returncode"),
+                    "blockedAt": blocked,
+                    "output": child.get("output"),
+                    "performanceTimeout": performance_timeout,
+                }
+                break
+            resume = {
+                "target": blocked.get("target"),
+                "user": blocked.get("user"),
+                "iteration": blocked.get("iteration"),
+                "mode": blocked.get("mode"),
+                "previousLane": str(child_dir.resolve()),
+            }
+            if not all(resume.get(key) not in (None, "") for key in ("target", "user", "iteration", "mode")):
+                terminal_failure = {
+                    "attempt": attempt,
+                    "classification": "PERFORMANCE_TIMEOUT_RESUME_COORDINATE_MISSING",
+                    "performanceTimeout": performance_timeout,
+                }
+                break
+            attempt += 1
+            # A performance timeout is not an emulator restart boundary.  Preserve any prior
+            # post-LOW_MEMORY rebootstrap result only for the first continuation after restart;
+            # subsequent timeout retries execute the exact launch coordinate directly.
+            post_restart_rebootstrap = False
+            print(json.dumps({
+                "event": "PERFORMANCE_TIMEOUT_RETRY_ACCEPTED",
+                "attempt": attempt,
+                "retryOrdinal": performance_timeout["retryOrdinal"],
+                "retryBudget": PERFORMANCE_TIMEOUT_RETRY_BUDGET,
+                "resume": resume,
+                "output": str(args.output),
+            }, ensure_ascii=False), flush=True)
+            continue
+
+        terminal_failure = {
+            "attempt": attempt,
+            "summaryStatus": summary.get("status", "MISSING"),
+            "returncode": child.get("returncode"),
+            "blockedAt": summary.get("blockedAt"),
+            "output": child.get("output"),
+        }
+        break
+
+    report = aggregate(
+        args, children, low_memory_events, performance_timeout_events, terminal_failure,
+    )
     write_json(args.output / "c4-r03-summary.json", report)
     print(json.dumps({
         "status": report["status"],
         "terminalRows": report["observedTerminalRows"],
         "expectedRows": report["expectedRows"],
         "lowMemoryRecoveries": len(low_memory_events),
+        "performanceTimeoutRetries": report["attemptPolicy"].get("performanceTimeoutRetries", 0),
+        "performanceTimeoutRetryBudget": PERFORMANCE_TIMEOUT_RETRY_BUDGET,
         "blockedAt": terminal_failure,
         "output": str(args.output),
     }, ensure_ascii=False, indent=2), flush=True)

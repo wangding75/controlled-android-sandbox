@@ -1,5 +1,11 @@
 # C4-R05 Host LOW_MEMORY 非阻断策略（2026-09-02）
 
+> 2026-09-02 追加执行覆盖：明确的启动/Guest `TimeoutException` 现按宿主机性能限制
+> 允许最多 5 次显式重试，具体分类和证据规则见
+> `docs/review/C4_R05_PERFORMANCE_TIMEOUT_RETRY_POLICY_20260902.md`。本文件关于 Host
+> `LOW_MEMORY` 的独立无限次数记录/恢复规则仍然有效；以下历史“不放宽”文字按该追加
+> 覆盖理解，不得用泛化 timeout 文本触发重试。
+
 ## 当前决定
 
 受 MuMu `RD测试` 宿主机性能限制，Host 进程的显式 `ApplicationExitInfo reason=3
@@ -20,9 +26,10 @@ rebootstrap 后，从原始失败的精确 target/user/iteration/mode 坐标继�
 
 `LOW_MEMORY` 的非阻断只改变环境事件的次数策略，不改变启动验收门槛。cold/hot
 `FIRST_FRAME_DRAWN` deadline、动态 Window/Surface/截图检查、add gate、两轮完整矩阵、
-回归和 30 分钟双用户短测均保持原任务书要求。没有 Host `LOW_MEMORY` 证据的黑屏、启动
-超时、添加失败、静态 marker、FATAL、ANR、非环境错误、恢复失败、坐标缺失或 phase
-deadline 到期，仍然立即 fail-closed。
+回归和 30 分钟双用户短测均保持原任务书要求。没有 Host `LOW_MEMORY` 证据且没有明确
+launch/Guest `TimeoutException` 类型的黑屏、启动失败、添加失败、静态 marker、FATAL、
+ANR、非环境错误、恢复失败、坐标缺失或 phase deadline 到期，仍然立即 fail-closed。
+明确 `TimeoutException` 仅按追加策略最多重试 5 次，不能扩大 SLO 或 phase deadline。
 
 每个 `LOW_MEMORY` 事件是独立的环境恢复记录，不是隐藏的 case 自动重试；原始失败行
 进入 `observations`，后续成功行只替换该坐标的 terminal observation，不删除历史失败。

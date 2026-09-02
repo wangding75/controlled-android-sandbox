@@ -25,7 +25,9 @@ from run_c4_r05_rd import (  # noqa: E402
     DEFAULT_PHASE_TIMEOUT_SECONDS,
 )
 from run_c4_r03_low_memory_continuation import (  # noqa: E402
+    PERFORMANCE_TIMEOUT_RETRY_BUDGET,
     classify_low_memory,
+    classify_performance_timeout_row,
     reconstruct_interrupted_lane,
     seed_existing_lane,
 )
@@ -35,6 +37,34 @@ from types import SimpleNamespace
 class C4R05OrchestratorTests(unittest.TestCase):
     def test_r05_phase_timeout_default_is_twelve_hours(self) -> None:
         self.assertEqual(DEFAULT_PHASE_TIMEOUT_SECONDS, 12 * 60 * 60)
+
+    def test_performance_timeout_exception_is_bounded_to_five_retries(self) -> None:
+        self.assertEqual(PERFORMANCE_TIMEOUT_RETRY_BUDGET, 5)
+        row = {
+            "task": "C4-R03", "target": "fanqie", "user": 0,
+            "iteration": 4, "mode": "cold", "failureDetected": True,
+            "requestId": "request-1", "operationId": "request-1-launch",
+            "commandResult": {
+                "status": "FAIL",
+                "result": {
+                    "command": "launch",
+                    "errorType": "java.lang.IllegalStateException",
+                    "errorMessage": (
+                        "launch failed: errorType=java.util.concurrent.TimeoutException"
+                    ),
+                },
+            },
+        }
+        event = classify_performance_timeout_row(row)
+        self.assertIsNotNone(event)
+        self.assertEqual(event["classification"], "PERFORMANCE_TIMEOUT")
+        self.assertEqual(event["retryBudget"], 5)
+        generic_timeout = dict(row)
+        generic_timeout["commandResult"] = {
+            "status": "ERROR",
+            "detail": "RD_ENVIRONMENT_RESOLUTION_BLOCKED: debug-command-result timeout",
+        }
+        self.assertIsNone(classify_performance_timeout_row(generic_timeout))
 
     def test_launch_matrix_passes_phase_timeout_to_child_and_host_boundary(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -152,6 +182,51 @@ class C4R05OrchestratorTests(unittest.TestCase):
             self.assertTrue(continuation["complete"])
             self.assertEqual(continuation["recoveredEnvironmentCoordinates"],
                              [["dingtalk", 0, 1, "cold"]])
+
+    def test_performance_timeout_row_is_resumable_and_replaced_only_by_later_observation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            lane = Path(temporary) / "launch-matrix"
+            failed_dir = lane / "attempt-001" / "attempts" / "fanqie" / "user-0" / "cold-001"
+            passed_dir = lane / "attempt-002" / "attempts" / "fanqie" / "user-0" / "cold-001"
+            hot_dir = lane / "attempt-002" / "attempts" / "fanqie" / "user-0" / "hot-001"
+            failed_dir.mkdir(parents=True)
+            failed = {
+                "task": "C4-R03", "target": "fanqie", "user": 0,
+                "iteration": 1, "mode": "cold", "failureDetected": True,
+                "commandResult": {
+                    "status": "FAIL",
+                    "result": {
+                        "command": "launch",
+                        "errorType": "java.lang.IllegalStateException",
+                        "errorMessage": "errorType=java.util.concurrent.TimeoutException",
+                    },
+                },
+            }
+            passed = {
+                "task": "C4-R03", "target": "fanqie", "user": 0,
+                "iteration": 1, "mode": "cold", "failureDetected": False,
+            }
+            hot = {
+                "task": "C4-R03", "target": "fanqie", "user": 0,
+                "iteration": 1, "mode": "hot", "failureDetected": False,
+            }
+            (failed_dir / "case.json").write_text(json.dumps(failed), encoding="utf-8")
+            first = launch_continuation(lane, "fanqie", "0", 1)
+
+            passed_dir.mkdir(parents=True)
+            hot_dir.mkdir(parents=True)
+            (passed_dir / "case.json").write_text(json.dumps(passed), encoding="utf-8")
+            (hot_dir / "case.json").write_text(json.dumps(hot), encoding="utf-8")
+            second = launch_continuation(lane, "fanqie", "0", 1)
+
+        self.assertEqual(first["target"], "fanqie")
+        self.assertEqual(first["iteration"], 1)
+        self.assertEqual(first["mode"], "cold")
+        self.assertEqual(first["performanceTimeoutInterruption"]["retryBudget"], 5)
+        self.assertTrue(first["performanceTimeoutInterruption"]["originalFailurePreserved"])
+        self.assertTrue(second["complete"])
+        self.assertEqual(second["recoveredPerformanceTimeoutCoordinates"],
+                         [["fanqie", 0, 1, "cold"]])
 
     def test_full_lane_seed_preserves_low_memory_failure_and_recovery_rows(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

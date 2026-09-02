@@ -1,5 +1,10 @@
 # C4-R05 formal matrix: Fanqie cold-004 non-LOW_MEMORY failure
 
+> 本文件首段和原始分类是历史首失败记录，保留其 `BLOCKED` 时点事实，不因后续续接而
+> 删除或改写。2026-09-02 用户随后批准了明确 `TimeoutException` 的 5 次性能异常重试；
+> 该决定见 `docs/review/C4_R05_PERFORMANCE_TIMEOUT_RETRY_POLICY_20260902.md`，并只改变
+> 当前续接策略，不改变以下原始证据。
+
 - **Task / status**: `C4-R05` / `BLOCKED`; this is not a completion receipt and does not close C4.
 - **Failure kind**: first non-`LOW_MEMORY` terminal failure after the durable-lane continuation.
 - **Observed local time**: `2026-09-02 11:34:27.141` request start; command failure at
@@ -114,3 +119,19 @@ startup boundary, a clean pushed commit, and a new fail-closed continuation from
 coordinate while preserving this original failure. Host `LOW_MEMORY` remains independently
 non-blocking per the campaign policy: each such event is recorded and dynamically recovered,
 but it does not authorize this non-`LOW_MEMORY` timeout to pass.
+
+## Policy overlay and current continuation decision (2026-09-02)
+
+The historical observation above remains authoritative: it is a real request-scoped launch
+failure, with no first frame and no Host `LOW_MEMORY`. The user has now classified this specific
+kind of explicit launch/Guest `TimeoutException` as a host-performance exception that may be
+retried at most five times. The current occurrence is therefore **accepted as retryable**, not
+as a PASS and not as a root-cause closure.
+
+The continuation wrapper now accepts only a failed launch result containing the explicit
+`TimeoutException` type, preserves every full failure bundle, and launches the same coordinate in
+a separate attempt. A generic collector timeout, phase timeout, black screen, missing window or
+any non-timeout failure remains fail-closed. If a later observation reaches the real
+`FIRST_FRAME_DRAWN` contract, it may replace this coordinate's terminal row while the original
+failure stays in `observations`; if five retries are exhausted, the lane is blocked with
+`PERFORMANCE_TIMEOUT_RETRY_BUDGET_EXHAUSTED`.

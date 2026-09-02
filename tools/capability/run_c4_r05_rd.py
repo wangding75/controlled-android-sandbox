@@ -4,13 +4,15 @@
 The orchestrator owns the C4-R05 evidence boundary.  It builds one commit, resolves the
 MuMu instance by name, runs the configured stage or overall acceptance rounds, and stops at the
 first non-PASS phase.  The launch-matrix child delegates its individual observations to
-``run_c4_r03_rd.py`` and has one explicit environment exception: a host-scoped LOW_MEMORY
-exit is recorded, the emulator is restarted, and the matrix continues from a separately
-recorded coordinate.  Child campaigns keep their own request-scoped raw evidence; this runner
-records the command, summary, commit and phase decision without turning a later observation into
-an automatic retry.  If the bounded host-side phase envelope expires, the complete child process
-tree is terminated before durable-lane classification or continuation so a stale nested child
-cannot overlap the next APK install/rebootstrap operation.
+``run_c4_r03_rd.py`` and has two explicit performance/environment boundaries: a host-scoped
+LOW_MEMORY exit is recorded, the emulator is restarted, and the matrix continues from a
+separately recorded coordinate; a concrete launch/Guest TimeoutException is preserved and
+retried from that exact coordinate at most five times.  Child campaigns keep their own
+request-scoped raw evidence; this runner records the command, summary, commit and phase
+decision without hiding a retry or changing the launch readiness SLO.  If the bounded host-side
+phase envelope expires, the complete child process tree is terminated before durable-lane
+classification or continuation so a stale nested child cannot overlap the next APK
+install/rebootstrap operation.
 """
 
 from __future__ import annotations
@@ -35,7 +37,11 @@ if str(TOOLS) not in sys.path:
 
 from run_p1_00_rd import debug_command  # noqa: E402
 from run_c4_r03_rd import capture_snapshot  # noqa: E402
-from run_c4_r03_low_memory_continuation import restart_mumu  # noqa: E402
+from run_c4_r03_low_memory_continuation import (  # noqa: E402
+    PERFORMANCE_TIMEOUT_RETRY_BUDGET,
+    classify_performance_timeout_row,
+    restart_mumu,
+)
 from run_rd_campaign import (  # noqa: E402
     GUEST_PACKAGE,
     HOST_PACKAGE,
@@ -239,6 +245,11 @@ def is_host_low_memory_interruption(row: dict[str, Any]) -> bool:
     )
 
 
+def is_performance_timeout_interruption(row: dict[str, Any]) -> bool:
+    """Allow only an explicit launch/Guest TimeoutException as a bounded case continuation."""
+    return classify_performance_timeout_row(row) is not None
+
+
 def find_command_record(output: Path, label: str) -> dict[str, Any]:
     for path in sorted((output / "commands").glob("*.json")):
         record = read_summary(path)
@@ -262,6 +273,7 @@ def launch_continuation(lane: Path, targets: str, users: str, loops: int) -> dic
     sources: dict[tuple[str, int, int, str], Path] = {}
     duplicates: list[tuple[str, int, int, str]] = []
     recovered_environment_coordinates: list[tuple[str, int, int, str]] = []
+    recovered_performance_timeout_coordinates: list[tuple[str, int, int, str]] = []
     latest_child = attempt_dirs[-1]
     for child in attempt_dirs:
         child_has_rows = False
@@ -277,8 +289,20 @@ def launch_continuation(lane: Path, targets: str, users: str, loops: int) -> dic
                 # A later, successful observation may replace exactly one durable device-loss
                 # row.  The original row remains in its prior attempt and is still included by
                 # the child aggregate's observations; only the terminal coordinate is updated.
-                if is_environment_interruption(previous) and not row.get("failureDetected"):
+                previous_environment = is_environment_interruption(previous)
+                previous_timeout = is_performance_timeout_interruption(previous)
+                current_environment = is_environment_interruption(row)
+                current_timeout = is_performance_timeout_interruption(row)
+                if previous_environment and not row.get("failureDetected"):
                     recovered_environment_coordinates.append(coordinate)
+                elif previous_timeout and not row.get("failureDetected"):
+                    recovered_performance_timeout_coordinates.append(coordinate)
+                elif ((previous_environment or previous_timeout)
+                      and (current_environment or current_timeout)):
+                    # A later bounded environment/timeout observation may still be a failure;
+                    # retain it as the latest terminal row so the child wrapper can enforce its
+                    # own explicit recovery/retry budget.  This is not a PASS substitution.
+                    pass
                 else:
                     duplicates.append(coordinate)
             observed[coordinate] = row
@@ -335,6 +359,29 @@ def launch_continuation(lane: Path, targets: str, users: str, loops: int) -> dic
                         "evidence": host_low_memory_evidence(row) if low_memory else [],
                     },
                 }
+            if is_performance_timeout_interruption(row):
+                timeout = classify_performance_timeout_row(row) or {}
+                target, user, iteration, mode = coordinate
+                return {
+                    "previousLane": str(latest_child.resolve()),
+                    "seedLane": str(lane.resolve()),
+                    "target": target,
+                    "user": user,
+                    "iteration": iteration,
+                    "mode": mode,
+                    "completedRows": len(observed) - 1,
+                    "expectedRows": len(expected),
+                    "attempts": [str(path.resolve()) for path in attempt_dirs],
+                    "performanceTimeoutInterruption": {
+                        "coordinate": list(coordinate),
+                        "source": str(sources[coordinate].resolve()),
+                        "classification": "PERFORMANCE_TIMEOUT",
+                        "originalFailurePreserved": True,
+                        "retryBudget": PERFORMANCE_TIMEOUT_RETRY_BUDGET,
+                        "policyDecision": "CONTINUE_UP_TO_5_EXPLICIT_RETRIES",
+                        "evidence": timeout.get("evidence", []),
+                    },
+                }
             raise PhaseFailure("launch-continuation", "existing lane contains a non-terminal failure",
                                {"coordinate": coordinate, "row": row,
                                 "source": str(sources[coordinate].resolve())})
@@ -349,6 +396,10 @@ def launch_continuation(lane: Path, targets: str, users: str, loops: int) -> dic
     if recovered_environment_coordinates:
         result["recoveredEnvironmentCoordinates"] = [list(item)
                                                      for item in recovered_environment_coordinates]
+    if recovered_performance_timeout_coordinates:
+        result["recoveredPerformanceTimeoutCoordinates"] = [
+            list(item) for item in recovered_performance_timeout_coordinates
+        ]
     return result
 
 
