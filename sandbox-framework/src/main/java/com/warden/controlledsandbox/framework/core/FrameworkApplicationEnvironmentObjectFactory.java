@@ -83,14 +83,27 @@ final class FrameworkApplicationEnvironmentObjectFactory {
                         new Class<?>[]{boolean.class, float.class}, new Object[]{false, 1.0f});
             }
             Class<?> internalType = Class.forName("android.content.pm.LauncherActivityInfoInternal");
-            Object internal = construct(internalType,
-                    new Class<?>[]{ActivityInfo.class, incrementalType, UserHandle.class},
-                    new Object[]{activity, incremental,
-                            userHandle(UserHandle.class, identity.virtualUserId())});
+            // Android 16 images in the campaign carry the provider's user and archived-state
+            // bit in a four-argument constructor. Prefer that actual API 36 shape, while
+            // retaining the two- and three-argument forms used by older platform branches.
+            Object internal = null;
+            if (android.os.Build.VERSION.SDK_INT >= 36) {
+                internal = construct(internalType,
+                        new Class<?>[]{ActivityInfo.class, incrementalType, UserHandle.class,
+                                boolean.class},
+                        new Object[]{activity, incremental,
+                                userHandle(UserHandle.class, identity.virtualUserId()), false});
+            }
             if (internal == null) {
                 internal = construct(internalType,
-                    new Class<?>[]{ActivityInfo.class, incrementalType},
-                    new Object[]{activity, incremental});
+                        new Class<?>[]{ActivityInfo.class, incrementalType},
+                        new Object[]{activity, incremental});
+            }
+            if (internal == null) {
+                internal = construct(internalType,
+                        new Class<?>[]{ActivityInfo.class, incrementalType, UserHandle.class},
+                        new Object[]{activity, incremental,
+                                userHandle(UserHandle.class, identity.virtualUserId())});
             }
             if (incremental != null && internal != null) return internal;
             throw unsupported("LAUNCHER_ACTIVITY_INTERNAL", internalType);
@@ -261,7 +274,7 @@ final class FrameworkApplicationEnvironmentObjectFactory {
             Constructor<?> constructor = type.getDeclaredConstructor(parameterTypes);
             constructor.setAccessible(true);
             return constructor.newInstance(values);
-        } catch (Throwable ignored) { return null; }
+        } catch (ReflectiveOperationException | RuntimeException ignored) { return null; }
     }
 
     private static Object read(Object target, String... names) {

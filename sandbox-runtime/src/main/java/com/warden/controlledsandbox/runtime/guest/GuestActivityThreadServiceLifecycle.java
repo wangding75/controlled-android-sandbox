@@ -42,7 +42,8 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
     private static final int SERVICE_DONE_EXECUTING_ANON = 0;
     private static final int SERVICE_DONE_EXECUTING_START = 1;
     private static final int SERVICE_DONE_EXECUTING_STOP = 2;
-    private static final int SERVICE_DONE_EXECUTING_UNBIND = 3;
+    private static final int SERVICE_DONE_EXECUTING_UNBIND_API35 = 3;
+    private static final int SERVICE_DONE_EXECUTING_UNBIND_API36 = 4;
     private static final int START_TASK_REMOVED_COMPLETE = 1000;
 
     private final GuestRuntimeEnvironment.Session session;
@@ -301,9 +302,9 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
     }
 
     /**
-     * API32's CREATE_SERVICE packet has no start Intent. The first BIND_SERVICE/SERVICE_ARGS
-     * packet does carry our route, so replace the framework-created Stub object at that token
-     * before dispatching the actual Guest callback.
+     * API32 and API36 CREATE_SERVICE packets have no start Intent. The first
+     * BIND_SERVICE/SERVICE_ARGS packet does carry our route, so replace the framework-created
+     * Stub object at that token before dispatching the actual Guest callback.
      */
     private void promoteCreatedService(IBinder token, Intent hostIntent) throws Exception {
         Object data = mapGet(servicesData, token);
@@ -426,7 +427,7 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
             // but it must never call Service.onUnbind(): Android only delivers that callback for
             // the final live binding record.  Calling it for an unknown intent corrupts
             // doRebind state and can destroy a Service that still has another client.
-            unbindFinished(record.token, hostIntent, false);
+            serviceDone(record.token, serviceDoneExecutingUnbindType(), 0, 0, hostIntent);
             android.util.Log.w("CS_SERVICE_FRAMEWORK",
                     "ignored unbind for unknown filtered Intent component=" + record.className);
             logLifecycle("GUEST_SERVICE_FRAMEWORK_UNBIND_IGNORED", record, "UNKNOWN_INTENT");
@@ -440,13 +441,13 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
         FrameworkServiceBindingLedger.UnbindResult unbound =
                 record.bindings.unbindAndReport(intent, rebind);
         // Android 15 split the completion contract: a rebind request still uses
-        // unbindFinished(), while an ordinary onUnbind(false) uses the API35
-        // serviceDoneExecuting(..., serviceIntent) transaction.  Keep the pre-35
-        // acknowledgement unchanged because those framework contracts use unbindFinished()
-        // for both branches.
+        // unbindFinished(), while an ordinary onUnbind(false) uses the API35+
+        // serviceDoneExecuting(..., serviceIntent) transaction. Android 16 changes
+        // unbindFinished() to carry only the filtered Intent instead of the
+        // Intent/rebind boolean pair, so preserve both shapes at this boundary.
         boolean rebindRequested = unbound.lastClient() && unbound.rebindPending();
         if (Build.VERSION.SDK_INT >= 35 && !rebindRequested) {
-            serviceDone(record.token, SERVICE_DONE_EXECUTING_UNBIND, 0, 0, hostIntent);
+            serviceDone(record.token, serviceDoneExecutingUnbindType(), 0, 0, hostIntent);
         } else {
             unbindFinished(record.token, hostIntent, rebindRequested);
         }
@@ -741,12 +742,25 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
         }
     }
 
+    private static int serviceDoneExecutingUnbindType() {
+        return Build.VERSION.SDK_INT >= 36
+                ? SERVICE_DONE_EXECUTING_UNBIND_API36
+                : SERVICE_DONE_EXECUTING_UNBIND_API35;
+    }
+
     private void publishService(IBinder token, Intent intent, IBinder binder) throws Exception {
         invokeActivityManager("publishService", token, intent, binder);
     }
 
     private void unbindFinished(IBinder token, Intent intent, boolean rebind) throws Exception {
-        invokeActivityManager("unbindFinished", token, intent, rebind);
+        if (Build.VERSION.SDK_INT >= 36) {
+            // The API36 runtime image used by this lane carries no bindToken field in its
+            // ActivityThread.BindServiceData. Its unbindFinished transaction is keyed by the
+            // filtered Intent, while API35 and earlier also carry the rebind boolean.
+            invokeActivityManager("unbindFinished", token, intent);
+        } else {
+            invokeActivityManager("unbindFinished", token, intent, rebind);
+        }
     }
 
     private void invokeActivityManager(String name, Object... args) throws Exception {

@@ -4298,3 +4298,56 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   `reports/t57-r03/c6/C6_T01D_API35_CONVERGENCE_REPORT.md`。完成后只创建一个主题为
   `C6-T01D: converge Android API35 platform behavior` 的提交并推送当前分支。
 - **下一任务**：`C6-T01E`；本条完成后停止，不自动开始 API36。
+
+### C6-T01E：Android API36 Platform Convergence（2026-09-03）
+
+- **状态**：`DONE`；`RESULT=PASS`。父任务 `C6-T01` 仍为 `IN_PROGRESS`；本条完成后停止，
+  不启动 API37 或 C6-T02 专项。
+- **开始基线**：分支 `feature/t57-r03-va-pro-capability-campaign`，
+  `START_BASELINE_HEAD=3e8a8fa3953b09313994d43eff1ef2dd1901e009`；进入本条时工作区
+  clean。task book 未修改。
+- **API36 正式设备**：`T57_R03_API36_x86_64` / `emulator-5564` / Pixel 6 / Google APIs；
+  Android 16 / API36；x86_64，ABI list `x86_64,arm64-v8a`；page size `4096`；
+  fingerprint `google/sdk_gphone64_x86_64/emu64xa:16/BE2A.250530.026.F3/13894323:userdebug/dev-keys`。
+  headless 启动使用 `-no-window -no-audio -no-boot-anim -no-snapshot -wipe-data
+  -gpu swiftshader_indirect`。
+- **构建边界**：正式产物 `compileSdk=36`、`targetSdk=35`、`minSdk=26`；targetSdk36
+  仅用于单 flag/受控兼容探针，结束后恢复 targetSdk35 并重建、重装、复验。
+- **Baseline-first**：API36 Lane A corrected baseline
+  `c6-t01e-api36-baseline-lane-a` 为 `10 total / 5 PASS / 5 FAIL / 0 SKIP`，其中
+  S03/S08/S09/S10 为 API36 product launch-gate failure、S04 为当轮环境 timeout；
+  capability baseline 为 `8 total / 4 PASS / 3 FAIL / 1 SKIP`。未通过降低 assertion 或
+  diagnostic retry 掩盖。
+- **API36 修复**：完成 exact `java.lang.Runtime` nativeLoad hidden-API exemption；
+  Guest WebView provider APK paths 注入 Guest-owned AssetManager；按 actual API36
+  `LauncherActivityInfoInternal` 四参构造器适配；按 API36 service unbind/completion
+  transaction shape（unbind code 4、two-arg `unbindFinished`、filtered Intent key）适配。
+  同时增强 capability post-marker logcat 合并，防止 marker 后 FATAL/ANR false pass。
+- **Lane A 最终结果**：正式 targetSdk35 的 API36 S01–S10
+  `c6-t01e-final-api36-post-target35-rebuild` 为 `10/10 PASS`；清理 Host/Guest/fixture
+  后 capability `c6-t01e-final-api36-capabilities-post-target35-rebuild-clean` 为
+  `8 total / 7 PASS / 0 FAIL / 1 SKIP`，唯一 skip 为 `CAP-APPWIDGET-DYNAMIC`。
+- **Lane B**：逐个只启用一个 flag、执行 suite、reset 并验证 override 清空：
+  `288912692` STPE、`377864165` edge-to-edge、`161252188` safer intents、`29623414`
+  intent redirection、`356174596` hidden send-intent、`349487600` network 均最终 PASS；
+  `343977174` MediaStore 因当前无 dynamic fixture 记 SKIP，但 enable/reset 已验证。
+  未启用 `374323858`/`341201311` quota bypass。
+- **targetSdk36 探针**：受控 targetSdk36 APK 的 S01–S10
+  `c6-t01e-target36-predictive-back-probe` 为 `10/10 PASS`，观察到 API36
+  CoreBackPreview/`OnBackInvokedCallbackInfo`；正式 targetSdk35 已恢复。明确记录
+  `TARGET36_MIGRATION_REQUIRED`：fixture-only `TaskProbeEvidence` 仍有 direct
+  `onBackPressed()` helper，永久 targetSdk36 前迁移到 `OnBackInvokedDispatcher`；CAS
+  production core 无 legacy back hook。
+- **16 KB**：当前 Host/fixture APK 的 19 个 ELF 全部 `PT_LOAD=0x4000`（`19/19 PASS`），
+  三份 APK `zipalign -P 16` 全 PASS，manifest 无 `android:pageSizeCompat`；API36 runtime
+  为 4 KB。动态 16 KB/ARM64/cross-bitness 留给 C6-T02，未将静态结果冒充动态 PASS。
+- **跨版本回归**：API35、API34、API33 Google APIs x86_64 AVD 与 API32 MuMu `RD测试`
+  最终 S01–S10 均为 `10/10 PASS`；API32 含 S04–S09 mandatory regression。API36
+  Companion32 因无 32-bit ABI 显式记 `UNSUPPORTED_PLATFORM`。
+- **质量门禁**：`gradlew projects`、`assembleDebug`、`test`、Python unittest `7/7`、
+  `compileall`、`git diff --check`、harness false-pass test、ref unchanged 均 PASS；
+  raw evidence 仅留 ignored `out/verification`，报告不嵌入大日志。
+- **报告与提交**：详细报告为
+  `reports/t57-r03/c6/C6_T01E_API36_CONVERGENCE_REPORT.md`。完成后只创建一个主题为
+  `C6-T01E: converge Android API36 platform behavior` 的提交并推送当前分支。
+- **下一任务**：`C6-T02`；本条完成后停止。

@@ -28,6 +28,7 @@ from .core.policy import HarnessTimeout, RetryPolicy, TimeoutKind, TimeoutPolicy
 from .core.runner import AttemptExecution, run_case
 from .device.screen import inspect_png
 from .reporting.summary import build_summary, render_compact_report
+from .run_api33_capabilities import _merge_case_logcat
 
 
 def _chunk(kind: bytes, body: bytes) -> bytes:
@@ -210,6 +211,14 @@ class HarnessContractTests(unittest.TestCase):
         self.assertIn("S01", report)
         self.assertNotIn("SECRET_RAW_LOG", report)
         self.assertNotIn("SUCCESS_WITH_WARNING", report)
+
+    def test_capability_scan_keeps_post_marker_crash_evidence(self) -> None:
+        logcat = _merge_case_logcat(
+            "FRAMEWORK_PROBE_PASS",
+            "FATAL EXCEPTION: main\nProcess: com.warden.controlledsandbox.fixture",
+        )
+        self.assertIn("FRAMEWORK_PROBE_PASS", logcat)
+        self.assertIn("FATAL EXCEPTION", logcat)
 
 
 if __name__ == "__main__":

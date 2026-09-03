@@ -1,4 +1,4 @@
-"""Run the API33/API34/API35 extension capability suite and persist compact local evidence.
+"""Run the API33/API34/API35/API36 extension capability suite and persist compact local evidence.
 
 The suite deliberately reuses the same DebugCommandActivity surface and fixture
 components as the S01-S10 contract.  It records complete device evidence under
@@ -57,7 +57,7 @@ def _now() -> str:
 
 def _install_required(device: AdbDevice, apk_paths: dict[str, Path]) -> list[dict[str, Any]]:
     installs: list[dict[str, Any]] = []
-    # API33/API34/API35 x86_64 lanes intentionally omit the 32-bit Companion.  The
+    # API33/API34/API35/API36 x86_64 lanes intentionally omit the 32-bit Companion.  The
     # compat32 fixture includes an x86_64 variant only so package/PMS/cross-package
     # identity can still be tested; cross-bitness remains C6-T02 scope.
     for name in ("host", "fixture", "fixture32"):
@@ -108,6 +108,12 @@ def _wait_for_all(device: AdbDevice, markers: tuple[str, ...], timeout: float) -
     return _wait_for_markers(device, markers, timeout)
 
 
+def _merge_case_logcat(*snapshots: str) -> str:
+    """Keep both the marker-wait window and the post-marker crash window for one case."""
+
+    return "\n".join(snapshot for snapshot in snapshots if snapshot)
+
+
 def _check_case(
     context: SmokeContext,
     run_dir: Path,
@@ -124,13 +130,23 @@ def _check_case(
     started = time.monotonic()
     artifacts: list[str] = []
     logcat = ""
+    post_marker_logcat = ""
     result: dict[str, Any] = {}
     errors: list[str] = []
     try:
         if component is None:
             raise RuntimeError("COMPONENT_NOT_CONFIGURED")
+        # Bound forbidden-marker checks to this case.  The device log buffer is shared across
+        # launches, so reading it without a pre-launch clear can attribute an earlier guest
+        # crash to a later, otherwise clean capability result.
+        context.device.clear_logcat()
         result, _initial_log, artifacts = _launch_component(context, case_dir, component, extras)
-        logcat = _wait_for_all(context.device, required, wait_seconds)
+        marker_logcat = _wait_for_all(context.device, required, wait_seconds)
+        # A guest crash can happen after the last required marker.  Capture a second bounded
+        # snapshot before teardown so forbidden-marker checks remain fail-closed and the evidence
+        # explains the result instead of relying on the initial launch snapshot.
+        post_marker_logcat = context.device.logcat(timeout_sec=60.0)
+        logcat = _merge_case_logcat(marker_logcat, post_marker_logcat)
         missing = [marker for marker in required if marker not in logcat]
         if any_required and not any(marker in logcat for marker in any_required):
             missing.append("ANY_OF:" + "|".join(any_required))
@@ -142,9 +158,15 @@ def _check_case(
         status = "FAIL"
         errors.append(f"{error.__class__.__name__}:{error}")
         try:
-            logcat = context.device.logcat(timeout_sec=60.0)
+            post_marker_logcat = context.device.logcat(timeout_sec=60.0)
+            logcat = _merge_case_logcat(logcat, post_marker_logcat)
         except Exception as log_error:
             errors.append(f"LOGCAT_CAPTURE_FAILED:{log_error}")
+    if post_marker_logcat:
+        case_dir.mkdir(parents=True, exist_ok=True)
+        post_marker_path = case_dir / "post-marker-logcat.txt"
+        post_marker_path.write_text(post_marker_logcat, encoding="utf-8")
+        artifacts.append(post_marker_path.relative_to(ROOT).as_posix())
     if not artifacts:
         try:
             captured = _capture(context, case_dir / "failure", case_id)
@@ -349,9 +371,9 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
     run_id = args.run_id or dt.datetime.now().strftime("%Y%m%dT%H%M%SZ")
     run_dir = (Path(args.output_root).resolve() / run_id)
     run_dir.mkdir(parents=True, exist_ok=True)
-    if args.api34 and args.api35:
-        raise DeviceMetadataError("API34_AND_API35_FLAGS_ARE_MUTUALLY_EXCLUSIVE")
-    expected_api = 35 if args.api35 else 34 if args.api34 else 33
+    if sum(bool(value) for value in (args.api34, args.api35, args.api36)) > 1:
+        raise DeviceMetadataError("API34_API35_API36_FLAGS_ARE_MUTUALLY_EXCLUSIVE")
+    expected_api = 36 if args.api36 else 35 if args.api35 else 34 if args.api34 else 33
     device = AdbDevice(args.serial, root=ROOT)
     apk_paths = _apk_paths(include_companion32=False)
     metadata = collect_device_metadata(
@@ -553,6 +575,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--instance-name", default="C6_T01B_API33_GoogleApis_x86_64")
     parser.add_argument("--api34", action="store_true", help="Require API 34 x86_64/4096 device contract")
     parser.add_argument("--api35", action="store_true", help="Require API 35 x86_64/4096 device contract")
+    parser.add_argument("--api36", action="store_true", help="Require API 36 x86_64/4096 device contract")
     parser.add_argument("--run-id", default="")
     parser.add_argument("--output-root", default=str(DEFAULT_OUTPUT_ROOT))
     return parser

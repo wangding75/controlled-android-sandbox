@@ -28,8 +28,11 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.util.HashMap;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.lang.reflect.Method;
 import com.warden.controlledsandbox.contract.VirtualPackageProjectionSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import java.util.concurrent.Executor;
@@ -179,6 +182,12 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     }
     void configureWebViewProvider(String providerPackage) {
         webViewProviderServices.configure(providerPackage);
+        // Android 16 moved WebView provider resources behind the registered-resource-paths
+        // change. The platform-created provider Context receives those paths, but Chromium's
+        // ContextUtils intentionally keeps the embedding Application's AssetManager. Append the
+        // verified provider APK set to that Guest-owned AssetManager so assets such as
+        // Trichrome's icudtl.dat remain available without exposing a Host Context or data root.
+        if (Build.VERSION.SDK_INT >= 36) appendApi36WebViewAssets(providerPackage);
     }
     void closeWebViewProviderServices() {
         webViewProviderServices.close();
@@ -832,6 +841,99 @@ public final class GuestContext extends GuestHostOperationDenyContext {
             info.className = state.applicationClass();
         }
         return info;
+    }
+
+    private void appendApi36WebViewAssets(String providerPackage) {
+        if (!com.warden.controlledsandbox.framework.contract.WebViewProviderServiceContract
+                .isProviderPackage(providerPackage)) {
+            throw new SecurityException("VIRTUAL_WEBVIEW_PROVIDER_NOT_ALLOWLISTED:" + providerPackage);
+        }
+        ApplicationInfo provider;
+        try {
+            provider = hostServiceContext.getPackageManager().getApplicationInfo(providerPackage,
+                    PackageManager.GET_SHARED_LIBRARY_FILES);
+        } catch (PackageManager.NameNotFoundException error) {
+            throw new IllegalStateException("WEBVIEW_PROVIDER_APPLICATION_INFO_UNAVAILABLE",
+                    error);
+        }
+        Set<String> paths = new LinkedHashSet<>();
+        addAssetPath(paths, provider.sourceDir);
+        addAssetPath(paths, provider.publicSourceDir);
+        addAssetPaths(paths, provider.splitSourceDirs);
+        addAssetPaths(paths, provider.splitPublicSourceDirs);
+        addAssetPaths(paths, optionalStringArray(provider, "sharedLibraryFiles"));
+        // ApplicationInfo.getAllApkPaths() is the framework's canonical API 36 path set. The
+        // field fallback above keeps this source compatible with the API 32 compile stubs.
+        try {
+            Method allApkPaths = ApplicationInfo.class.getDeclaredMethod("getAllApkPaths");
+            allApkPaths.setAccessible(true);
+            addAssetPaths(paths, (String[]) allApkPaths.invoke(provider));
+        } catch (ReflectiveOperationException | RuntimeException ignored) { }
+        if (paths.isEmpty()) {
+            throw new IllegalStateException("WEBVIEW_PROVIDER_ASSET_PATHS_EMPTY");
+        }
+        Method addSharedLibrary = findAssetPathMethod("addAssetPathAsSharedLibrary");
+        Method addNormal = findAssetPathMethod("addAssetPath");
+        if (addSharedLibrary == null && addNormal == null) {
+            throw new IllegalStateException("WEBVIEW_ASSET_PATH_API_UNAVAILABLE");
+        }
+        int added = 0;
+        String methodName = addSharedLibrary == null ? "addAssetPath" : addSharedLibrary.getName();
+        for (String path : paths) {
+            Method selected = addSharedLibrary == null ? addNormal : addSharedLibrary;
+            int cookie = assetPathCookie(selected, path);
+            if (cookie == 0 && selected != addNormal && addNormal != null) {
+                selected = addNormal;
+                cookie = assetPathCookie(selected, path);
+                methodName = selected.getName();
+            }
+            if (cookie != 0) added++;
+        }
+        if (added == 0) {
+            throw new IllegalStateException("WEBVIEW_PROVIDER_ASSETS_REJECTED");
+        }
+        android.util.Log.i("CS_WEBVIEW_ASSETS", "API36 provider=" + providerPackage
+                + " candidates=" + paths.size() + " added=" + added
+                + " method=" + methodName);
+    }
+
+    private static Method findAssetPathMethod(String name) {
+        try {
+            Method method = AssetManager.class.getDeclaredMethod(name, String.class);
+            method.setAccessible(true);
+            return method;
+        } catch (ReflectiveOperationException | RuntimeException unavailable) {
+            return null;
+        }
+    }
+
+    private int assetPathCookie(Method method, String path) {
+        try {
+            Object result = method.invoke(assets, path);
+            return result instanceof Number ? ((Number) result).intValue() : 0;
+        } catch (ReflectiveOperationException | RuntimeException error) {
+            return 0;
+        }
+    }
+
+    private static void addAssetPath(Set<String> paths, String path) {
+        if (path != null && !path.trim().isEmpty()) paths.add(path.trim());
+    }
+
+    private static void addAssetPaths(Set<String> paths, String[] values) {
+        if (values == null) return;
+        for (String value : values) addAssetPath(paths, value);
+    }
+
+    private static String[] optionalStringArray(ApplicationInfo info, String fieldName) {
+        try {
+            java.lang.reflect.Field field = ApplicationInfo.class.getDeclaredField(fieldName);
+            field.setAccessible(true);
+            Object value = field.get(info);
+            return value instanceof String[] ? (String[]) value : null;
+        } catch (ReflectiveOperationException | RuntimeException unavailable) {
+            return null;
+        }
     }
 
     private static void setOptionalField(ApplicationInfo info, String name, Object value) {

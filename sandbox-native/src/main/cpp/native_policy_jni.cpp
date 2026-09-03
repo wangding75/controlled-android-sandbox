@@ -249,6 +249,11 @@ bool install_hidden_api_bridge(JNIEnv* env) {
     // Keep this list tied to framework classes used by the audited compatibility hooks. A
     // package wildcard or process-wide global policy is intentionally not used.
     constexpr const char* prefixes[] = {
+            // Runtime.nativeLoad(String, ClassLoader, Class) is the API 16+ native entry
+            // point used by the audited loader diagnostic. The two-argument overload is a
+            // Java wrapper on current releases, so exempt the declaring class exactly rather
+            // than attempting to register a non-native wrapper method.
+            "Ljava/lang/Runtime;",
             "Landroid/app/",
             "Landroid/companion/",
             "Landroid/content/",
