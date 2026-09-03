@@ -200,8 +200,16 @@ public final class FrameworkHooks implements AutoCloseable {
                 () -> TelephonyServiceHook.installSubscription(hostServiceContext, identity));
         attempt("wifi", installed, failures, hooks, bindingDetails,
                 () -> WifiServiceHook.install(hostServiceContext, identity));
-        attempt("wifiScanner", installed, failures, hooks, bindingDetails,
-                () -> WifiServiceHook.installScanner(hostServiceContext, identity));
+        if (PlatformServiceCompatibility.isApplicationRestricted("wifiScanner")) {
+            installed.put("wifiScanner", false);
+            failures.put("wifiScanner",
+                    PlatformServiceCompatibility.restrictionReason("wifiScanner"));
+            android.util.Log.i("CS_FRAMEWORK", "HOOK_UNAVAILABLE wifiScanner reason="
+                    + PlatformServiceCompatibility.restrictionReason("wifiScanner"));
+        } else {
+            attempt("wifiScanner", installed, failures, hooks, bindingDetails,
+                    () -> WifiServiceHook.installScanner(hostServiceContext, identity));
+        }
         attempt("connectivity", installed, failures, hooks,
                 () -> ConnectivityServiceHook.install(hostServiceContext, identity));
         attempt("dnsResolver", installed, failures, hooks,

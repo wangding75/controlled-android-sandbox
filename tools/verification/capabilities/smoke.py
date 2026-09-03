@@ -1,4 +1,4 @@
-"""S01-S10 RD/API32 capability smoke cases.
+"""S01-S10 platform capability smoke cases.
 
 The cases use the existing debug command surface and fixtures as black-box
 test inputs.  They do not embed product implementation details beyond the
@@ -49,6 +49,7 @@ class SmokeContext:
     timeout_policy: TimeoutPolicy = field(default_factory=TimeoutPolicy)
     apk_paths: dict[str, Path] = field(default_factory=dict)
     setup_installs: list[dict[str, Any]] = field(default_factory=list)
+    setup_omissions: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -70,7 +71,7 @@ def smoke_specs() -> list[TestcaseSpec]:
             "Build outputs are installable and the Host launcher reaches a visible frame.",
             guest_package="",
             precondition="debug Host and smoke fixture APKs are built",
-            operation="install Host/Companion/Guest APKs; launch Host MainActivity",
+            operation="install platform-supported Host/fixture APKs; launch Host MainActivity",
             expected={"host_install": True, "host_visible_frame": True},
             timeout_kind=TimeoutKind.INSTALL.value,
         ),
@@ -218,6 +219,7 @@ def _s01(context: SmokeContext, attempt_dir: Path, _attempt: int) -> AttemptExec
     )
     actual = {
         "installs": installs,
+        "omitted_apks": dict(context.setup_omissions),
         "host_start": _command_dict(started),
         "host_teardown": host_teardown,
         **evidence,

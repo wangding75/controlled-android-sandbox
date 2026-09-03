@@ -300,12 +300,29 @@ public final class C2T05SchedulingInteractionActivity extends Activity {
                 new Class<?>[]{String.class}, channelId);
         Object active = invoke(manager, "getActiveNotifications", new Class<?>[0]);
         int activeCount = active == null || !active.getClass().isArray() ? 0 : Array.getLength(active);
-        if (readback == null || activeCount < 1) {
+        boolean notificationPermissionGranted = Build.VERSION.SDK_INT < 33
+                || checkSelfPermission("android.permission.POST_NOTIFICATIONS")
+                == android.content.pm.PackageManager.PERMISSION_GRANTED;
+        if (readback == null) {
             throw new IllegalStateException("NOTIFICATION_READBACK_MISSING channel=" + channelId
                     + " active=" + activeCount);
         }
+        if (!notificationPermissionGranted && activeCount != 0) {
+            throw new IllegalStateException("NOTIFICATION_PERMISSION_DENIAL_BYPASSED active="
+                    + activeCount);
+        }
+        if (notificationPermissionGranted && activeCount < 1) {
+            throw new IllegalStateException("NOTIFICATION_READBACK_MISSING channel=" + channelId
+                    + " active=" + activeCount);
+        }
+        if (!notificationPermissionGranted) {
+            Log.i(TAG, "C2_T05_NOTIFICATION_PERMISSION_DENIED_EXPECTED loop=" + loop
+                    + " channel=" + channelId + " active=" + activeCount
+                    + " package=" + getPackageName() + " session=" + session);
+        }
         Log.i(TAG, "C2_T05_NOTIFICATION_RETURN loop=" + loop + " tag=" + tag
                 + " id=" + id + " channel=" + channelId + " active=" + activeCount
+                + " permissionGranted=" + notificationPermissionGranted
                 + " session=" + session);
         click.send();
         awaitEvent("C2_T05_NOTIFICATION_CLICK_CALLBACK", session, CALLBACK_TIMEOUT_SECONDS);

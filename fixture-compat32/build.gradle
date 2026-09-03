@@ -15,7 +15,10 @@ android {
         versionCode 1
         versionName '1.0-fixture32'
         externalNativeBuild { cmake { cppFlags '-std=c++20 -Wall -Wextra -Werror' } }
-        ndk { abiFilters 'armeabi-v7a', 'x86' }
+        // API33 verification uses the required x86_64 AVD.  Keep the original 32-bit
+        // variants for the API32 compatibility lane; this does not claim cross-bitness
+        // coverage, which remains in C6-T02.
+        ndk { abiFilters 'armeabi-v7a', 'x86', 'x86_64' }
     }
 
     buildTypes { release { minifyEnabled false } }

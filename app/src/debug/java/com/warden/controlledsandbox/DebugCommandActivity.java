@@ -460,7 +460,8 @@ public final class DebugCommandActivity extends Activity {
                 SandboxRecord serviceRecord = record.withServiceComponent(component, processName);
                 operation = runtime.prepare(serviceRecord, virtualUserId);
                 requireStatus("service-lifecycle-prepare", operation,
-                        "PREPARED", "ALREADY_PREPARED");
+                        "PREPARED", "ALREADY_PREPARED", "PREPARED_DEGRADED",
+                        "ALREADY_PREPARED_DEGRADED");
                 int iterations = Math.max(1, Math.min(100,
                         extras.getInt("iterations", 1)));
                 JSONArray cycles = new JSONArray();

@@ -1,0 +1,471 @@
+"""Run the API33 extension capability suite and persist compact local evidence.
+
+The suite deliberately reuses the same DebugCommandActivity surface and fixture
+components as the S01-S10 contract.  It records complete device evidence under
+``out/verification`` while keeping the committed matrix small and fail-closed.
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import json
+import sys
+import time
+from pathlib import Path
+from typing import Any
+
+if __package__ in {None, ""}:
+    _ROOT = Path(__file__).resolve().parents[2]
+    if str(_ROOT) not in sys.path:
+        sys.path.insert(0, str(_ROOT))
+
+from tools.verification.capabilities.smoke import (  # noqa: E402
+    FRAMEWORK_PROBE_COMPONENT,
+    GUEST_PACKAGE,
+    SmokeContext,
+    _capture,
+    _invoke_debug,
+    _wait_for_markers,
+)
+from tools.verification.core.policy import TimeoutKind  # noqa: E402
+from tools.verification.device.adb import AdbDevice  # noqa: E402
+from tools.verification.device.metadata import (  # noqa: E402
+    DeviceMetadataError,
+    collect_device_metadata,
+)
+from tools.verification.run_rd_smoke import (  # noqa: E402
+    _apk_paths,
+    _git,
+    _validate_api33_device,
+)
+
+
+ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_OUTPUT_ROOT = ROOT / "out" / "verification"
+FIXTURE32 = "com.warden.controlledsandbox.fixture32"
+
+
+def _now() -> str:
+    return dt.datetime.now(dt.timezone.utc).isoformat()
+
+
+def _install_required(device: AdbDevice, apk_paths: dict[str, Path]) -> list[dict[str, Any]]:
+    installs: list[dict[str, Any]] = []
+    # API33 is intentionally tested on x86_64 without the 32-bit Companion.  The
+    # compat32 fixture includes an x86_64 variant only so package/PMS/cross-package
+    # identity can still be tested; cross-bitness remains C6-T02 scope.
+    for name in ("host", "fixture", "fixture32"):
+        apk = apk_paths[name]
+        result = device.install(apk, timeout_sec=120.0)
+        row = {
+            "name": name,
+            "path": str(apk),
+            "returncode": result.returncode,
+            "ok": result.ok,
+            "stderr": result.text("stderr")[-300:],
+        }
+        installs.append(row)
+        if not result.ok:
+            raise RuntimeError(f"APK_INSTALL_FAILED:{name}:{row}")
+    return installs
+
+
+def _launch_component(
+    context: SmokeContext,
+    case_dir: Path,
+    component: str,
+    extras: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any], str, list[str]]:
+    observation = _invoke_debug(
+        context,
+        case_dir,
+        command="launch-component",
+        package=GUEST_PACKAGE,
+        timeout_kind=TimeoutKind.RECOVERY,
+        extras={"component": component, **(extras or {})},
+        force_stop_host=True,
+    )
+    result = observation.actual["debug_result"]
+    operation = result.get("operation") or {}
+    if result.get("status") != "PASS" or operation.get("status") != "LAUNCH_PASS":
+        raise RuntimeError(
+            "LAUNCH_COMPONENT_NOT_PASS:" + json.dumps(
+                {"status": result.get("status"), "operation": operation},
+                ensure_ascii=False,
+            )
+        )
+    return result, observation.logcat, list(observation.artifacts)
+
+
+def _wait_for_all(device: AdbDevice, markers: tuple[str, ...], timeout: float) -> str:
+    return _wait_for_markers(device, markers, timeout)
+
+
+def _check_case(
+    context: SmokeContext,
+    run_dir: Path,
+    *,
+    case_id: str,
+    component: str | None,
+    required: tuple[str, ...] = (),
+    any_required: tuple[str, ...] = (),
+    forbidden: tuple[str, ...] = (),
+    extras: dict[str, Any] | None = None,
+    wait_seconds: float = 60.0,
+) -> dict[str, Any]:
+    case_dir = run_dir / "cases" / case_id
+    started = time.monotonic()
+    artifacts: list[str] = []
+    logcat = ""
+    result: dict[str, Any] = {}
+    errors: list[str] = []
+    try:
+        if component is None:
+            raise RuntimeError("COMPONENT_NOT_CONFIGURED")
+        result, _initial_log, artifacts = _launch_component(context, case_dir, component, extras)
+        logcat = _wait_for_all(context.device, required, wait_seconds)
+        missing = [marker for marker in required if marker not in logcat]
+        if any_required and not any(marker in logcat for marker in any_required):
+            missing.append("ANY_OF:" + "|".join(any_required))
+        forbidden_seen = [marker for marker in forbidden if marker in logcat]
+        errors.extend("MISSING:" + marker for marker in missing)
+        errors.extend("FORBIDDEN:" + marker for marker in forbidden_seen)
+        status = "PASS" if not errors else "FAIL"
+    except Exception as error:  # preserve the result and continue with later capabilities
+        status = "FAIL"
+        errors.append(f"{error.__class__.__name__}:{error}")
+        try:
+            logcat = context.device.logcat(timeout_sec=60.0)
+        except Exception as log_error:
+            errors.append(f"LOGCAT_CAPTURE_FAILED:{log_error}")
+    if not artifacts:
+        try:
+            captured = _capture(context, case_dir / "failure", case_id)
+            artifacts = captured["artifacts"]
+            if not logcat:
+                logcat = captured["logcat"]
+        except Exception as capture_error:
+            errors.append(f"CAPTURE_FAILED:{capture_error}")
+    evidence = {
+        "case_id": case_id,
+        "component": component,
+        "status": status,
+        "required_markers": list(required),
+        "any_required_markers": list(any_required),
+        "forbidden_markers": list(forbidden),
+        "observed_markers": [marker for marker in (*required, *any_required) if marker in logcat],
+        "errors": errors,
+        "debug_status": result.get("status", ""),
+        "operation_status": (result.get("operation") or {}).get("status", ""),
+        "artifacts": artifacts,
+        "duration_ms": max(0, int(round((time.monotonic() - started) * 1000))),
+    }
+    case_dir.mkdir(parents=True, exist_ok=True)
+    (case_dir / "capability.json").write_text(
+        json.dumps(evidence, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    return evidence
+
+
+def _framework_case(context: SmokeContext, run_dir: Path) -> dict[str, Any]:
+    required = (
+        "FRAMEWORK_PROBE_PROVIDER_BULK_PASS",
+        "FRAMEWORK_PROBE_PROVIDER_BATCH_PASS",
+        "FRAMEWORK_PROBE_PENDING_INTENT_PASS",
+        "FRAMEWORK_PROBE_PENDING_INTENT_BINDER_PASS",
+        "FRAMEWORK_PROBE_PENDING_INTENT_CALLBACK_PASS",
+        "FRAMEWORK_PROBE_JOB_READBACK_PASS",
+        "FRAMEWORK_PROBE_ALARM_CLOCK_READBACK_PASS",
+        "FRAMEWORK_PROBE_RECEIVER_FRAMEWORK_REQUESTED",
+        "FRAMEWORK_PROBE_RECEIVER_FRAMEWORK_PASS",
+        "FRAMEWORK_PROBE_ORDERED_RECEIVER_DELIVERED",
+        "FRAMEWORK_PROBE_ORDERED_RECEIVER_FRAMEWORK_PASS",
+        "FRAMEWORK_PROBE_ORDERED_ASYNC_RECEIVER_DELIVERED",
+        "FRAMEWORK_PROBE_ORDERED_ASYNC_RECEIVER_FINISHED",
+        "FRAMEWORK_PROBE_ORDERED_ASYNC_RECEIVER_FRAMEWORK_PASS",
+        "GUEST_RECEIVER_FRAMEWORK_DELIVERED",
+        "GUEST_RECEIVER_FRAMEWORK_REGISTERED",
+        "GUEST_BROADCAST status=BROADCAST_DELIVERED",
+        "FRAMEWORK_PROBE_DYNAMIC_RECEIVER_FRAMEWORK_PASS",
+        "FRAMEWORK_PROBE_SERVICE_BIND_PASS",
+        "FRAMEWORK_PROBE_PACKAGE_UNIVERSE_PASS",
+        "FRAMEWORK_PROBE_PACKAGE_IDENTITY_PASS",
+        "FRAMEWORK_PROBE_COMPONENT_METADATA_PASS",
+        "FRAMEWORK_PROBE_PACKAGE_CONTEXT_PASS",
+        "FRAMEWORK_PROBE_CROSS_PROVIDER_PASS",
+        "FRAMEWORK_PROBE_CROSS_PROVIDER_OBSERVER_DELIVERED",
+        "FRAMEWORK_PROBE_CROSS_PROVIDER_OBSERVER_PASS",
+        "FRAMEWORK_PROBE_ACTIVITY_CONTRACT_PASS",
+        "GUEST_ACTIVITY_PERSISTABLE_CREATE",
+        "FRAMEWORK_PROBE_CROSS_ACTIVITY_PASS",
+        "FRAMEWORK_PROBE_CROSS_SERVICE_BIND_PASS",
+        "FRAMEWORK_PROBE_CROSS_PENDING_INTENT_PASS",
+        "FRAMEWORK_PROBE_REMOTE_ROUTE_REQUESTED",
+        "FRAMEWORK_PROBE_REMOTE_STOP_PASS",
+        "FRAMEWORK_PROBE_CROSS_STOP_PASS",
+        "FRAMEWORK_PROBE_PASS",
+        "VIRTUAL_PENDING_INTENT_DELIVERY status=BROADCAST_DELIVERED",
+    )
+    forbidden = (
+        "FRAMEWORK_PROBE_TASK_REUSE_FAIL",
+        "FRAMEWORK_PROBE_PENDING_INTENT_BINDER_FAIL",
+        "VIRTUAL_PENDING_INTENT_DELIVERY status=FAILED",
+        "FATAL EXCEPTION",
+        "ANR in",
+        "NOTIFICATION_PERMISSION_DENIAL_BYPASSED",
+        "VIRTUAL_PACKAGE_UNIVERSE_MISMATCH",
+        "ATTRIBUTION_SOURCE_IDENTITY_MISMATCH",
+    )
+
+    case = _check_case(
+        context,
+        run_dir,
+        case_id="CAP-FRAMEWORK-TRANSPORT-IDENTITY",
+        component=FRAMEWORK_PROBE_COMPONENT,
+        required=required,
+        any_required=(
+            "FRAMEWORK_PROBE_NOTIFICATION_PERMISSION_DENIED_EXPECTED",
+            "FRAMEWORK_PROBE_NOTIFICATION_READBACK_PASS",
+        ),
+        forbidden=forbidden,
+        wait_seconds=75.0,
+    )
+    return case
+
+
+def _write_matrix(run_dir: Path, payload: dict[str, Any]) -> None:
+    (run_dir / "capability-matrix.json").write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+
+
+def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
+    start_head = _git("rev-parse", "HEAD")
+    run_id = args.run_id or dt.datetime.now().strftime("%Y%m%dT%H%M%SZ")
+    run_dir = (Path(args.output_root).resolve() / run_id)
+    run_dir.mkdir(parents=True, exist_ok=True)
+    device = AdbDevice(args.serial, root=ROOT)
+    apk_paths = _apk_paths(include_companion32=False)
+    metadata = collect_device_metadata(
+        device,
+        instance_name=args.instance_name,
+        resolver_snapshot={"mode": "explicit-serial", "serial": args.serial},
+        cas_commit=start_head,
+        apk_paths=apk_paths.values(),
+    )
+    _validate_api33_device(metadata)
+    (run_dir / "device-metadata.json").write_text(
+        json.dumps(metadata, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    installs = _install_required(device, apk_paths)
+    context = SmokeContext(
+        root=ROOT,
+        device=device,
+        metadata=metadata,
+        apk_paths=apk_paths,
+        setup_installs=installs,
+        setup_omissions={
+            "companion32": (
+                "UNSUPPORTED_PLATFORM: API33 x86_64 AVD has no 32-bit ABI; "
+                "cross-bitness is deferred to C6-T02"
+            )
+        },
+    )
+
+    # Import both virtual packages up front.  The peer is required by the package-universe,
+    # cross-provider, cross-service and cross-PendingIntent identity checks.
+    setup: list[dict[str, Any]] = []
+    for package in (GUEST_PACKAGE, FIXTURE32):
+        observation = _invoke_debug(
+            context,
+            run_dir / "setup" / package.rsplit(".", 1)[-1],
+            command="import-only",
+            package=package,
+            timeout_kind=TimeoutKind.ADD_IMPORT,
+            force_stop_host=True,
+        )
+        result = observation.actual["debug_result"]
+        setup.append({
+            "package": package,
+            "status": result.get("status"),
+            "operation_status": (result.get("operation") or {}).get("status"),
+            "artifacts": observation.artifacts,
+        })
+        if result.get("status") != "PASS" or (result.get("operation") or {}).get("status") != "IMPORTED":
+            raise RuntimeError(f"IMPORT_FAILED:{package}:{result}")
+
+    cases: list[dict[str, Any]] = []
+    cases.append(
+        _check_case(
+            context,
+            run_dir,
+            case_id="CAP-PMS-PERMISSION-APPOPS-ATTRIBUTION",
+            component="com.warden.controlledsandbox.fixture.PmsPermissionAttributionProbeActivity",
+            required=("C2_T02_PROBE_PASS",),
+            forbidden=(
+                "C2_T02_PROBE_FAIL",
+                "PMS_HOST_APPLICATION_VISIBLE",
+                "APPOPS_HOST_PACKAGE_VISIBLE",
+                "ATTRIBUTION_SOURCE_IDENTITY_MISMATCH",
+                "CALLBACK_PACKAGE_IDENTITY_MISMATCH",
+            ),
+            wait_seconds=45.0,
+        )
+    )
+    cases.append(_framework_case(context, run_dir))
+    cases.append(
+        _check_case(
+            context,
+            run_dir,
+            case_id="CAP-SCHEDULING-NOTIFICATION-ALARM-JOB-FGS",
+            component="com.warden.controlledsandbox.fixture.C2T05SchedulingInteractionActivity",
+            extras={"c2t05Mode": "full", "c2t05Loops": 1},
+            required=(
+                "C2_T05_LOOP_PASS loop=1",
+                "C2_T05_INTERACTION_PASS",
+                "C2_T05_NOTIFICATION_PASS loop=1",
+                "C2_T05_ALARM_PASS loop=1",
+                "C2_T05_JOB_CALLBACK_PASS loop=1",
+                "C2_T05_FGS_STOP_PASS loop=1",
+                "C2_T05_WINDOW_TOKEN_PASS",
+                "C2_T05_DISPLAY_CONTEXT_PASS",
+                "C2_T05_IME_PASS",
+                "C2_T05_CAMPAIGN_PASS loops=1",
+            ),
+            any_required=(
+                "C2_T05_NOTIFICATION_PERMISSION_DENIED_EXPECTED",
+                "C2_T05_NOTIFICATION_RETURN loop=1",
+            ),
+            forbidden=("C2_T05_CAMPAIGN_FAIL", "NOTIFICATION_PERMISSION_DENIAL_BYPASSED"),
+            wait_seconds=75.0,
+        )
+    )
+    cases.append(
+        _check_case(
+            context,
+            run_dir,
+            case_id="CAP-NETWORK-MEDIA-DNS-VPN",
+            component="com.warden.controlledsandbox.fixture.C2T06DeviceNetworkMediaActivity",
+            extras={"c2t06Mode": "full", "c2t06Loops": 1},
+            required=("C2_T06_LOOP_PASS loop=1", "C2_T06_CAMPAIGN_PASS loops=1"),
+            forbidden=("C2_T06_CAMPAIGN_FAIL", "FATAL EXCEPTION", "ANR in"),
+            wait_seconds=75.0,
+        )
+    )
+    cases.append(
+        _check_case(
+            context,
+            run_dir,
+            case_id="CAP-ENVIRONMENT-SHORTCUT-LAUNCHER",
+            component="com.warden.controlledsandbox.fixture.C2T07ApplicationEnvironmentActivity",
+            extras={"c2t07Mode": "full", "c2t07Loops": 1, "c2t07User": 0},
+            required=(
+                "C2_T07_LOOP_PASS loop=1",
+                "C2_T07_SHORTCUT_RETURN loop=1",
+                "C2_T07_HOST_IDENTITY_GUARDED status=PASS",
+                "C2_T07_CAMPAIGN_PASS loops=1",
+            ),
+            forbidden=(
+                "C2_T07_CAMPAIGN_FAIL",
+                "Shortcut package name mismatch",
+                "C2_T07_SHORTCUT_RETURN status=NOT_APPLICABLE",
+            ),
+            wait_seconds=75.0,
+        )
+    )
+    # There is no AppWidget provider/dynamic host fixture in the current API33 suite.  Keep
+    # this explicit rather than treating AppWidgetManager's static readback as full coverage.
+    widget_case = {
+        "case_id": "CAP-APPWIDGET-DYNAMIC",
+        "component": None,
+        "status": "SKIP",
+        "reason": "NOT_COVERED_BY_API33_DYNAMIC_SUITE",
+        "required_markers": [],
+        "observed_markers": [],
+        "errors": [],
+        "artifacts": [],
+        "duration_ms": 0,
+    }
+    (run_dir / "cases" / widget_case["case_id"] / "capability.json").parent.mkdir(
+        parents=True, exist_ok=True
+    )
+    (run_dir / "cases" / widget_case["case_id"] / "capability.json").write_text(
+        json.dumps(widget_case, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    cases.append(widget_case)
+
+    # MainActivity is the existing WebView smoke and FixtureApplication emits the JNI load
+    # marker before Activity creation.  This verifies initialization/class-loader/native load
+    # without introducing an ABI/cross-bitness assertion into the API33 task.
+    cases.append(
+        _check_case(
+        context,
+        run_dir,
+        case_id="CAP-WEBVIEW-CLASSLOADER-NATIVE",
+        component="com.warden.controlledsandbox.fixture.MainActivity",
+        required=("NATIVE_LOAD JNI_LOADED",),
+        forbidden=("FATAL EXCEPTION", "ANR in", "JNI_UNAVAILABLE"),
+        wait_seconds=30.0,
+        )
+    )
+
+    summary = {
+        "total": len(cases),
+        "pass": sum(item["status"] == "PASS" for item in cases),
+        "fail": sum(item["status"] == "FAIL" for item in cases),
+        "skip": sum(item["status"] == "SKIP" for item in cases),
+    }
+    payload = {
+        "run_id": run_id,
+        "start_head": start_head,
+        "final_head": start_head,
+        "started_at": _now(),
+        "device_metadata": metadata,
+        "setup_installs": installs,
+        "setup_imports": setup,
+        "capabilities": cases,
+        "summary": summary,
+        "limitations": [
+            "API33 device contract is validated from system properties, not AVD name.",
+            "AppWidget dynamic host/provider fixture is not present and is explicit SKIP.",
+            "32-bit Companion/cross-bitness is deferred to C6-T02; fixture32 x86_64 is used for identity routing.",
+            "API33 NOT_EXPORTED dynamic receiver is exercised by a same-Guest send; adb-shell external delivery is not treated as equivalent.",
+        ],
+        "evidence_root": run_dir.relative_to(ROOT).as_posix(),
+        "finished_at": _now(),
+    }
+    _write_matrix(run_dir, payload)
+    return (0 if summary["fail"] == 0 else 2), run_dir, payload
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--serial", required=True)
+    parser.add_argument("--instance-name", default="C6_T01B_API33_GoogleApis_x86_64")
+    parser.add_argument("--run-id", default="")
+    parser.add_argument("--output-root", default=str(DEFAULT_OUTPUT_ROOT))
+    return parser
+
+
+def main() -> int:
+    args = _parser().parse_args()
+    try:
+        code, run_dir, payload = run(args)
+    except (DeviceMetadataError, FileNotFoundError, OSError, RuntimeError) as error:
+        print(json.dumps({"status": "BLOCKED", "error": str(error)}, ensure_ascii=False))
+        return 2
+    print(json.dumps({
+        "run_id": payload["run_id"],
+        "run_dir": str(run_dir),
+        "total": payload["summary"]["total"],
+        "pass": payload["summary"]["pass"],
+        "fail": payload["summary"]["fail"],
+        "skip": payload["summary"]["skip"],
+        "exit_code": code,
+    }, ensure_ascii=False))
+    return code
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

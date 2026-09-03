@@ -2,6 +2,7 @@ package com.warden.controlledsandbox.runtime.guest;
 
 import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
+import com.warden.controlledsandbox.framework.core.PlatformServiceCompatibility;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +32,10 @@ final class DeviceServiceProxyReadiness {
                 "deviceIdentity", "settingsIdentity");
         requireDomain(profile.telephony().mode(), installed, bindingDetails, missing,
                 "telephony", "phoneSubInfo", "telephonyRegistry", "subscription");
-        requireDomain(profile.wifi().mode(), installed, bindingDetails, missing, "wifi", "wifiScanner");
+        requireDomain(profile.wifi().mode(), installed, bindingDetails, missing, "wifi");
+        if (!PlatformServiceCompatibility.isApplicationRestricted("wifiScanner")) {
+            requireDomain(profile.wifi().mode(), installed, bindingDetails, missing, "wifiScanner");
+        }
         requireDomain(profile.bluetooth().mode(), installed, bindingDetails, missing, "bluetooth");
         requireDomain(profile.sensors().mode(), installed, bindingDetails, missing, "sensorCatalog");
         if (!missing.isEmpty()) {

@@ -1,8 +1,10 @@
-"""Run the real RD/API32 S01-S10 smoke suite and persist evidence.
+"""Run the real platform S01-S10 smoke suite and persist evidence.
 
 Usage from the repository root::
 
     python tools/verification/run_rd_smoke.py --instance-name RD测试
+
+For an explicitly verified API33 AVD, use ``--serial emulator-5554 --api33``.
 
 The default run performs the required Gradle acceptance commands first.  Use
 ``--skip-build`` only when those commands were already run and their results
@@ -124,13 +126,15 @@ def _find_apk(module: str, preferred: str) -> Path | None:
     return candidates[0] if len(candidates) == 1 else None
 
 
-def _apk_paths() -> dict[str, Path]:
+def _apk_paths(*, include_companion32: bool = True) -> dict[str, Path]:
     requested = {
         "host": ("app", "app-debug.apk"),
         "companion32": ("sandbox-companion32", "sandbox-companion32-debug.apk"),
         "fixture": ("fixture-basic", "fixture-basic-debug.apk"),
         "fixture32": ("fixture-compat32", "fixture-compat32-debug.apk"),
     }
+    if not include_companion32:
+        requested.pop("companion32")
     paths: dict[str, Path] = {}
     for name, (module, preferred) in requested.items():
         found = _find_apk(module, preferred)
@@ -140,6 +144,35 @@ def _apk_paths() -> dict[str, Path]:
             )
         paths[name] = found
     return paths
+
+
+def _resolve_device(args: argparse.Namespace) -> tuple[dict[str, Any], AdbDevice]:
+    if args.serial:
+        serial = args.serial.strip()
+        if not serial:
+            raise DeviceMetadataError("EXPLICIT_SERIAL_EMPTY")
+        return {
+            "mode": "explicit-serial",
+            "serial": serial,
+            "instance_name": args.instance_name,
+        }, AdbDevice(serial, root=ROOT)
+    return resolve_rd_device(args.instance_name, root=ROOT)
+
+
+def _validate_api33_device(metadata: dict[str, Any]) -> None:
+    mismatches: list[str] = []
+    if metadata.get("api_level") != 33:
+        mismatches.append(f"api_level={metadata.get('api_level')!r}")
+    if metadata.get("abi") != "x86_64":
+        mismatches.append(f"abi={metadata.get('abi')!r}")
+    if "x86_64" not in (metadata.get("abi_list") or []):
+        mismatches.append(f"abi_list={metadata.get('abi_list')!r}")
+    if metadata.get("page_size") != 4096:
+        mismatches.append(f"page_size={metadata.get('page_size')!r}")
+    if mismatches:
+        raise DeviceMetadataError(
+            "API33_DEVICE_CONTRACT_MISMATCH: " + ", ".join(mismatches)
+        )
 
 
 def _case_device(metadata: dict[str, Any]) -> dict[str, Any]:
@@ -227,18 +260,27 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
     output_root = Path(args.output_root).resolve()
     run_dir = output_root / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
-    specs = smoke_specs()
+    all_specs = smoke_specs()
+    if args.only_case:
+        requested = set(args.only_case)
+        unknown = requested - {spec.testcase_id for spec in all_specs}
+        if unknown:
+            raise RuntimeError(f"unknown smoke testcase(s): {sorted(unknown)}")
+        specs = [spec for spec in all_specs if spec.testcase_id in requested]
+    else:
+        specs = all_specs
     run_payload: dict[str, Any] = {
         "run_id": run_id,
         "start_head": start_head,
         "final_head": start_head,
         "branch": _git("branch", "--show-current"),
+        "selected_testcases": [spec.testcase_id for spec in specs],
         "started_at": _now(),
         "evidence_root": run_dir.relative_to(ROOT).as_posix()
         if run_dir.is_relative_to(ROOT)
         else str(run_dir),
         "limitations": [
-            "This C6-T01A foundation executes the current RD/API32 smoke set; API33-37 adaptation and the ARM/16KB matrix remain in later C6 tasks.",
+            "The runner executes the shared S01-S10 contract against a resolved or explicitly supplied device; API33 selection is validated from system properties.",
             "The harness records real readiness and screen evidence; it never promotes an accepted/pending launch or a black frame to PASS.",
         ],
     }
@@ -283,8 +325,8 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
         cases = _blocked_cases(specs, run_dir, metadata, reason)
     else:
         try:
-            apk_paths = _apk_paths()
-            resolver_snapshot, device = resolve_rd_device(args.instance_name, root=ROOT)
+            resolver_snapshot, device = _resolve_device(args)
+            apk_paths = _apk_paths(include_companion32=not args.api33)
             metadata = collect_device_metadata(
                 device,
                 instance_name=args.instance_name,
@@ -301,11 +343,23 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
                     f"device metadata incomplete: {metadata.get('missing_fields')}",
                 )
             else:
+                if args.api33:
+                    _validate_api33_device(metadata)
                 context = SmokeContext(
                     root=ROOT,
                     device=device,
                     metadata=metadata,
                     apk_paths=apk_paths,
+                    setup_omissions=(
+                        {
+                            "companion32": (
+                                "UNSUPPORTED_PLATFORM: API33 x86_64 AVD has no 32-bit ABI; "
+                                "32-bit compatibility/cross-bitness coverage is deferred to C6-T02"
+                            )
+                        }
+                        if args.api33
+                        else {}
+                    ),
                 )
                 retry_policy = RetryPolicy(
                     max_diagnostic_retries=0 if args.no_diagnostic_retry else 1
@@ -350,10 +404,18 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--instance-name", default="RD测试")
+    parser.add_argument("--serial", default="", help="Use this ADB serial instead of the RD resolver")
+    parser.add_argument("--api33", action="store_true", help="Require API 33 x86_64/4096 device contract")
     parser.add_argument("--run-id", default="")
     parser.add_argument("--output-root", default=str(DEFAULT_OUTPUT_ROOT))
     parser.add_argument("--skip-build", action="store_true")
     parser.add_argument("--no-diagnostic-retry", action="store_true")
+    parser.add_argument(
+        "--only-case",
+        action="append",
+        default=[],
+        help="Run one or more named smoke cases (repeatable) for targeted comparison",
+    )
     parser.add_argument("--build-timeout", type=float, default=900.0)
     parser.add_argument("--harness-status", default="NOT_RECORDED")
     parser.add_argument("--gradle-projects-status", default="")

@@ -47,12 +47,12 @@ final class VirtualCompatibilityDefaults {
 
     /**
      * The platform provider package is part of the API compatibility profile, not Host identity.
-     * API 32 uses the AOSP provider name; the API 35 GMS image used by the runtime matrix uses
-     * the Google provider name.  No installed package, version, signature or Host metadata is
+     * API 32 uses the AOSP provider name; API 33+ Google API images use the Google provider
+     * name.  No installed package, version, signature or Host metadata is
      * read while constructing defaults.
      */
     private static String defaultWebViewProvider() {
-        return Build.VERSION.SDK_INT >= 35
+        return Build.VERSION.SDK_INT >= 33
                 ? "com.google.android.webview"
                 : "com.android.webview";
     }

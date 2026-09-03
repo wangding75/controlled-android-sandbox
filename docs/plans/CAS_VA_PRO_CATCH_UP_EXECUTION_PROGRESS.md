@@ -4137,3 +4137,52 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
 - **剩余项**：D01-D06 无 unresolved API32 product defect；API33-37、真实 ARM64、16 KB
   page-size 及更宽矩阵仍留给后续任务。
 - **下一任务**：`C6-T01B`；本条完成后停止，不自动开始 API33。
+
+### C6-T01B：Android API33 Platform Convergence（2026-09-03）
+
+- **状态**：`DONE`；`RESULT=PASS`。父任务 `C6-T01` 仍为 `IN_PROGRESS`；本条只关闭
+  API33 平台收敛，不启动 API34 或 C6-T02。
+- **开始基线**：分支 `feature/t57-r03-va-pro-capability-campaign`，
+  `START_BASELINE_HEAD=68f4877684bbde636985b5497037b7367f76e402`；进入 API33 前工作区
+  clean。API33 AVD 为 Google APIs `sdk_gphone64_x86_64`，serial `emulator-5554`，
+  manufacturer `Google`，Android `13` / API `33`，ABI `x86_64`，ABI list `x86_64`，
+  page size `4096`，fingerprint
+  `google/sdk_gphone64_x86_64/emu64x:13/TE1A.240213.009/12342917:userdebug/dev-keys`。
+- **Baseline-first**：直接使用起始 HEAD 的原始 API33 矩阵为 `10 total / 0 PASS / 10
+  FAIL`，首个真实原因是 x86_64 API33 镜像无法安装 32-bit Companion（`NO_MATCHING_ABIS`）；
+  其余为 setup cascade。原始证据保留在
+  `out/verification/c6-t01b-api33-20260903-baseline1/`，未将 cascade 误记为产品缺陷。
+- **发现与根因**：修复前序能力套件造成的非 clean 虚拟任务状态后，确认一个通用产品
+  缺陷（live `DEGRADED` Guest 被误判为 dead，导致 Activity callback 内重建同一 generation，
+  影响 S04/S08）和一个 API33 产品缺陷（Google WebView provider 阈值错误）。另有 API33
+  Companion 安装前置条件、`PREPARED_DEGRADED` debug 状态观测、通知权限拒绝、
+  `NOT_EXPORTED` dynamic receiver 外部发送边界等 Harness/fixture/expected-platform
+  findings，均已显式分类，未用 fallback 或 retry 掩盖。
+- **实现**：增加集中式 `PlatformServiceCompatibility`，对 API33 system-only
+  `wifiscanner`/`dnsresolver` 使用合法 app-facing facade；放宽 lifecycle coordinator 的
+  live degraded reuse 条件；API33 选择 Google WebView；S01 runner 增加实际 device property
+  校验、serial/API33 模式、Companion omission 记录和 targeted case 选择；新增 API33
+  capability runner；fixture 对 API33 notification/dynamic receiver 语义做真实断言。
+- **API33 最终结果**：干净专用 AVD 上重新安装精确测试包后，
+  `out/verification/c6-t01b-api33-final-smoke-20260903-clean/` 的 S01-S10 为
+  `10/10 PASS`。S04 具备 `PRE_REUSE_*`、`LIFECYCLE_NEW_INTENT`、resumed/first-frame
+  witness；API33 capability suite 在
+  `out/verification/c6-t01b-api33-capabilities-20260903-final/` 为
+  `7 total / 6 PASS / 0 FAIL / 1 SKIP`，唯一 skip 为明确的
+  `NOT_COVERED_BY_API33_DYNAMIC_SUITE` AppWidget。
+- **API32 回归**：受影响用例先以 `5/5 PASS` 完成 targeted regression；最终
+  `out/verification/c6-t01b-api32-final-smoke-20260903/` 的 S01-S10 为 `10/10 PASS`，
+  包含 S04 Activity reuse、S05 Service、S06 Broadcast、S07 Provider、S08 PendingIntent、
+  S09 package lifecycle mandatory regression。
+- **构建与 Harness**：`./gradlew.bat projects`、`assembleDebug`、`test` 均 PASS；
+  `python -m unittest tools.verification.test_harness -v` 为 `6/6 PASS`；
+  `compileall`、`git diff --check`、`FALSE_PASS_CHECK` 和 evidence hygiene 均 PASS。
+- **VA/NBB 对照与 Git hygiene**：仅检查本地 `ref/upstream/VirtualApp`、
+  `ref/upstream/NewBlackbox` 的 proxy/identity/task/process ownership 作为架构参考，未复制
+  未知授权代码；`ref/` 未改变。logcat、screenshots、dumpsys、raw traces、APK/build/AVD
+  outputs 均留在 ignored local evidence，不进入 Git。详细报告：
+  `reports/t57-r03/c6/C6_T01B_API33_CONVERGENCE_REPORT.md`。
+- **限制**：API33 x86_64 镜像无 32-bit ABI，Companion32/cross-bitness 标记为
+  `UNSUPPORTED_PLATFORM` 并留给 C6-T02；AppWidget dynamic fixture 未覆盖；通知权限和
+  system-only service visibility 按 Android 13 平台策略处理，未绕过策略。
+- **下一任务**：`C6-T01C`；本条完成后停止，不自动开始 API34。

@@ -4,6 +4,7 @@ import android.os.Build;
 import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNetworkServiceProfileSnapshot;
 import com.warden.controlledsandbox.framework.core.ReflectiveServiceHook;
+import com.warden.controlledsandbox.framework.core.PlatformServiceCompatibility;
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 
 /**
@@ -21,7 +22,8 @@ public final class DnsResolverServiceHook {
     public static AutoCloseable install(GuestIdentity identity, boolean nativeHooksInstalled)
             throws Exception {
         if (Build.VERSION.SDK_INT >= 29) {
-            if (Build.VERSION.SDK_INT < 35) {
+            if (Build.VERSION.SDK_INT < 35
+                    && !PlatformServiceCompatibility.isApplicationRestricted("dnsResolver")) {
                 // API 32 keeps this system Binder for the resolver daemon, while the app-facing
                 // DnsResolver still enters NetworkUtils/native code directly.
                 ReflectiveServiceHook.validateServiceManagerDescriptor(

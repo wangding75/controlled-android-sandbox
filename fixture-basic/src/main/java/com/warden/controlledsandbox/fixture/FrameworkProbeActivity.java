@@ -9,6 +9,7 @@ import android.content.BroadcastReceiver;
 import android.content.ContentValues;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.content.ContentProviderOperation;
 import android.content.ContentProviderResult;
@@ -55,6 +56,13 @@ public final class FrameworkProbeActivity extends Activity {
         } else {
             registerReceiver(dynamicReceiver, dynamicFilter);
         }
+        // Android 13's NOT_EXPORTED registration intentionally rejects an adb-shell
+        // sender.  Exercise the real same-application runtime receiver contract from
+        // the Guest process so the API33 capability suite does not mistake an external
+        // broadcast boundary for successful Guest dispatch.
+        sendBroadcast(new Intent(getPackageName() + ".DYNAMIC_PING")
+                .setPackage(getPackageName())
+                .putExtra("frameworkDynamicReceiverValue", "dynamic-framework-probe"));
         providerBulkInsertProbe();
         providerBatchProbe();
         pendingIntentProbe();
@@ -230,6 +238,16 @@ public final class FrameworkProbeActivity extends Activity {
             }
             invokeObject(manager, "cancel", new Class<?>[]{String.class, int.class},
                     "framework-readback", 371);
+            if (Build.VERSION.SDK_INT >= 33
+                    && checkSelfPermission("android.permission.POST_NOTIFICATIONS")
+                    != PackageManager.PERMISSION_GRANTED) {
+                if (found) {
+                    throw new AssertionError("NOTIFICATION_PERMISSION_DENIAL_BYPASSED");
+                }
+                Log.i(TAG, "FRAMEWORK_PROBE_NOTIFICATION_PERMISSION_DENIED_EXPECTED package="
+                        + getPackageName());
+                return;
+            }
             if (!found) throw new AssertionError("NOTIFICATION_READBACK_MISSING");
             Log.i(TAG, "FRAMEWORK_PROBE_NOTIFICATION_READBACK_PASS");
         } catch (Throwable error) {

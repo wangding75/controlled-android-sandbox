@@ -248,15 +248,28 @@ final class RuntimeGuestLifecycleCoordinator {
                 }
                 boolean frameworkActivityReady = runtimeStatus != null
                         && runtimeStatus.getBoolean("frameworkActivityTransportInstalled", false)
-                        && runtimeStatus.getBoolean("frameworkComponentLifecycleReady", false);
+                        && runtimeStatus.getBoolean("frameworkComponentLifecycleReady", false)
+                        && !"BLOCKED".equals(runtimeStatus.getString("frameworkReadiness", ""));
+                String runtimeReadiness = runtimeStatus == null
+                        ? "" : runtimeStatus.getString(RuntimeKeys.STATUS, "");
+                boolean reusableRuntime = "READY".equals(runtimeReadiness)
+                        || "DEGRADED".equals(runtimeReadiness);
                 if (runtimeStatus != null
-                        && "READY".equals(runtimeStatus.getString(RuntimeKeys.STATUS, ""))
+                        && reusableRuntime
                         && frameworkActivityReady) {
+                    // A non-mandatory framework capability may be unavailable by an expected
+                    // platform policy (for example API33's untrusted-app wifiscanner boundary).
+                    // That status remains visible to diagnostics and capability assertions, but
+                    // it must not make an otherwise live bindApplication/LoadedApk transport
+                    // look process-dead. Rebuilding the same generation during an Activity
+                    // callback would tear down the caller's main-thread session and deadlock the
+                    // framework launch transaction.
                     lifecycleStage(input, session, "SESSION_BIND_BEGIN", lifecycleStarted);
                     owner.receiverCoordinator.bindSession(session);
                     lifecycleStage(input, session, "SESSION_BIND_RETURN", lifecycleStarted);
                     Bundle out = new Bundle(cached);
                     out.putString(RuntimeKeys.STATUS, cached.getBoolean("frameworkDegraded", false)
+                            || "DEGRADED".equals(runtimeReadiness)
                             ? "ALREADY_PREPARED_DEGRADED" : "ALREADY_PREPARED");
                     return out;
                 }
