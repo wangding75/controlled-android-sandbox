@@ -7,6 +7,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.ServiceInfo;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Message;
@@ -41,6 +42,7 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
     private static final int SERVICE_DONE_EXECUTING_ANON = 0;
     private static final int SERVICE_DONE_EXECUTING_START = 1;
     private static final int SERVICE_DONE_EXECUTING_STOP = 2;
+    private static final int SERVICE_DONE_EXECUTING_UNBIND = 3;
     private static final int START_TASK_REMOVED_COMPLETE = 1000;
 
     private final GuestRuntimeEnvironment.Session session;
@@ -435,15 +437,19 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
         // ledger reference may call Guest Service.onUnbind().
         boolean lastClient = binding.bindCount() <= 1;
         boolean rebind = lastClient && record.service.onUnbind(intent);
-        // ActivityThread.handleUnbindService acknowledges both branches through
-        // IActivityManager.unbindFinished().  serviceDoneExecuting() is only the
-        // execution completion path for CREATE/START/STOP and leaves AMS's bind
-        // record unfinished for the ordinary onUnbind(false) case.
         FrameworkServiceBindingLedger.UnbindResult unbound =
                 record.bindings.unbindAndReport(intent, rebind);
-        // Preserve the framework's doRebind acknowledgement only for the final client.  An
-        // intermediate unbind must not cause a later bind to enter onRebind().
-        unbindFinished(record.token, hostIntent, unbound.lastClient() && unbound.rebindPending());
+        // Android 15 split the completion contract: a rebind request still uses
+        // unbindFinished(), while an ordinary onUnbind(false) uses the API35
+        // serviceDoneExecuting(..., serviceIntent) transaction.  Keep the pre-35
+        // acknowledgement unchanged because those framework contracts use unbindFinished()
+        // for both branches.
+        boolean rebindRequested = unbound.lastClient() && unbound.rebindPending();
+        if (Build.VERSION.SDK_INT >= 35 && !rebindRequested) {
+            serviceDone(record.token, SERVICE_DONE_EXECUTING_UNBIND, 0, 0, hostIntent);
+        } else {
+            unbindFinished(record.token, hostIntent, rebindRequested);
+        }
         recordFrameworkEvent(record, lifecycleRoute(record, hostIntent), ComponentOperations.FRAMEWORK_SERVICE_EVENT_UNBIND,
                 0, 0);
         logLifecycle("GUEST_SERVICE_FRAMEWORK_UNBOUND", record, rebind ? "REBIND" : "UNBIND");
@@ -723,7 +729,16 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
     }
 
     private void serviceDone(IBinder token, int type, int startId, int result) throws Exception {
-        invokeActivityManager("serviceDoneExecuting", token, type, startId, result);
+        serviceDone(token, type, startId, result, null);
+    }
+
+    private void serviceDone(IBinder token, int type, int startId, int result,
+                             Intent serviceIntent) throws Exception {
+        if (Build.VERSION.SDK_INT >= 35) {
+            invokeActivityManager("serviceDoneExecuting", token, type, startId, result, serviceIntent);
+        } else {
+            invokeActivityManager("serviceDoneExecuting", token, type, startId, result);
+        }
     }
 
     private void publishService(IBinder token, Intent intent, IBinder binder) throws Exception {

@@ -4,8 +4,8 @@ Usage from the repository root::
 
     python tools/verification/run_rd_smoke.py --instance-name RD测试
 
-For an explicitly verified API33/API34 AVD, use the matching ``--api33`` or
-``--api34`` flag with an explicit serial.
+For an explicitly verified API33/API34/API35 AVD, use the matching lane flag
+with an explicit serial.
 
 The default run performs the required Gradle acceptance commands first.  Use
 ``--skip-build`` only when those commands were already run and their results
@@ -184,6 +184,10 @@ def _validate_api34_device(metadata: dict[str, Any]) -> None:
     _validate_api_device(metadata, 34)
 
 
+def _validate_api35_device(metadata: dict[str, Any]) -> None:
+    _validate_api_device(metadata, 35)
+
+
 def _case_device(metadata: dict[str, Any]) -> dict[str, Any]:
     keys = (
         "instance_name", "serial", "manufacturer", "model", "api_level",
@@ -336,12 +340,14 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
         try:
             resolver_snapshot, device = _resolve_device(args)
             platform_lane = ""
-            if args.api33 and args.api34:
-                raise DeviceMetadataError("API33_AND_API34_FLAGS_ARE_MUTUALLY_EXCLUSIVE")
+            if sum(bool(value) for value in (args.api33, args.api34, args.api35)) > 1:
+                raise DeviceMetadataError("API33_API34_API35_FLAGS_ARE_MUTUALLY_EXCLUSIVE")
             if args.api33:
                 platform_lane = "API33"
             elif args.api34:
                 platform_lane = "API34"
+            elif args.api35:
+                platform_lane = "API35"
             apk_paths = _apk_paths(include_companion32=not platform_lane)
             metadata = collect_device_metadata(
                 device,
@@ -363,6 +369,8 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
                     _validate_api_device(metadata, 33)
                 elif platform_lane == "API34":
                     _validate_api_device(metadata, 34)
+                elif platform_lane == "API35":
+                    _validate_api_device(metadata, 35)
                 context = SmokeContext(
                     root=ROOT,
                     device=device,
@@ -425,6 +433,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--serial", default="", help="Use this ADB serial instead of the RD resolver")
     parser.add_argument("--api33", action="store_true", help="Require API 33 x86_64/4096 device contract")
     parser.add_argument("--api34", action="store_true", help="Require API 34 x86_64/4096 device contract")
+    parser.add_argument("--api35", action="store_true", help="Require API 35 x86_64/4096 device contract")
     parser.add_argument("--run-id", default="")
     parser.add_argument("--output-root", default=str(DEFAULT_OUTPUT_ROOT))
     parser.add_argument("--skip-build", action="store_true")

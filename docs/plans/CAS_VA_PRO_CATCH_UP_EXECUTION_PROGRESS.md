@@ -1,14 +1,14 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：2.0
-更新时间：2026-09-02 22:50（Asia/Shanghai）
+更新时间：2026-09-03（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C6`（IN_PROGRESS；按用户明确指令提前进入 C6，C4-R05 正式关门及 C1/C2/C4 合并回归延后至完整回归处理）
-当前任务：`C6-T01`（IN_PROGRESS；`C6-T01A-R01` 已完成）
-下一任务：`C6-T01B`
-最后完成任务：`C6-T01A-R01`
+当前任务：`C6-T01D`（DONE；父任务 `C6-T01` 仍为 IN_PROGRESS）
+下一任务：`C6-T01E`
+最后完成任务：`C6-T01D`
 
 ## 1. 使用规则
 
@@ -77,6 +77,9 @@
 | C6-T01 | API33-37 回归 | IN_PROGRESS（用户授权提前进入） | C4-R05（用户授权跳过当前依赖） | - | §5 C6-T01（2026-09-02） |
 | C6-T01A | Unified Android Verification Harness Foundation | DONE | C6-T01 | `6b03d5ca95f45d48bbcadab56fb0beddab3aa287` | §5 C6-T01A |
 | C6-T01A-R01 | API32 Core Smoke Defect Closure | DONE | C6-T01A | `HEAD`（本任务唯一提交；精确 SHA 见 §5 C6-T01A-R01 回执） | §5 C6-T01A-R01 |
+| C6-T01B | API33 Platform Convergence | DONE | C6-T01A-R01 | `HEAD`（本任务唯一提交；精确 SHA 见 §5 C6-T01B 回执） | §5 C6-T01B |
+| C6-T01C | API34 Platform Convergence | DONE | C6-T01B | `HEAD`（本任务唯一提交；精确 SHA 见 §5 C6-T01C 回执） | §5 C6-T01C |
+| C6-T01D | API35 Platform Convergence | DONE | C6-T01C | `HEAD`（本任务唯一提交；精确 SHA 见 §5 C6-T01D 回执） | §5 C6-T01D |
 | C6-T02 | ARM/跨宽度/16KB | PENDING | C3-T03,C6-T01 | - | - |
 | C6-T03 | Android Matrix 发布门禁 | PENDING | C6-T01,C6-T02 | - | - |
 | C7-T01 | OEM 优先级与代表设备 | PENDING | C6 | - | - |
@@ -4237,3 +4240,61 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   路径和 root-cause matrix 记录于该报告。完成后只创建一个主题为
   `C6-T01C: converge Android API34 platform behavior` 的提交并推送当前分支。
 - **下一任务**：`C6-T01D`；本条完成后停止，不自动开始 API35。
+
+### C6-T01D：Android API35 Platform Convergence（2026-09-03）
+
+- **状态**：`DONE`；`RESULT=PASS`。父任务 `C6-T01` 仍为 `IN_PROGRESS`；本条只关闭
+  API35 平台收敛，不启动 API36/37 或 C6-T02 专项。
+- **开始基线**：分支 `feature/t57-r03-va-pro-capability-campaign`，
+  `START_BASELINE_HEAD=daab4cbec81e3819e8f54ce2cd1b6ad9996bec3d`；进入 API35 前工作区
+  clean。Task book 定义未变化，因此未修改 task book。
+- **API35 设备**：Google APIs AVD
+  `C6_T01D_API35_GoogleApis_x86_64` / `emulator-5562` / model
+  `sdk_gphone64_x86_64`；Android 15 / API35；ABI `x86_64`，ABI list
+  `x86_64,arm64-v8a`；page size `4096`；fingerprint
+  `google/sdk_gphone64_x86_64/emu64xa:15/AE3A.240806.043/12960925:userdebug/dev-keys`。
+  serial、model、manufacturer、API、release、ABI、ABI list、page size、fingerprint 和
+  kernel 均由系统属性/命令实际记录。
+- **Baseline-first**：无生产代码修改的 API35 baseline 为
+  `10 total / 5 PASS / 5 FAIL / 0 SKIP`，证据在
+  `out/verification/c6-t01d-api35-baseline/`；能力 baseline 为
+  `8 total / 4 PASS / 3 FAIL / 1 SKIP`，证据在
+  `out/verification/c6-t01d-api35-capability-baseline/`。S03/S04/S09/S10 的
+  `InputMethodInfoSafeList` launch-gate failure 与 S05 Service callback timeout，均先以
+  API34/API33/API32 相同 testcase 对照并通过，确认不是 general/API32 regression。
+- **缺陷与修复**：API35-specific 根因共 2 项：InputMethod list 返回值从 collection
+  形态收敛为 framework-owned `InputMethodInfoSafeList`，以及
+  `serviceDoneExecuting`/ordinary unbind 的 API35 service `Intent`/completion contract。
+  修复集中在现有 interaction hook、精确 hidden-API class exemption 和 Guest Service
+  lifecycle adapter。两个 API35-specific product defect 均已 targeted/final closure；没有
+  package/OEM 特判、retry/sleep 掩盖 race、吞异常、Host fallback 或降低断言。
+- **Harness 与平台边界**：两个 runner 增加 API35 实际设备校验和 x86_64 Companion32
+  omission 的显式 `UNSUPPORTED_PLATFORM` 记录。通知权限 denial、`NOT_EXPORTED` 外部
+  adb-shell receiver delivery 限制按 Android 平台行为处理；动态 AppWidget 为
+  `NOT_COVERED_BY_API35_DYNAMIC_SUITE`，未伪造 PASS。完整 capability suite 中偶发的
+  C2_T05 FGS marker 缺失在 API35/API34 均可见，最小前缀与 isolated run 通过，未归因
+  为 API35 product defect，也未修改严格 assertion。
+- **API35 最终结果**：S01-S10 run
+  `out/verification/c6-t01d-api35-final-smoke/` 为 `10/10 PASS`；capability run
+  `out/verification/c6-t01d-api35-capabilities-final/` 为 `8 total / 7 PASS / 0 FAIL /
+  1 SKIP`。Package visibility、permission/AppOps/AttributionSource、task/window、
+  Service/FGS、broadcast/PendingResult、Provider、PendingIntent、notification、Alarm、
+  Job、network/media/DNS/VPN、shortcut/launcher、WebView、ClassLoader/native/JNI 均按
+  当前 fixture contract 通过；唯一 skip 为 `CAP-APPWIDGET-DYNAMIC`。
+- **16 KB 静态 readiness**：对当前 Host/fixture APK 的 19 个 ELF 执行
+  `llvm-readelf` 检查，全部 `PT_LOAD` alignment 为 `0x4000`，结果 `19/19 PASS`；API35
+  动态设备仍为 4 KB，真实动态 16 KB/ARM64/cross-bitness 留给 C6-T02。
+- **回归**：最终清理状态下 API34、API33、API32 S01-S10 分别为
+  `10/10 PASS`，证据目录分别为
+  `out/verification/c6-t01d-api34-regression-smoke-final/`、
+  `out/verification/c6-t01d-api33-regression-smoke/`、
+  `out/verification/c6-t01d-api32-regression-smoke-final/`；API32 包含 S04-S09
+  mandatory regression。
+- **质量门禁**：Harness `6/6 PASS`；`./gradlew.bat projects`、`assembleDebug`、`test`、
+  `compileall`、`git diff --check` 和 false-pass/evidence hygiene 均 PASS；
+  `ref/` unchanged，运行日志、截图、dumpsys、raw trace、APK、build/AVD output 均只在
+  ignored local evidence 中。
+- **报告与提交**：详细报告为
+  `reports/t57-r03/c6/C6_T01D_API35_CONVERGENCE_REPORT.md`。完成后只创建一个主题为
+  `C6-T01D: converge Android API35 platform behavior` 的提交并推送当前分支。
+- **下一任务**：`C6-T01E`；本条完成后停止，不自动开始 API36。

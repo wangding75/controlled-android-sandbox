@@ -1,5 +1,7 @@
 package com.warden.controlledsandbox.framework.core;
 
+import android.os.Build;
+
 import com.warden.controlledsandbox.contract.VirtualDisplayProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualDisplaySnapshot;
 import com.warden.controlledsandbox.contract.VirtualInputMethodProfileSnapshot;
@@ -163,7 +165,7 @@ final class InteractionServiceInvocationInterceptor {
         if (VirtualWindowPolicySnapshot.MODE_BLOCKED.equals(policy.mode())) {
             if (isCleanup(name)) return Call.handled(successValue(method.getReturnType()));
             if (name.contains("list") || name.startsWith("getinputmethod") || name.startsWith("getenabled")) {
-                return Call.handled(emptyCollection(method.getReturnType()));
+                return Call.handled(emptyInputMethodResult(method.getReturnType()));
             }
             return Call.handled(falseValue(method.getReturnType()));
         }
@@ -172,7 +174,7 @@ final class InteractionServiceInvocationInterceptor {
         }
         if (name.startsWith("getinputmethodlist") || name.startsWith("getenabledinputmethodlist")
                 || name.startsWith("getinputmethodsubtypelist") || name.contains("shortcutinputmethods")) {
-            return Call.handled(emptyCollection(method.getReturnType()));
+            return Call.handled(emptyInputMethodResult(method.getReturnType()));
         }
         if (name.contains("getcurrentinputmethodinfo") || name.contains("getlastinputmethodsubtype")) {
             return Call.handled(null);
@@ -371,6 +373,22 @@ final class InteractionServiceInvocationInterceptor {
         if (java.util.Set.class.isAssignableFrom(type)) return Collections.emptySet();
         if (type.isArray()) return java.lang.reflect.Array.newInstance(type.getComponentType(), 0);
         return null;
+    }
+    private static Object emptyInputMethodResult(Class<?> type) {
+        if (Build.VERSION.SDK_INT >= 35 && type != null
+                && "com.android.internal.inputmethod.InputMethodInfoSafeList".equals(type.getName())) {
+            HiddenApiAccess.ensureExemptions();
+            try {
+                Method empty = type.getDeclaredMethod("empty");
+                empty.setAccessible(true);
+                Object result = empty.invoke(null);
+                if (type.isInstance(result)) return result;
+                throw new IllegalStateException("INPUT_METHOD_SAFE_LIST_EMPTY_TYPE_MISMATCH");
+            } catch (ReflectiveOperationException | RuntimeException error) {
+                throw new IllegalStateException("INPUT_METHOD_SAFE_LIST_EMPTY_UNAVAILABLE", error);
+            }
+        }
+        return emptyCollection(type);
     }
     private static Object successValue(Class<?> type) {
         if (type == boolean.class || type == Boolean.class) return true;

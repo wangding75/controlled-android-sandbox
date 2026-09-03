@@ -1,4 +1,4 @@
-"""Run the API33/API34 extension capability suite and persist compact local evidence.
+"""Run the API33/API34/API35 extension capability suite and persist compact local evidence.
 
 The suite deliberately reuses the same DebugCommandActivity surface and fixture
 components as the S01-S10 contract.  It records complete device evidence under
@@ -57,7 +57,7 @@ def _now() -> str:
 
 def _install_required(device: AdbDevice, apk_paths: dict[str, Path]) -> list[dict[str, Any]]:
     installs: list[dict[str, Any]] = []
-    # API33/API34 x86_64 lanes intentionally omit the 32-bit Companion.  The
+    # API33/API34/API35 x86_64 lanes intentionally omit the 32-bit Companion.  The
     # compat32 fixture includes an x86_64 variant only so package/PMS/cross-package
     # identity can still be tested; cross-bitness remains C6-T02 scope.
     for name in ("host", "fixture", "fixture32"):
@@ -349,7 +349,9 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
     run_id = args.run_id or dt.datetime.now().strftime("%Y%m%dT%H%M%SZ")
     run_dir = (Path(args.output_root).resolve() / run_id)
     run_dir.mkdir(parents=True, exist_ok=True)
-    expected_api = 34 if args.api34 else 33
+    if args.api34 and args.api35:
+        raise DeviceMetadataError("API34_AND_API35_FLAGS_ARE_MUTUALLY_EXCLUSIVE")
+    expected_api = 35 if args.api35 else 34 if args.api34 else 33
     device = AdbDevice(args.serial, root=ROOT)
     apk_paths = _apk_paths(include_companion32=False)
     metadata = collect_device_metadata(
@@ -503,7 +505,7 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
 
     # MainActivity is the existing WebView smoke and FixtureApplication emits the JNI load
     # marker before Activity creation.  This verifies initialization/class-loader/native load
-    # without introducing an ABI/cross-bitness assertion into the API33 task.
+    # without introducing an ABI/cross-bitness assertion into the API33/API34/API35 task.
     cases.append(
         _check_case(
         context,
@@ -550,6 +552,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--serial", required=True)
     parser.add_argument("--instance-name", default="C6_T01B_API33_GoogleApis_x86_64")
     parser.add_argument("--api34", action="store_true", help="Require API 34 x86_64/4096 device contract")
+    parser.add_argument("--api35", action="store_true", help="Require API 35 x86_64/4096 device contract")
     parser.add_argument("--run-id", default="")
     parser.add_argument("--output-root", default=str(DEFAULT_OUTPUT_ROOT))
     return parser
