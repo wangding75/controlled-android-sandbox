@@ -4,7 +4,8 @@ Usage from the repository root::
 
     python tools/verification/run_rd_smoke.py --instance-name RD测试
 
-For an explicitly verified API33 AVD, use ``--serial emulator-5554 --api33``.
+For an explicitly verified API33/API34 AVD, use the matching ``--api33`` or
+``--api34`` flag with an explicit serial.
 
 The default run performs the required Gradle acceptance commands first.  Use
 ``--skip-build`` only when those commands were already run and their results
@@ -159,9 +160,9 @@ def _resolve_device(args: argparse.Namespace) -> tuple[dict[str, Any], AdbDevice
     return resolve_rd_device(args.instance_name, root=ROOT)
 
 
-def _validate_api33_device(metadata: dict[str, Any]) -> None:
+def _validate_api_device(metadata: dict[str, Any], expected_api: int) -> None:
     mismatches: list[str] = []
-    if metadata.get("api_level") != 33:
+    if metadata.get("api_level") != expected_api:
         mismatches.append(f"api_level={metadata.get('api_level')!r}")
     if metadata.get("abi") != "x86_64":
         mismatches.append(f"abi={metadata.get('abi')!r}")
@@ -171,8 +172,16 @@ def _validate_api33_device(metadata: dict[str, Any]) -> None:
         mismatches.append(f"page_size={metadata.get('page_size')!r}")
     if mismatches:
         raise DeviceMetadataError(
-            "API33_DEVICE_CONTRACT_MISMATCH: " + ", ".join(mismatches)
+            f"API{expected_api}_DEVICE_CONTRACT_MISMATCH: " + ", ".join(mismatches)
         )
+
+
+def _validate_api33_device(metadata: dict[str, Any]) -> None:
+    _validate_api_device(metadata, 33)
+
+
+def _validate_api34_device(metadata: dict[str, Any]) -> None:
+    _validate_api_device(metadata, 34)
 
 
 def _case_device(metadata: dict[str, Any]) -> dict[str, Any]:
@@ -326,7 +335,14 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
     else:
         try:
             resolver_snapshot, device = _resolve_device(args)
-            apk_paths = _apk_paths(include_companion32=not args.api33)
+            platform_lane = ""
+            if args.api33 and args.api34:
+                raise DeviceMetadataError("API33_AND_API34_FLAGS_ARE_MUTUALLY_EXCLUSIVE")
+            if args.api33:
+                platform_lane = "API33"
+            elif args.api34:
+                platform_lane = "API34"
+            apk_paths = _apk_paths(include_companion32=not platform_lane)
             metadata = collect_device_metadata(
                 device,
                 instance_name=args.instance_name,
@@ -343,8 +359,10 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
                     f"device metadata incomplete: {metadata.get('missing_fields')}",
                 )
             else:
-                if args.api33:
-                    _validate_api33_device(metadata)
+                if platform_lane == "API33":
+                    _validate_api_device(metadata, 33)
+                elif platform_lane == "API34":
+                    _validate_api_device(metadata, 34)
                 context = SmokeContext(
                     root=ROOT,
                     device=device,
@@ -353,11 +371,11 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
                     setup_omissions=(
                         {
                             "companion32": (
-                                "UNSUPPORTED_PLATFORM: API33 x86_64 AVD has no 32-bit ABI; "
+                                f"UNSUPPORTED_PLATFORM: {platform_lane} x86_64 AVD has no 32-bit ABI; "
                                 "32-bit compatibility/cross-bitness coverage is deferred to C6-T02"
                             )
                         }
-                        if args.api33
+                        if platform_lane
                         else {}
                     ),
                 )
@@ -406,6 +424,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--instance-name", default="RD测试")
     parser.add_argument("--serial", default="", help="Use this ADB serial instead of the RD resolver")
     parser.add_argument("--api33", action="store_true", help="Require API 33 x86_64/4096 device contract")
+    parser.add_argument("--api34", action="store_true", help="Require API 34 x86_64/4096 device contract")
     parser.add_argument("--run-id", default="")
     parser.add_argument("--output-root", default=str(DEFAULT_OUTPUT_ROOT))
     parser.add_argument("--skip-build", action="store_true")

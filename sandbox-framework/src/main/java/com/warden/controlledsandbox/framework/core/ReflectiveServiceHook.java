@@ -434,6 +434,14 @@ public final class ReflectiveServiceHook implements AutoCloseable {
         throw failure;
     }
 
+    /** API34+ keeps InputMethodManager IPCs in a process-global lazy service cache. */
+    public static ReflectiveServiceHook globalInputMethodServiceCache(
+            GuestIdentity identity) throws Exception {
+        HiddenApiAccess.ensureExemptions();
+        return staticField("android.view.inputmethod.IInputMethodManagerGlobalInvoker",
+                "sServiceCache", "getService", identity, "inputMethod");
+    }
+
     /**
      * Replaces known manager/global caches with empty instances for the lifetime of a proxy.
      * This prevents a DisplayManager created before installation from returning a host Display

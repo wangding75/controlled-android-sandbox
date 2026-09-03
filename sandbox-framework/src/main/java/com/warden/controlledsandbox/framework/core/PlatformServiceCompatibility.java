@@ -11,13 +11,13 @@ public final class PlatformServiceCompatibility {
     private PlatformServiceCompatibility() { }
 
     /**
-     * Android 13 exposes these Binder names only to the system API domain.  An ordinary
-     * application process cannot discover them through ServiceManager on the AOSP/Google API33
-     * image, even though the services are registered for system components.  Each caller must
+     * Android 13 and later expose these Binder names only to the system API domain.  An ordinary
+     * application process cannot discover them through ServiceManager on the AOSP/Google API33+
+     * images, even though the services are registered for system components.  Each caller must
      * use its supported application-facing facade when one exists.
      */
     public static boolean isApplicationRestricted(String logicalCapability) {
-        return Build.VERSION.SDK_INT == 33
+        return Build.VERSION.SDK_INT >= 33
                 && ("wifiScanner".equals(logicalCapability)
                 || "dnsResolver".equals(logicalCapability));
     }
@@ -25,11 +25,11 @@ public final class PlatformServiceCompatibility {
     public static String restrictionReason(String logicalCapability) {
         if (!isApplicationRestricted(logicalCapability)) return "";
         if ("wifiScanner".equals(logicalCapability)) {
-            return "EXPECTED_PLATFORM_BEHAVIOR:API33 system-api wifiscanner is not discoverable by "
+            return "EXPECTED_PLATFORM_BEHAVIOR:API33+ system-api wifiscanner is not discoverable by "
                     + "the untrusted application domain; WifiManager remains the supported app API";
         }
         if ("dnsResolver".equals(logicalCapability)) {
-            return "EXPECTED_PLATFORM_BEHAVIOR:API33 system-api dnsresolver is not discoverable by "
+            return "EXPECTED_PLATFORM_BEHAVIOR:API33+ system-api dnsresolver is not discoverable by "
                     + "the untrusted application domain; DnsResolver native facade remains the "
                     + "supported app API";
         }

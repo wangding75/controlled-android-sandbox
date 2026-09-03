@@ -4186,3 +4186,54 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   `UNSUPPORTED_PLATFORM` 并留给 C6-T02；AppWidget dynamic fixture 未覆盖；通知权限和
   system-only service visibility 按 Android 13 平台策略处理，未绕过策略。
 - **下一任务**：`C6-T01C`；本条完成后停止，不自动开始 API34。
+
+### C6-T01C：Android API34 Platform Convergence（2026-09-03）
+
+- **状态**：`DONE`；`RESULT=PASS`。父任务 `C6-T01` 仍为 `IN_PROGRESS`；本条只关闭
+  API34 平台收敛，不启动 API35 或后续专项。
+- **开始基线**：分支 `feature/t57-r03-va-pro-capability-campaign`，
+  `START_BASELINE_HEAD=6656f2cd466ff4297e599d819d4c0481d48f3e3f`；进入 API34 前工作区
+  clean。Task book 定义未变化，因此未修改 task book。
+- **API34 设备**：Google APIs AVD
+  `C6_T01C_API34_GoogleApis_x86_64` / `emulator-5560` / model
+  `sdk_gphone64_x86_64`；Android 14 / API34；ABI `x86_64`，ABI list
+  `x86_64,arm64-v8a`；page size `4096`；fingerprint
+  `google/sdk_gphone64_x86_64/emu64xa:14/UE1A.230829.050/12077443:userdebug/dev-keys`。
+  serial、model、manufacturer、API、release、ABI、ABI list、page size、fingerprint 和
+  kernel 均由系统属性/命令实际记录。
+- **Baseline-first**：无生产代码修改的完整 API34 baseline 为 `10 total / 2 PASS /
+  8 FAIL / 0 SKIP`，证据在 `out/verification/c6-t01c-api34-baseline-complete/`；首个
+  raw setup probe 的 Companion32 ABI 不匹配与级联结果另保存在
+  `out/verification/c6-t01c-api34-baseline-raw/`，未误记为十项独立产品失败。能力
+  baseline 为 `7 total / 0 PASS / 6 FAIL / 1 SKIP`，六项共享同一 readiness 根因。
+- **缺陷与修复**：API34-specific 根因共 4 项：API33-only `wifiScanner`/
+  `dnsResolver` restriction gate、InputMethodManager global invoker cache、
+  `LauncherActivityInfoInternal`/`IncrementalStatesInfo` constructor 与 virtual
+  UserHandle projection、以及 physical StubService 的 `FOREGROUND_SERVICE_DATA_SYNC`
+  权限。分别在集中式 platform adapter、InputMethod hook、framework object factory 和
+  Host manifest 边界完成最小修复。x86_64 无 32-bit ABI 的 Companion32 为显式
+  `UNSUPPORTED_PLATFORM`/C6-T02 边界；runner 的 API34 lane 和 split contract 修正为
+  harness fixes。没有 package/OEM 特判、retry/sleep 掩盖 race、吞异常、Host fallback
+  或降低断言。
+- **API34 最终结果**：S01-S10 run
+  `out/verification/c6-t01c-api34-smoke-final/` 为 `10/10 PASS`；capability run
+  `out/verification/c6-t01c-api34-capabilities-final-r3/` 为 `8 total / 7 PASS / 0
+  FAIL / 1 SKIP`。Package visibility、permission/AppOps/AttributionSource、task/window、
+  Service/FGS、broadcast/PendingResult、Provider、PendingIntent、notification、Alarm、
+  Job、network/media/DNS/VPN、shortcut/launcher、WebView、ClassLoader/native/JNI 和
+  base+dynamic-feature split 均通过；唯一 skip 为
+  `CAP-APPWIDGET-DYNAMIC=NOT_COVERED_BY_API34_DYNAMIC_SUITE`。
+- **P0 状态**：Receiver、PendingIntent、FGS、Job、exact alarm、process/recovery 均
+  `PASS`；dynamic-code 状态限定为 Guest APK/split ClassLoader 与 native load
+  `PASS_FOR_GUEST_APK_SPLIT_CLASSLOADER`，外部 runtime DEX/JAR、动态 AppWidget 和直接
+  BAL/killBackgroundProcesses fixture 标记 `NOT_IN_CURRENT_SCOPE`，未伪造 PASS。
+- **回归**：API33 capability `8 total / 7 PASS / 0 FAIL / 1 SKIP`，API33 S01-S10
+  `10/10 PASS`；API32 `RD测试` S01-S10 `10/10 PASS`，包含 S04-S09 mandatory regression。
+- **质量门禁**：Harness `6/6 PASS`；`./gradlew.bat projects`、`assembleDebug`、
+  `test`、`compileall`、`git diff --check` 和 false-pass/evidence hygiene 均 PASS；
+  `ref/` unchanged，运行日志、截图、dumpsys、raw trace、APK、build/AVD output 均只在
+  ignored local evidence 中。
+- **报告**：`reports/t57-r03/c6/C6_T01C_API34_CONVERGENCE_REPORT.md`；完整本地证据
+  路径和 root-cause matrix 记录于该报告。完成后只创建一个主题为
+  `C6-T01C: converge Android API34 platform behavior` 的提交并推送当前分支。
+- **下一任务**：`C6-T01D`；本条完成后停止，不自动开始 API35。

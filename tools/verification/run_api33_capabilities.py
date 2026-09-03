@@ -1,4 +1,4 @@
-"""Run the API33 extension capability suite and persist compact local evidence.
+"""Run the API33/API34 extension capability suite and persist compact local evidence.
 
 The suite deliberately reuses the same DebugCommandActivity surface and fixture
 components as the S01-S10 contract.  It records complete device evidence under
@@ -37,13 +37,18 @@ from tools.verification.device.metadata import (  # noqa: E402
 from tools.verification.run_rd_smoke import (  # noqa: E402
     _apk_paths,
     _git,
-    _validate_api33_device,
+    _validate_api_device,
 )
 
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT_ROOT = ROOT / "out" / "verification"
 FIXTURE32 = "com.warden.controlledsandbox.fixture32"
+SPLIT_PACKAGE = "com.warden.controlledsandbox.fixture.split"
+SPLIT_BASE_COMPONENT = "com.warden.controlledsandbox.fixture.split.SplitBaseActivity"
+SPLIT_FEATURE_COMPONENT = "com.warden.controlledsandbox.fixture.split.feature.FeatureActivity"
+SPLIT_BASE_APK = ROOT / "fixture-split-base" / "build" / "outputs" / "apk" / "debug" / "fixture-split-base-debug.apk"
+SPLIT_FEATURE_APK = ROOT / "fixture-split-feature" / "build" / "outputs" / "apk" / "debug" / "fixtureSplitFeature-debug.apk"
 
 
 def _now() -> str:
@@ -52,7 +57,7 @@ def _now() -> str:
 
 def _install_required(device: AdbDevice, apk_paths: dict[str, Path]) -> list[dict[str, Any]]:
     installs: list[dict[str, Any]] = []
-    # API33 is intentionally tested on x86_64 without the 32-bit Companion.  The
+    # API33/API34 x86_64 lanes intentionally omit the 32-bit Companion.  The
     # compat32 fixture includes an x86_64 variant only so package/PMS/cross-package
     # identity can still be tested; cross-bitness remains C6-T02 scope.
     for name in ("host", "fixture", "fixture32"):
@@ -76,12 +81,13 @@ def _launch_component(
     case_dir: Path,
     component: str,
     extras: dict[str, Any] | None = None,
+    package: str = GUEST_PACKAGE,
 ) -> tuple[dict[str, Any], str, list[str]]:
     observation = _invoke_debug(
         context,
         case_dir,
         command="launch-component",
-        package=GUEST_PACKAGE,
+        package=package,
         timeout_kind=TimeoutKind.RECOVERY,
         extras={"component": component, **(extras or {})},
         force_stop_host=True,
@@ -234,6 +240,104 @@ def _framework_case(context: SmokeContext, run_dir: Path) -> dict[str, Any]:
     return case
 
 
+def _split_case(context: SmokeContext, run_dir: Path, expected_api: int) -> dict[str, Any]:
+    """Exercise the existing installed split fixture through the virtual import path."""
+
+    case_id = "CAP-SPLIT-APK-CLASSLOADER"
+    case_dir = run_dir / "cases" / case_id
+    started = time.monotonic()
+    artifacts: list[str] = []
+    errors: list[str] = []
+    evidence: dict[str, Any] = {
+        "case_id": case_id,
+        "component": SPLIT_BASE_COMPONENT,
+        "feature_component": SPLIT_FEATURE_COMPONENT,
+        "status": "FAIL",
+        "required_markers": [
+            "CS_SPLIT_FIXTURE: BASE_CREATE featureClassLoaded=true",
+            "CS_SPLIT_FIXTURE: FEATURE_CREATE classLoaded=true",
+        ],
+        "observed_markers": [],
+        "errors": errors,
+        "artifacts": artifacts,
+    }
+    try:
+        if not SPLIT_BASE_APK.is_file() or not SPLIT_FEATURE_APK.is_file():
+            raise FileNotFoundError(
+                f"split fixture APKs are missing: {SPLIT_BASE_APK}, {SPLIT_FEATURE_APK}"
+            )
+        install = context.device.run(
+            ["install-multiple", "-r", str(SPLIT_BASE_APK), str(SPLIT_FEATURE_APK)],
+            timeout_sec=120.0,
+        )
+        if not install.ok:
+            raise RuntimeError(
+                f"SPLIT_APK_INSTALL_FAILED:returncode={install.returncode}:"
+                f"{install.text('stderr')[-500:]}"
+            )
+        physical_paths = context.device.shell_text(["pm", "path", SPLIT_PACKAGE])
+        split_paths = [line for line in physical_paths.splitlines() if line.strip()]
+        if len(split_paths) < 2:
+            raise RuntimeError(f"SPLIT_PHYSICAL_INSTALL_INCOMPLETE:{physical_paths!r}")
+
+        imported = _invoke_debug(
+            context,
+            case_dir / "import",
+            command="import-only",
+            package=SPLIT_PACKAGE,
+            timeout_kind=TimeoutKind.ADD_IMPORT,
+            force_stop_host=True,
+        )
+        import_result = imported.actual["debug_result"]
+        if import_result.get("status") != "PASS" or (
+            import_result.get("operation") or {}
+        ).get("status") != "IMPORTED":
+            raise RuntimeError(f"SPLIT_IMPORT_NOT_PASS:{import_result}")
+
+        base_result, base_logcat, base_artifacts = _launch_component(
+            context, case_dir / "base", SPLIT_BASE_COMPONENT, package=SPLIT_PACKAGE
+        )
+        if "CS_SPLIT_FIXTURE: BASE_CREATE featureClassLoaded=true" not in base_logcat:
+            raise RuntimeError("SPLIT_BASE_FEATURE_CLASS_NOT_LOADED")
+
+        feature_result, feature_logcat, feature_artifacts = _launch_component(
+            context, case_dir / "feature", SPLIT_FEATURE_COMPONENT, package=SPLIT_PACKAGE
+        )
+        if "CS_SPLIT_FIXTURE: FEATURE_CREATE classLoaded=true" not in feature_logcat:
+            raise RuntimeError("SPLIT_FEATURE_ACTIVITY_NOT_CREATED")
+
+        artifacts.extend(imported.artifacts)
+        artifacts.extend(base_artifacts)
+        artifacts.extend(feature_artifacts)
+        evidence.update({
+            "status": "PASS",
+            "physical_split_paths": split_paths,
+            "import_result": import_result,
+            "base_result": base_result,
+            "feature_result": feature_result,
+            "observed_markers": [
+                "CS_SPLIT_FIXTURE: BASE_CREATE featureClassLoaded=true",
+                "CS_SPLIT_FIXTURE: FEATURE_CREATE classLoaded=true",
+            ],
+            "api": expected_api,
+        })
+    except Exception as error:
+        errors.append(f"{error.__class__.__name__}:{error}")
+        try:
+            captured = _capture(context, case_dir / "failure", case_id)
+            artifacts.extend(captured["artifacts"])
+            evidence["failure_capture"] = captured
+        except Exception as capture_error:
+            errors.append(f"CAPTURE_FAILED:{capture_error}")
+    evidence["artifacts"] = list(dict.fromkeys(artifacts))
+    evidence["duration_ms"] = max(0, int(round((time.monotonic() - started) * 1000)))
+    case_dir.mkdir(parents=True, exist_ok=True)
+    (case_dir / "capability.json").write_text(
+        json.dumps(evidence, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    return evidence
+
+
 def _write_matrix(run_dir: Path, payload: dict[str, Any]) -> None:
     (run_dir / "capability-matrix.json").write_text(
         json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
@@ -245,6 +349,7 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
     run_id = args.run_id or dt.datetime.now().strftime("%Y%m%dT%H%M%SZ")
     run_dir = (Path(args.output_root).resolve() / run_id)
     run_dir.mkdir(parents=True, exist_ok=True)
+    expected_api = 34 if args.api34 else 33
     device = AdbDevice(args.serial, root=ROOT)
     apk_paths = _apk_paths(include_companion32=False)
     metadata = collect_device_metadata(
@@ -254,7 +359,7 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
         cas_commit=start_head,
         apk_paths=apk_paths.values(),
     )
-    _validate_api33_device(metadata)
+    _validate_api_device(metadata, expected_api)
     (run_dir / "device-metadata.json").write_text(
         json.dumps(metadata, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
@@ -267,7 +372,7 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
         setup_installs=installs,
         setup_omissions={
             "companion32": (
-                "UNSUPPORTED_PLATFORM: API33 x86_64 AVD has no 32-bit ABI; "
+                f"UNSUPPORTED_PLATFORM: API{expected_api} x86_64 AVD has no 32-bit ABI; "
                 "cross-bitness is deferred to C6-T02"
             )
         },
@@ -374,13 +479,14 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
             wait_seconds=75.0,
         )
     )
-    # There is no AppWidget provider/dynamic host fixture in the current API33 suite.  Keep
+    cases.append(_split_case(context, run_dir, expected_api))
+    # There is no AppWidget provider/dynamic host fixture in the current API suite.  Keep
     # this explicit rather than treating AppWidgetManager's static readback as full coverage.
     widget_case = {
         "case_id": "CAP-APPWIDGET-DYNAMIC",
         "component": None,
         "status": "SKIP",
-        "reason": "NOT_COVERED_BY_API33_DYNAMIC_SUITE",
+        "reason": f"NOT_COVERED_BY_API{expected_api}_DYNAMIC_SUITE",
         "required_markers": [],
         "observed_markers": [],
         "errors": [],
@@ -427,10 +533,10 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
         "capabilities": cases,
         "summary": summary,
         "limitations": [
-            "API33 device contract is validated from system properties, not AVD name.",
+            f"API{expected_api} device contract is validated from system properties, not AVD name.",
             "AppWidget dynamic host/provider fixture is not present and is explicit SKIP.",
-            "32-bit Companion/cross-bitness is deferred to C6-T02; fixture32 x86_64 is used for identity routing.",
-            "API33 NOT_EXPORTED dynamic receiver is exercised by a same-Guest send; adb-shell external delivery is not treated as equivalent.",
+            f"32-bit Companion/cross-bitness is deferred to C6-T02; fixture32 x86_64 is used for identity routing on API{expected_api}.",
+            f"API{expected_api} NOT_EXPORTED dynamic receiver is exercised by a same-Guest send; adb-shell external delivery is not treated as equivalent.",
         ],
         "evidence_root": run_dir.relative_to(ROOT).as_posix(),
         "finished_at": _now(),
@@ -443,6 +549,7 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--serial", required=True)
     parser.add_argument("--instance-name", default="C6_T01B_API33_GoogleApis_x86_64")
+    parser.add_argument("--api34", action="store_true", help="Require API 34 x86_64/4096 device contract")
     parser.add_argument("--run-id", default="")
     parser.add_argument("--output-root", default=str(DEFAULT_OUTPUT_ROOT))
     return parser

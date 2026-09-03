@@ -4,6 +4,7 @@ import android.content.ComponentName;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ComponentInfo;
 import android.content.pm.ResolveInfo;
+import android.os.UserHandle;
 import com.warden.controlledsandbox.contract.VirtualWidgetSnapshot;
 import com.warden.controlledsandbox.contract.VirtualShortcutSnapshot;
 import com.warden.controlledsandbox.contract.VirtualUsageEventSnapshot;
@@ -72,13 +73,25 @@ final class FrameworkApplicationEnvironmentObjectFactory {
     private static Object launcherServiceActivity(GuestIdentity identity) {
         ActivityInfo activity = launcherActivityInfo(identity);
         try {
+            HiddenApiAccess.ensureExemptions();
             Class<?> incrementalType = Class.forName("android.content.pm.IncrementalStatesInfo");
             Object incremental = construct(incrementalType,
-                    new Class<?>[]{boolean.class, float.class}, new Object[]{false, 1.0f});
+                    new Class<?>[]{boolean.class, float.class, long.class},
+                    new Object[]{false, 1.0f, 0L});
+            if (incremental == null) {
+                incremental = construct(incrementalType,
+                        new Class<?>[]{boolean.class, float.class}, new Object[]{false, 1.0f});
+            }
             Class<?> internalType = Class.forName("android.content.pm.LauncherActivityInfoInternal");
             Object internal = construct(internalType,
+                    new Class<?>[]{ActivityInfo.class, incrementalType, UserHandle.class},
+                    new Object[]{activity, incremental,
+                            userHandle(UserHandle.class, identity.virtualUserId())});
+            if (internal == null) {
+                internal = construct(internalType,
                     new Class<?>[]{ActivityInfo.class, incrementalType},
                     new Object[]{activity, incremental});
+            }
             if (incremental != null && internal != null) return internal;
             throw unsupported("LAUNCHER_ACTIVITY_INTERNAL", internalType);
         } catch (ClassNotFoundException legacyPlatform) {
