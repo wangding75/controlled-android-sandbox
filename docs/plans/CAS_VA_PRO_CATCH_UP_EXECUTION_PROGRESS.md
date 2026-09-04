@@ -4352,6 +4352,39 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   `C6-T01E: converge Android API36 platform behavior` 的提交并推送当前分支。
 - **下一任务**：`C6-T02`；本条完成后停止。
 
+### C6-T01F-R01：API37 Memory Limiter Environment & Recovery Closure（2026-09-04）
+
+- **状态**：`BLOCKED_ENV`；C6-T01F 仍为 `BLOCKED`。本轮没有修改产品源码，不进入
+  C6-T01G/C6-T02。
+- **开始基线**：`START_HEAD=70055637ac33e60e3af774142a86186f85fa4aff`；仅处理
+  Memory Limiter environment、M05 前置和 renderer environment。
+- **Headless AVD**：`C6_T01F_API37_GoogleApis_x86_64` / `emulator-5574`，
+  stable API37 Google APIs revision 6；AVD `hw.ramSize=4G`，Guest
+  `MemTotal=4008496 kB`（约 3914.55 MiB），PAGE_SIZE=4096。
+- **Memory Limiter contract**：cgroup v2 已挂载，cgroup.controllers 包含 memory，
+  `/proc/cgroups` 的 memory controller enabled；但 root 及 system/system_ext/product/
+  vendor/odm 搜索均未找到 `memory-limiter-config.xml`，且 `am memory-limiter status`
+  仍为 `disabled`。4 GiB 已使 RAM 生效，未盲目升至 6 GiB；
+  `MEMORY_LIMITER_ENV=BLOCKED_ENV`。
+- **M05**：因 limiter ENABLED 前置不成立，未设置 manual limit、未杀进程、未读取
+  ApplicationExitInfo，也未伪造 MemoryLimiter termination 或 recovery。PID/UID、
+  stale-state cleanup、relaunch/new PID 均为 `NOT_RUN_ENVIRONMENT_BLOCKED`。
+- **Renderer**：纯 headless 依次测试 `-gpu software` 和非废弃的 `-gpu swiftshader`；
+  两者均触发 `readColorBufferDma`。设置 `debug.sf.luma_sampling=0` 并精确重启
+  SurfaceFlinger 后短时稳定，但 TaskSnapshotPersist/direct screencap 仍 abort；
+  `RENDERER_ENVIRONMENT=BLOCKED_ENV`。未关闭 window/first-frame gate，未修改 system image。
+- **验证**：当前 HEAD 的 Gradle projects、assembleDebug、test、Harness `8/8`、
+  false-pass、ref unchanged 和 evidence hygiene 均 PASS；API37 原有 smoke `10/10`、
+  capability `7/0/1`、MessageQueue/reset、API32-36 regression 继续有效。
+- **清理**：R01 AVD 已停止；运行时 debug property 不持久化；未产生 manual override，
+  记录 `MEMORY_LIMITER_OVERRIDE_RESET=PASS_NOT_SET_NO_MANUAL_OVERRIDE`；AVD 定义保留
+  为后续 API37 lane 的 4 GiB 配置。
+- **报告**：已在原报告增加 `C6-T01F-R01 Closure` 章节：
+  `reports/t57-r03/c6/C6_T01F_API37_CONVERGENCE_REPORT.md`。
+- **下一步**：需要具备真实 limiter 配置且 `status=enabled` 的 Android 17 image/device
+  （或 Cuttlefish/AOSP/真实设备）完成 M05 recovery，并取得稳定 headless renderer；
+  在此之前 `NEXT_TASK=BLOCKED`。
+
 ### C6-T01F：Android API37 / Android 17 Platform Convergence（2026-09-04）
 
 - **状态**：`BLOCKED`；API37 runtime 收敛和大部分验证已完成，但严格 PASS gate 被

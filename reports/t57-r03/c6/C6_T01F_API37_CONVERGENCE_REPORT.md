@@ -315,7 +315,188 @@ TEMP_OVERLAY_REMOVED=PASS
 TEMP_COMPAT_OVERRIDE=RESET_AND_VERIFIED
 TEMP_MEMORY_LIMITER_OVERRIDE=RESTORED
 
-## 13. Final receipt
+## 13. C6-T01F-R01 Closure
+
+### 13.1 Previous blocker and scope
+
+C6-T01F 的唯一未关闭 gate 是 API37 Memory Limiter M05：前一轮约 2 GiB AVD 的
+`am memory-limiter status` 为 disabled，且默认 renderer 在 readColorBufferDma 路径
+崩溃。本 R01 只处理 limiter environment、headless renderer 和 M05 前置；没有重新
+开发已经 PASS 的 MessageQueue、static-final、Package、Service、Provider、PendingIntent
+或 WebView contract。
+
+R01 从已推送的 C6-T01F HEAD 开始：
+
+START_HEAD=70055637ac33e60e3af774142a86186f85fa4aff
+AVD_MODE=HEADLESS
+API37_DEVICE=C6_T01F_API37_GoogleApis_x86_64 / emulator-5574
+
+没有修改 Android system image、memory-limiter service、CAS 检测逻辑或产品源码；所有
+renderer 和 AVD 变更均为专用 emulator/AVD 环境操作，evidence 留在 ignored
+out/verification。
+
+### 13.2 Memory-Limiter-capable environment check
+
+| Check | Evidence | Result |
+|---|---|---|
+| AVD RAM | config.ini hw.ramSize=4G | PASS_CONFIGURED |
+| Guest MemTotal | 4008496 kB = 3914.55 MiB | PASS_RAM_ABOVE_3.2_GIB |
+| API/release | 37 / 17 | PASS |
+| PAGE_SIZE | 4096 | PASS |
+| cgroup v2 | /sys/fs/cgroup mounted as cgroup2 | PASS |
+| memory controller | cgroup.controllers=memory；/proc/cgroups memory enabled | PASS |
+| limiter config | root search and system/system_ext/product/vendor/odm paths found nothing | FAIL_MISSING_PLATFORM_CONFIG |
+| am memory-limiter status | Memory limiter / disabled | FAIL_DISABLED |
+
+`MEMORY_LIMITER_ENV=BLOCKED_ENV`。
+
+4 GiB 的 Guest MemTotal 已高于 Android/AOSP 文档中的低内存排除阈值，因此没有盲目
+扩大到 6 GiB；当前失败原因不是 AVD RAM 未生效，而是公开 stable API37 image 没有
+可解析的 memory-limiter-config.xml 且运行时 status 仍 disabled。Android 17 的退出
+标记规则参见 [Android 17 memory-limiter behavior](https://developer.android.com/about/versions/17/behavior-changes-all)，
+配置背景参见 [AOSP Memory Limiter configuration](https://source.android.google.cn/docs/core/perf/memory-limiter?hl=en)。
+
+`am help` 确认当前 image 的实际接口为 manual PID PERCENT|none；由于 limiter environment
+没有 ENABLED，未调用 manual，不开始 M05。
+
+### 13.3 Renderer environment closure attempt
+
+所有尝试均为 headless，并使用了任务指定的非废弃 backend：
+
+| Backend/run | Result |
+|---|---|
+| -gpu software | S01 可启动；S03/S04 期间 surfaceflinger RegionSampling 触发 readColorBufferDma abort，随后 Broken pipe |
+| -gpu swiftshader | 同样触发 mapper.ranchu/readColorBufferDma abort |
+| swiftshader + debug.sf.luma_sampling=0 | 设置属性并精确重启 surfaceflinger 后短时稳定，但 TaskSnapshotPersist 和直接 screencap 仍触发 readColorBufferDma；不能作为稳定 renderer |
+
+`RENDERER_ENVIRONMENT=BLOCKED_ENV`。
+`GRAPHICS_BACKEND=software; swiftshader`。
+`READ_COLOR_BUFFER_DMA_STATUS=FAIL_ENVIRONMENT_BOTH_BACKENDS`。
+
+Targeted evidence：
+
+- out/verification/c6-t01f-r01-renderer-4g-software/
+- out/verification/c6-t01f-r01-renderer-4g-software-sequence/
+- out/verification/c6-t01f-r01-env-4g-swiftshader/
+- out/verification/c6-t01f-r01-env-4g-swiftshader-prop/
+- out/verification/c6-t01f-r01-renderer-4g-swiftshader-lumaoff-sequence/
+
+luma sampling workaround 没有关闭窗口、first-frame 或 harness assertion；即使 WMS 有
+surface，TaskSnapshotPersist/direct screencap 仍能复现 emulator abort。因此这些 targeted
+run 的失败不归类为 CAS product defect，也不满足 renderer PASS。WebView smoke 在
+renderer gate 未通过后不启动，避免把不健康 system_server 上的结果误记为 WebView 结论。
+
+### 13.4 M05 precondition and fail-closed result
+
+M05 的第一步要求 limiter ENABLED、Host+Guest 正常 cold/warm launch、并解析真实
+Guest sandbox process slot 到 Linux PID/UID。本 R01 在 environment contract 阶段已经
+失败，因此严格停止在 M05 前置，不施加 manual limit，不杀进程，不读取伪造的
+ApplicationExitInfo，不把 ordinary kill、LMK、crash 或 renderer 崩溃算作 MemoryLimiter。
+
+M05_TARGET_PROCESS=NOT_RUN_ENVIRONMENT_BLOCKED
+M05_TARGET_PID=NOT_RUN
+M05_TARGET_UID=NOT_RUN
+M05_MANUAL_LIMIT_MB=NOT_SET；当前 image contract 使用 PERCENT
+M05_TRIGGER=NOT_RUN
+APPLICATION_EXIT_REASON=NOT_OBSERVED
+APPLICATION_EXIT_DESCRIPTION=NOT_OBSERVED
+PROCESS_CLEANUP=NOT_RUN
+PROCESS_SLOT_CLEANUP=NOT_RUN
+BINDER_CLEANUP=NOT_RUN
+ACTIVITY_CLEANUP=NOT_RUN
+SERVICE_CLEANUP=NOT_RUN
+PROVIDER_CLEANUP=NOT_RUN
+PACKAGE_STATE=NOT_RUN
+RELAUNCH=NOT_RUN
+FIRST_FRAME=NOT_RUN_FOR_M05
+NEW_PROCESS_IDENTITY=NOT_RUN
+MEMORY_LIMITER_RECOVERY=BLOCKED_ENV_NOT_PROVEN
+MEMORY_LIMITER_OVERRIDE_RESET=PASS_NOT_SET_NO_MANUAL_OVERRIDE
+
+没有产生 manual memory limit override；因此 cleanup 条件为 no override set，而不是
+依赖关闭 emulator 假设 reset。debug.sf.luma_sampling=0 也是运行时 debug property，
+不会写入 AVD config；AVD 停止后不保留。
+
+### 13.5 Regression and hygiene
+
+R01 没有产品源码修改，C6-T01F 已完成的 API37 10/10、capability 7/0/1、
+MessageQueue PASS/reset 和 API32-36 regression 继续有效。本轮重新执行：
+
+HARNESS_TESTS=8/8 PASS
+GRADLE_PROJECTS=PASS
+ASSEMBLE_DEBUG=PASS
+UNIT_TESTS=GRADLE_TEST PASS
+FALSE_PASS_CHECK=PASS
+REF_STATUS=UNCHANGED
+
+AVD_STOPPED=PASS
+AVD_FINAL_RAM=4096 MB
+AVD_CONFIG_RAM=hw.ramSize=4G
+TEMP_SYSTEM_IMAGE_MODIFICATION=NONE
+TEMP_MEMORY_LIMITER_OVERRIDE=NONE_SET
+TEMP_COMPAT_OVERRIDE=NONE_IN_R01; PRIOR_C6-T01F_RESET_VERIFIED
+EVIDENCE_GIT_HYGIENE=PASS
+
+### 13.6 R01 final receipt
+
+C6-T01F-R01
+RESULT=BLOCKED_ENV
+FINAL_HEAD=HEAD
+API37_DEVICE=C6_T01F_API37_GoogleApis_x86_64 / emulator-5574
+AVD_MODE=HEADLESS
+AVD_RAM_MB=4096
+MEM_TOTAL_MB=3914.55
+PAGE_SIZE=4096
+GRAPHICS_BACKEND=software; swiftshader
+READ_COLOR_BUFFER_DMA_STATUS=FAIL_ENVIRONMENT_BOTH_BACKENDS
+RENDERER_ENVIRONMENT=BLOCKED_ENV
+MEMORY_LIMITER_STATUS=DISABLED
+MEMORY_LIMITER_ENV=BLOCKED_ENV
+MEMORY_LIMITER_CONFIG=NOT_FOUND_IN_SYSTEM_SYSTEM_EXT_PRODUCT_VENDOR_ODM_OR_ROOT
+CGROUP_V2=PASS
+MEMORY_CONTROLLER=PASS
+M05_TARGET_PROCESS=NOT_RUN_ENVIRONMENT_BLOCKED
+M05_TARGET_PID=NOT_RUN
+M05_TARGET_UID=NOT_RUN
+M05_MANUAL_LIMIT_MB=NOT_SET
+M05_TRIGGER=NOT_RUN
+APPLICATION_EXIT_REASON=NOT_OBSERVED
+APPLICATION_EXIT_DESCRIPTION=NOT_OBSERVED
+PROCESS_CLEANUP=NOT_RUN
+PROCESS_SLOT_CLEANUP=NOT_RUN
+BINDER_CLEANUP=NOT_RUN
+ACTIVITY_CLEANUP=NOT_RUN
+SERVICE_CLEANUP=NOT_RUN
+PROVIDER_CLEANUP=NOT_RUN
+PACKAGE_STATE=NOT_RUN
+RELAUNCH=NOT_RUN
+FIRST_FRAME=NOT_RUN_FOR_M05
+NEW_PROCESS_IDENTITY=NOT_RUN
+MEMORY_LIMITER_RECOVERY=BLOCKED_ENV_NOT_PROVEN
+MEMORY_LIMITER_OVERRIDE_RESET=PASS_NOT_SET_NO_MANUAL_OVERRIDE
+COMPAT_OVERRIDES_RESET=PASS_PREVIOUS_C6-T01F
+API37_SMOKE_TOTAL=10
+API37_SMOKE_PASS=10
+API37_SMOKE_FAIL=0
+API37_CAPABILITY_TOTAL=8
+API37_CAPABILITY_PASS=7
+API37_CAPABILITY_FAIL=0
+API37_CAPABILITY_SKIP=1
+HARNESS_TESTS=8/8 PASS
+GRADLE_PROJECTS=PASS
+ASSEMBLE_DEBUG=PASS
+UNIT_TESTS=GRADLE_TEST PASS
+FALSE_PASS_CHECK=PASS
+EVIDENCE_GIT_HYGIENE=PASS
+REF_STATUS=UNCHANGED
+GIT_STATUS=CLEAN_AFTER_PUSH
+C6_T01F_FINAL_STATUS=BLOCKED
+NEXT_TASK=BLOCKED
+
+R01 关闭条件仍是：提供真实 ENABLED 的标准 API37 Memory Limiter image/device，完成
+M05 的 MemoryLimiter termination、ApplicationExitInfo、CAS stale-state cleanup 和
+new-PID recovery；同时提供不再触发 readColorBufferDma 的稳定 headless renderer。
+## 14. Final receipt
 
 C6-T01F
 RESULT=BLOCKED
