@@ -1,4 +1,4 @@
-"""Run the API33/API34/API35/API36 extension capability suite and persist compact local evidence.
+"""Run the API33/API34/API35/API36/API37 extension capability suite and persist compact local evidence.
 
 The suite deliberately reuses the same DebugCommandActivity surface and fixture
 components as the S01-S10 contract.  It records complete device evidence under
@@ -37,6 +37,7 @@ from tools.verification.device.metadata import (  # noqa: E402
 from tools.verification.run_rd_smoke import (  # noqa: E402
     _apk_paths,
     _git,
+    _wait_for_android_services,
     _validate_api_device,
 )
 
@@ -57,7 +58,7 @@ def _now() -> str:
 
 def _install_required(device: AdbDevice, apk_paths: dict[str, Path]) -> list[dict[str, Any]]:
     installs: list[dict[str, Any]] = []
-    # API33/API34/API35/API36 x86_64 lanes intentionally omit the 32-bit Companion.  The
+    # API33/API34/API35/API36/API37 x86_64 lanes intentionally omit the 32-bit Companion.  The
     # compat32 fixture includes an x86_64 variant only so package/PMS/cross-package
     # identity can still be tested; cross-bitness remains C6-T02 scope.
     for name in ("host", "fixture", "fixture32"):
@@ -73,6 +74,30 @@ def _install_required(device: AdbDevice, apk_paths: dict[str, Path]) -> list[dic
         installs.append(row)
         if not result.ok:
             raise RuntimeError(f"APK_INSTALL_FAILED:{name}:{row}")
+    # API37's PackageUpdateActivity can finish asynchronously after `adb install` has returned.
+    # If the first explicit DebugCommandActivity launch races that finish, SystemUI resumes the
+    # old no-extras intent and the command worker records `package extra is required`.  Fence the
+    # package-update surface before dispatching the first capability command.
+    deadline = time.monotonic() + 30.0
+    quiet_since: float | None = None
+    last_activity_dump = ""
+    while time.monotonic() < deadline:
+        activity_dump = device.shell(
+            ["dumpsys", "activity", "activities"], timeout_sec=60.0
+        )
+        last_activity_dump = activity_dump.text()
+        package_update_active = "PackageUpdateActivity" in last_activity_dump
+        if activity_dump.ok and not package_update_active:
+            quiet_since = quiet_since or time.monotonic()
+            if time.monotonic() - quiet_since >= 1.0:
+                return installs
+        else:
+            quiet_since = None
+        time.sleep(0.2)
+    raise RuntimeError(
+        "PACKAGE_UPDATE_ACTIVITY_NOT_IDLE: "
+        + last_activity_dump[-1200:].replace("\n", " ")
+    )
     return installs
 
 
@@ -371,10 +396,11 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
     run_id = args.run_id or dt.datetime.now().strftime("%Y%m%dT%H%M%SZ")
     run_dir = (Path(args.output_root).resolve() / run_id)
     run_dir.mkdir(parents=True, exist_ok=True)
-    if sum(bool(value) for value in (args.api34, args.api35, args.api36)) > 1:
-        raise DeviceMetadataError("API34_API35_API36_FLAGS_ARE_MUTUALLY_EXCLUSIVE")
-    expected_api = 36 if args.api36 else 35 if args.api35 else 34 if args.api34 else 33
+    if sum(bool(value) for value in (args.api34, args.api35, args.api36, args.api37)) > 1:
+        raise DeviceMetadataError("API34_API35_API36_API37_FLAGS_ARE_MUTUALLY_EXCLUSIVE")
+    expected_api = 37 if args.api37 else 36 if args.api36 else 35 if args.api35 else 34 if args.api34 else 33
     device = AdbDevice(args.serial, root=ROOT)
+    _wait_for_android_services(device)
     apk_paths = _apk_paths(include_companion32=False)
     metadata = collect_device_metadata(
         device,
@@ -576,6 +602,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--api34", action="store_true", help="Require API 34 x86_64/4096 device contract")
     parser.add_argument("--api35", action="store_true", help="Require API 35 x86_64/4096 device contract")
     parser.add_argument("--api36", action="store_true", help="Require API 36 x86_64/4096 device contract")
+    parser.add_argument("--api37", action="store_true", help="Require API 37 x86_64/4096 device contract")
     parser.add_argument("--run-id", default="")
     parser.add_argument("--output-root", default=str(DEFAULT_OUTPUT_ROOT))
     return parser

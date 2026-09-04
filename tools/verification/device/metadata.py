@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import hashlib
+import os
+import re
 import sys
 from pathlib import Path
 from typing import Any, Iterable
@@ -19,6 +21,7 @@ REQUIRED_PROPERTIES = {
     "manufacturer": "ro.product.manufacturer",
     "model": "ro.product.model",
     "build_fingerprint": "ro.build.fingerprint",
+    "build_incremental": "ro.build.version.incremental",
 }
 
 
@@ -53,6 +56,71 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _read_properties(path: Path) -> dict[str, str]:
+    properties: dict[str, str] = {}
+    try:
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            if not line.strip() or line.lstrip().startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            properties[key.strip()] = value.strip()
+    except OSError:
+        return {}
+    return properties
+
+
+def _stable_system_image_metadata(api_level: int | None, abi: str) -> dict[str, Any]:
+    """Find local stable image metadata without trusting an AVD display name."""
+
+    if api_level is None or not abi:
+        return {"revision": None, "path": "", "package": "", "tag": ""}
+    sdk_root = os.environ.get("ANDROID_SDK_ROOT") or os.environ.get("ANDROID_HOME")
+    if not sdk_root:
+        return {"revision": None, "path": "", "package": "", "tag": ""}
+    image_root = Path(sdk_root) / "system-images"
+    if not image_root.is_dir():
+        return {"revision": None, "path": "", "package": "", "tag": ""}
+
+    # Stable API37 is installed as android-37.0. Do not select preview/canary
+    # directories such as android-37-ext* or android-U*.
+    directory_pattern = re.compile(rf"android-{api_level}(?:\.0)?$")
+    candidates: list[tuple[int, Path, dict[str, str]]] = []
+    for api_dir in image_root.iterdir():
+        if not api_dir.is_dir() or not directory_pattern.fullmatch(api_dir.name):
+            continue
+        for tag_dir in sorted(api_dir.iterdir()):
+            if not tag_dir.is_dir():
+                continue
+            abi_dir = tag_dir / abi
+            properties_path = abi_dir / "source.properties"
+            properties = _read_properties(properties_path)
+            if not properties:
+                continue
+            if properties.get("AndroidVersion.PreviewSdkInt", "0") not in {"", "0"}:
+                continue
+            revision_text = properties.get("Pkg.Revision", "")
+            try:
+                revision = int(revision_text.split(".", 1)[0])
+            except ValueError:
+                continue
+            candidates.append((revision, abi_dir, properties))
+    if not candidates:
+        return {"revision": None, "path": "", "package": "", "tag": ""}
+    revision, abi_dir, properties = sorted(candidates, key=lambda item: item[0], reverse=True)[0]
+    return {
+        "revision": revision,
+        "path": str(abi_dir),
+        "package": f"system-images;android-{api_level}.0;{abi_dir.parent.name};{abi}",
+        "tag": properties.get("SystemImage.TagId", abi_dir.parent.name),
+        "source_properties": properties,
+    }
+
+
+def _parse_mem_total(meminfo: str) -> int | None:
+    match = re.search(r"^MemTotal:\s*(\d+)\s*kB\s*$", meminfo, flags=re.MULTILINE)
+    return int(match.group(1)) if match else None
 
 
 def collect_device_metadata(
@@ -100,12 +168,21 @@ def collect_device_metadata(
         "stdout": boot.text(),
         "stderr": boot.text("stderr"),
     }
+    meminfo = device.shell(["cat", "/proc/meminfo"], timeout_sec=30.0)
+    raw["cat /proc/meminfo"] = {
+        "returncode": meminfo.returncode,
+        "stdout": meminfo.text(),
+        "stderr": meminfo.text("stderr"),
+    }
 
     try:
         page_size: int | None = int(page.text().strip())
     except ValueError:
         page_size = None
     abi_list = [item for item in values["abi_list"].replace(",", " ").split() if item]
+    api_level = _int_or_none(values["api_level"])
+    ram_size_kb = _parse_mem_total(meminfo.text())
+    image = _stable_system_image_metadata(api_level, values["abi"])
     apk_hashes = {
         str(path): sha256_file(path) if path.is_file() else ""
         for path in apk_paths
@@ -116,14 +193,22 @@ def collect_device_metadata(
         "adb_serial": device.serial,
         "manufacturer": values["manufacturer"],
         "model": values["model"],
-        "api_level": _int_or_none(values["api_level"]),
+        "api_level": api_level,
         "android_version": values["android_version"],
         "abi": values["abi"],
         "abi_list": abi_list,
         "page_size": page_size,
         "build_fingerprint": values["build_fingerprint"],
         "fingerprint": values["build_fingerprint"],
+        "build_incremental": values["build_incremental"],
         "kernel": kernel.text().strip(),
+        "ram_size_kb": ram_size_kb,
+        "ram_size": f"{ram_size_kb} kB" if ram_size_kb is not None else "",
+        "system_image_revision": image["revision"],
+        "system_image_path": image["path"],
+        "system_image_package": image["package"],
+        "system_image_tag": image["tag"],
+        "system_image_source_properties": image.get("source_properties", {}),
         "boot_id": boot.text().strip(),
         "adb_state": state.text().strip(),
         "cas_commit": cas_commit,
@@ -137,6 +222,8 @@ def collect_device_metadata(
     ]
     if metadata["adb_state"] != "device":
         missing.append("adb_state")
+    if metadata.get("api_level") == 37 and not metadata.get("system_image_revision"):
+        missing.append("system_image_revision")
     metadata["metadata_complete"] = not missing
     metadata["missing_fields"] = missing
     return metadata

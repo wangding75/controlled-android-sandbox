@@ -8,27 +8,60 @@ device.
 from __future__ import annotations
 
 import struct
+import sys
 import tempfile
 import time
 import unittest
 import zlib
 from pathlib import Path
 
-from .capabilities.smoke import _matches_request, _session, _timeout_classification
-from .core.assertions import classify_failure_text
-from .core.models import (
-    AttemptResult,
-    ContractError,
-    FailureClass,
-    ResultState,
-    Testcase,
-    TestcaseSpec,
-)
-from .core.policy import HarnessTimeout, RetryPolicy, TimeoutKind, TimeoutPolicy, run_bounded
-from .core.runner import AttemptExecution, run_case
-from .device.screen import inspect_png
-from .reporting.summary import build_summary, render_compact_report
-from .run_api33_capabilities import _merge_case_logcat
+if __package__ in {None, ""}:
+    _ROOT = Path(__file__).resolve().parents[2]
+    if str(_ROOT) not in sys.path:
+        sys.path.insert(0, str(_ROOT))
+    from tools.verification.capabilities.smoke import _matches_request, _session, _timeout_classification
+    from tools.verification.core.assertions import classify_failure_text
+    from tools.verification.core.models import (
+        AttemptResult,
+        ContractError,
+        FailureClass,
+        ResultState,
+        Testcase,
+        TestcaseSpec,
+    )
+    from tools.verification.core.policy import HarnessTimeout, RetryPolicy, TimeoutKind, TimeoutPolicy, run_bounded
+    from tools.verification.core.runner import AttemptExecution, run_case
+    from tools.verification.device.screen import inspect_png
+    from tools.verification.memory_limiter import (
+        MEMORY_LIMITER_CLASSIFICATION,
+        PRODUCT_CRASH,
+        classify_exit,
+        classify_recovery,
+    )
+    from tools.verification.reporting.summary import build_summary, render_compact_report
+    from tools.verification.run_api33_capabilities import _merge_case_logcat
+else:
+    from .capabilities.smoke import _matches_request, _session, _timeout_classification
+    from .core.assertions import classify_failure_text
+    from .core.models import (
+        AttemptResult,
+        ContractError,
+        FailureClass,
+        ResultState,
+        Testcase,
+        TestcaseSpec,
+    )
+    from .core.policy import HarnessTimeout, RetryPolicy, TimeoutKind, TimeoutPolicy, run_bounded
+    from .core.runner import AttemptExecution, run_case
+    from .device.screen import inspect_png
+    from .memory_limiter import (
+        MEMORY_LIMITER_CLASSIFICATION,
+        PRODUCT_CRASH,
+        classify_exit,
+        classify_recovery,
+    )
+    from .reporting.summary import build_summary, render_compact_report
+    from .run_api33_capabilities import _merge_case_logcat
 
 
 def _chunk(kind: bytes, body: bytes) -> bytes:
@@ -102,7 +135,10 @@ class HarnessContractTests(unittest.TestCase):
                 "retry_attempt": None,
                 "final_classification": None,
             }
-            from .core.models import validate_testcase_payload
+            if __package__ in {None, ""}:
+                from tools.verification.core.models import validate_testcase_payload
+            else:
+                from .core.models import validate_testcase_payload
 
             validate_testcase_payload(validate)
 
@@ -219,6 +255,24 @@ class HarnessContractTests(unittest.TestCase):
         )
         self.assertIn("FRAMEWORK_PROBE_PASS", logcat)
         self.assertIn("FATAL EXCEPTION", logcat)
+
+    def test_memory_limiter_exit_is_not_confused_with_an_ordinary_crash(self) -> None:
+        memory_exit = (
+            "reason=13 (REASON_OTHER)\n"
+            "description=MemoryLimiter:AnonSwap process constrained"
+        )
+        ordinary_crash = "reason=4 (CRASH)\ndescription=java.lang.IllegalStateException"
+        self.assertEqual(classify_exit(memory_exit), MEMORY_LIMITER_CLASSIFICATION)
+        self.assertEqual(classify_exit(ordinary_crash), PRODUCT_CRASH)
+        self.assertNotEqual(classify_exit(memory_exit), PRODUCT_CRASH)
+        self.assertEqual(
+            classify_recovery(process_died=True, cleanup_ok=True, restarted=True),
+            "EXPECTED_PLATFORM_BEHAVIOR",
+        )
+        self.assertEqual(
+            classify_recovery(process_died=True, cleanup_ok=False, restarted=True),
+            "PRODUCT_DEFECT",
+        )
 
 
 if __name__ == "__main__":

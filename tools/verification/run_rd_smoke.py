@@ -4,7 +4,7 @@ Usage from the repository root::
 
     python tools/verification/run_rd_smoke.py --instance-name RD测试
 
-For an explicitly verified API33/API34/API35/API36 AVD, use the matching lane flag
+For an explicitly verified API33/API34/API35/API36/API37 AVD, use the matching lane flag
 with an explicit serial.
 
 The default run performs the required Gradle acceptance commands first.  Use
@@ -192,6 +192,40 @@ def _validate_api36_device(metadata: dict[str, Any]) -> None:
     _validate_api_device(metadata, 36)
 
 
+def _wait_for_android_services(device: AdbDevice, timeout_sec: float = 120.0) -> None:
+    """Wait until package/activity binders are callable before install or launch work."""
+
+    deadline = time.monotonic() + max(0.0, timeout_sec)
+    while True:
+        services = device.shell(["service", "list"], timeout_sec=30.0)
+        names = services.text()
+        # ``service list`` can expose the binder names during an Android 17 boot
+        # window in which the package service is not yet published.  Probe the
+        # actual shell endpoints as an install-race fence; otherwise adb install
+        # fails with "Can't find service: package" and the later cases cascade.
+        package_probe = device.shell(
+            ["cmd", "package", "list", "packages"], timeout_sec=30.0
+        )
+        activity_probe = device.shell(
+            ["cmd", "activity", "get-config"], timeout_sec=30.0
+        )
+        if (
+            services.ok
+            and "activity:" in names
+            and "package:" in names
+            and package_probe.ok
+            and "package:" in package_probe.text()
+            and activity_probe.ok
+            and "config:" in activity_probe.text()
+        ):
+            return
+        if time.monotonic() >= deadline:
+            raise DeviceMetadataError(
+                "ANDROID_SERVICES_NOT_READY: activity/package services were not available"
+            )
+        time.sleep(0.5)
+
+
 def _case_device(metadata: dict[str, Any]) -> dict[str, Any]:
     keys = (
         "instance_name", "serial", "manufacturer", "model", "api_level",
@@ -297,7 +331,7 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
         if run_dir.is_relative_to(ROOT)
         else str(run_dir),
         "limitations": [
-            "The runner executes the shared S01-S10 contract against a resolved or explicitly supplied device; API33 selection is validated from system properties.",
+            "The runner executes the shared S01-S10 contract against a resolved or explicitly supplied device; API lane selection is validated from system properties.",
             "The harness records real readiness and screen evidence; it never promotes an accepted/pending launch or a black frame to PASS.",
         ],
     }
@@ -343,9 +377,10 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
     else:
         try:
             resolver_snapshot, device = _resolve_device(args)
+            _wait_for_android_services(device)
             platform_lane = ""
-            if sum(bool(value) for value in (args.api33, args.api34, args.api35, args.api36)) > 1:
-                raise DeviceMetadataError("API33_API34_API35_API36_FLAGS_ARE_MUTUALLY_EXCLUSIVE")
+            if sum(bool(value) for value in (args.api33, args.api34, args.api35, args.api36, args.api37)) > 1:
+                raise DeviceMetadataError("API33_API34_API35_API36_API37_FLAGS_ARE_MUTUALLY_EXCLUSIVE")
             if args.api33:
                 platform_lane = "API33"
             elif args.api34:
@@ -354,6 +389,8 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
                 platform_lane = "API35"
             elif args.api36:
                 platform_lane = "API36"
+            elif args.api37:
+                platform_lane = "API37"
             apk_paths = _apk_paths(include_companion32=not platform_lane)
             metadata = collect_device_metadata(
                 device,
@@ -379,6 +416,8 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
                     _validate_api_device(metadata, 35)
                 elif platform_lane == "API36":
                     _validate_api_device(metadata, 36)
+                elif platform_lane == "API37":
+                    _validate_api_device(metadata, 37)
                 context = SmokeContext(
                     root=ROOT,
                     device=device,
@@ -443,6 +482,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--api34", action="store_true", help="Require API 34 x86_64/4096 device contract")
     parser.add_argument("--api35", action="store_true", help="Require API 35 x86_64/4096 device contract")
     parser.add_argument("--api36", action="store_true", help="Require API 36 x86_64/4096 device contract")
+    parser.add_argument("--api37", action="store_true", help="Require API 37 x86_64/4096 device contract")
     parser.add_argument("--run-id", default="")
     parser.add_argument("--output-root", default=str(DEFAULT_OUTPUT_ROOT))
     parser.add_argument("--skip-build", action="store_true")

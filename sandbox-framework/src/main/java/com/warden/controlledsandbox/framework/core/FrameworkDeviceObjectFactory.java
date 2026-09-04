@@ -12,6 +12,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -329,8 +330,18 @@ public final class FrameworkDeviceObjectFactory {
         return value;
     }
 
-    static List<Object> list(Method method, List<?> profiles, ElementFactory factory) {
+    static Object list(Method method, List<?> profiles, ElementFactory factory) {
+        List<Object> result = projectedList(method, profiles, factory);
+        return adaptCollection(result, method.getReturnType());
+    }
+
+    static Set<Object> set(Method method, List<?> profiles, ElementFactory factory) {
+        return Collections.unmodifiableSet(new LinkedHashSet<>(projectedList(method, profiles, factory)));
+    }
+
+    private static List<Object> projectedList(Method method, List<?> profiles, ElementFactory factory) {
         Class<?> elementType = listElementType(method);
+        if (elementType == null) elementType = inferredElementType(method);
         if (elementType == null) {
             // Host-side test interfaces often erase the element type; snapshots remain deterministic values.
             return Collections.unmodifiableList(new ArrayList<>(profiles));
@@ -340,8 +351,62 @@ public final class FrameworkDeviceObjectFactory {
         return Collections.unmodifiableList(result);
     }
 
-    static Set<Object> set(Method method, List<?> profiles, ElementFactory factory) {
-        return Collections.unmodifiableSet(new LinkedHashSet<>(list(method, profiles, factory)));
+    private static Object adaptCollection(List<Object> values, Class<?> returnType) {
+        if (returnType == null || List.class.isAssignableFrom(returnType)
+                || returnType == Object.class) return values;
+        if (returnType.isArray()) {
+            Object array = Array.newInstance(returnType.getComponentType(), values.size());
+            for (int index = 0; index < values.size(); index++) {
+                Array.set(array, index, values.get(index));
+            }
+            return array;
+        }
+        if (returnType.getName().endsWith("ParceledListSlice")) {
+            try {
+                HiddenApiAccess.ensureExemptions();
+                Constructor<?> constructor = null;
+                for (Constructor<?> candidate : returnType.getDeclaredConstructors()) {
+                    Class<?>[] parameters = candidate.getParameterTypes();
+                    if (parameters.length == 1 && parameters[0].isAssignableFrom(List.class)) {
+                        constructor = candidate;
+                        break;
+                    }
+                }
+                if (constructor == null) {
+                    throw new NoSuchMethodException(returnType.getName() + ".<init>(List)");
+                }
+                constructor.setAccessible(true);
+                return constructor.newInstance(values);
+            } catch (ReflectiveOperationException error) {
+                throw new IllegalStateException("VIRTUAL_DEVICE_COLLECTION_SLICE_UNSUPPORTED:"
+                        + returnType.getName(), error);
+            }
+        }
+        throw new IllegalStateException("VIRTUAL_DEVICE_COLLECTION_RETURN_UNSUPPORTED:"
+                + returnType.getName());
+    }
+
+    private static Class<?> inferredElementType(Method method) {
+        if (method == null) return null;
+        String name = method.getName().toLowerCase(java.util.Locale.ROOT);
+        try {
+            if (name.contains("scanresult")) {
+                return Class.forName("android.net.wifi.ScanResult");
+            }
+            if (name.contains("subscriptioninfo")) {
+                return Class.forName("android.telephony.SubscriptionInfo");
+            }
+            if (name.contains("cellinfo")) {
+                return Class.forName("android.telephony.CellInfo");
+            }
+            if (name.contains("sensorlist")) {
+                return Class.forName("android.hardware.Sensor");
+            }
+        } catch (ClassNotFoundException error) {
+            throw new IllegalStateException("VIRTUAL_DEVICE_COLLECTION_ELEMENT_UNAVAILABLE:" + name,
+                    error);
+        }
+        return null;
     }
 
     static Object dhcpInfo(Class<?> type, VirtualWifiProfileSnapshot profile) {

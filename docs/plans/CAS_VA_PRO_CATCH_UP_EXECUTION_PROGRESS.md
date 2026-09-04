@@ -4351,3 +4351,67 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   `reports/t57-r03/c6/C6_T01E_API36_CONVERGENCE_REPORT.md`。完成后只创建一个主题为
   `C6-T01E: converge Android API36 platform behavior` 的提交并推送当前分支。
 - **下一任务**：`C6-T02`；本条完成后停止。
+
+### C6-T01F：Android API37 / Android 17 Platform Convergence（2026-09-04）
+
+- **状态**：`BLOCKED`；API37 runtime 收敛和大部分验证已完成，但严格 PASS gate 被
+  API37 memory-limiter 设备能力和 clean default renderer 两项环境条件阻塞；不进入
+  C6-T01G。task book 未修改。
+- **开始基线**：分支 `feature/t57-r03-va-pro-capability-campaign`，
+  `START_BASELINE_HEAD=50648d6a247d4c05c9777cd35d0d45603e4c909b`；先执行未改生产源码的
+  API37 baseline，S01-S10 为 `10 total / 0 PASS / 10 FAIL / 0 SKIP`。首因是
+  x86_64 image 安装 Companion32 的 `INSTALL_FAILED_NO_MATCHING_ABIS` 及其级联，已
+  按实际 ABI 显式归类 `UNSUPPORTED_PLATFORM`，没有伪造 PASS。
+- **API37 设备**：`C6_T01F_API37_GoogleApis_x86_64` / `emulator-5574`；Android 17 /
+  API37；Google / `sdk_gphone64_x86_64`；ABI `x86_64`，ABI list
+  `x86_64,arm64-v8a`；runtime page size `4096`；RAM `2013496 kB`；fingerprint
+  `google/sdk_gphone64_x86_64/emu64xa:17/CE2A.260420.019/15611780:userdebug/dev-keys`；
+  stable system image revision 6，tag `google_apis,ai_glasses_compatible`。
+- **启动模式**：任务要求默认 headless；由于 S03 first-frame、WMS 和 SurfaceFlinger
+  证据需要图形页面，按用户授权使用 `AVD_MODE=VISIBLE_GRAPHICS_USER_APPROVED_EXCEPTION`。
+  未使用 GUI/manual click/坐标，操作仍全部通过 adb、instrumentation、system service 和
+  verification harness；交付前 AVD 已停止。
+- **构建边界**：正式配置保持 `compileSdk=36`、`HOST_TARGET_SDK=35`、
+  `FIXTURE_TARGET_SDK=35`；target37 仅使用单 ChangeId compat probe，没有永久升级
+  release configuration。
+- **API37 修复**：完成 Build static-final API37 guard；InputMethodInfoSafeList
+  `create(List)`；WebViewUpdateManager/UiModeManager Guest Context manager override；
+  AppOps manager/static service/nested AttributionSource identity；API37 Service callback
+  binder shapes；ActivityInfo hardware flag；shaded Wi-Fi `ParceledListSlice` adapter；
+  native exact exemptions；以及 API37 readiness、PackageUpdateActivity idle、screencap
+  renderer fallback、post-marker FATAL/ANR 观察修复。没有 package/OEM 特判、降低断言、
+  Host fallback 或吞异常。
+- **Lane A 最终**：`out/verification/c6-t01f-api37-final-v3/` 的统一 S01-S10 为
+  `10/10 PASS`；该结果运行于用户批准的可见图形模式和临时仿真器 workaround，证明
+  产品路径收敛，但不解除 clean default renderer gate。supported capability
+  `out/verification/c6-t01f-api37-capabilities-final-v7/` 为 `8 total / 7 PASS /
+  `0 FAIL / 1 SKIP`，唯一 skip 是 `NOT_COVERED_BY_API37_DYNAMIC_SUITE` AppWidget。
+- **Clean renderer 边界**：v9/v10/v11 的 default renderer runs 因
+  `readColorBufferDma` assertion 触发 TaskSnapshotPersist/SurfaceFlinger/system_server
+  崩溃，统一分类 `ENVIRONMENT_BLOCKED`，未折算为产品 PASS 或产品 defect。
+- **Lane B MessageQueue**：对实际 sandbox debug package/UID 单独启用 ChangeId
+  `421623328 USE_NEW_MESSAGEQUEUE`，执行 S03-S10 及 multi-process/WebView 路径，结果
+  `TARGET37_MESSAGEQUEUE_PROBE=PASS`；S01-S10 `10/10 PASS`，完成 disable/reset 并
+  验证 `COMPAT_OVERRIDES_RESET=PASS`。正式 targetSdk35 已恢复。
+- **Memory Limiter P0**：新增 `tools/verification/memory_limiter.py` 和分类单测；
+  普通 crash 与 `REASON_OTHER + MemoryLimiter:AnonSwap` 不混淆。当前 2 GiB API37 image
+  `am memory-limiter status` 为 disabled，M01-M04 仅为无 limiter 的生命周期/能力观察，
+  M05 `MANUAL_CONSTRAINED=BLOCKED_UNSUPPORTED_DEVICE`，真实 kill/recovery 未伪造，
+  `MEMORY_LIMITER_RECOVERY=NOT_PROVEN_BLOCKED`。probe 后 ignore/status 已恢复，随后
+  wipe-data 并停止 AVD。
+- **Target37 scope**：static-final/JNI probe PASS；ACCESS_LOCAL_NETWORK 未有独立
+  dynamic proof；ECH、URI grant、Bluetooth RFCOMM EOF 和 AppWidget memory limit 均按
+  当前 fixture scope 明确记录为未单独证明/延期/skip，不外推为 PASS。
+- **静态与回归**：static audit 为 `STATIC_FINAL_WRITE_SCAN_TOTAL=111`、
+  `FRAMEWORK_STATIC_FINAL_WRITE_COUNT=2`、`JNI_STATIC_FINAL_RISK_COUNT=0`，两处
+  framework write 均为 API<=36 guarded legacy path；19 个 ELF 的 PT_LOAD 均为
+  `0x4000`，三份 APK zipalign `3/3 PASS`，结果 `PASS_STATIC_ONLY`。API36/35/34/33/32
+  S01-S10 均 `10/10 PASS`，API32 保持 S04-S09 mandatory regression。
+- **质量与交付**：Gradle projects/assembleDebug/test、Python harness `8/8`、
+  compileall、build-environment lock、false-pass、git diff check、ref unchanged 均
+  PASS；evidence 仅留 ignored `out/verification`。AVD config data partition 已恢复
+  为原值，临时 overlay、compat override 和 memory-limiter 状态已清理。
+- **报告与下一步**：详细报告为
+  `reports/t57-r03/c6/C6_T01F_API37_CONVERGENCE_REPORT.md`。关闭 blocker 需要具备
+  至少 3.2 GiB 且 limiter enabled 的 API37 设备完成 M05 fail-closed recovery，并取得
+  clean default renderer/TaskSnapshot 证据；完成前保持 `NEXT_TASK=BLOCKED`。

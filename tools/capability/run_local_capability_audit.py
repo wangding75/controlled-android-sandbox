@@ -39,6 +39,21 @@ def load_issues() -> list[dict[str, Any]]:
     return list(load_yaml(ISSUES_PATH).get("issues") or [])
 
 
+def _pattern_matches(pattern: Any, output: str) -> bool:
+    """Match both legacy string evidence and structured YAML evidence patterns."""
+
+    if isinstance(pattern, str):
+        return bool(pattern) and pattern in output
+    if isinstance(pattern, dict):
+        return bool(pattern) and all(
+            str(key) in output and str(value) in output
+            for key, value in pattern.items()
+        )
+    if isinstance(pattern, (list, tuple)):
+        return bool(pattern) and all(_pattern_matches(item, output) for item in pattern)
+    return False
+
+
 NATIVE_CAMPAIGN_ALIASES = {
     "native",
     "native-enforcement",
@@ -72,7 +87,7 @@ def classify_gate(
         for issue in issues:
             if issue.get("classification") != "EXPECTED_BEHAVIOR":
                 continue
-            if any(pattern and pattern in output for pattern in issue.get("match_patterns") or []):
+            if any(_pattern_matches(pattern, output) for pattern in issue.get("match_patterns") or []):
                 expected_ids.append(issue["issue_id"])
         if expected_ids:
             return "EXPECTED_WARNING", expected_ids
@@ -85,7 +100,7 @@ def classify_gate(
         patterns = list(issue.get("match_patterns") or [])
         if issue.get("status") == "FIXED":
             continue
-        evidence_match = any(pattern and pattern in output for pattern in patterns)
+        evidence_match = any(_pattern_matches(pattern, output) for pattern in patterns)
         # Gate declarations constrain the possible issue set; they do not replace
         # the output evidence.  Otherwise an unrelated gate failure is silently
         # downgraded to KNOWN_ISSUE and a new regression is hidden.

@@ -261,7 +261,7 @@ final class DeviceServiceInvocationInterceptor {
                         (type, value) -> FrameworkDeviceObjectFactory.cellInfo(
                                 type, (VirtualCellInfoSnapshot) value));
                 android.util.Log.i("CS_TELEPHONY_CELL", "return=" + result.getClass().getName()
-                        + " size=" + ((List<?>) result).size());
+                        + " size=" + (result instanceof List<?> list ? list.size() : "slice"));
                 return Decision.handled(result);
             }
             if (!profile.cells().isEmpty()) {

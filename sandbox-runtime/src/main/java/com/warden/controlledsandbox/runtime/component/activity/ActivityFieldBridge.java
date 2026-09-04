@@ -25,7 +25,10 @@ import java.util.Map;
 /** Version-gated, audited and rollback-safe bridge for the remaining private Activity fields. */
 public final class ActivityFieldBridge {
     private static final int MIN_API = 26;
-    private static final int MAX_AUDITED_API = 36;
+    // API37 keeps the framework-owned ActivityThread transaction path used by
+    // GuestActivityThreadInstrumentation. This bound covers the real Guest
+    // Activity callback projection after ActivityThread has attached it.
+    private static final int MAX_AUDITED_API = 37;
     private static final List<String> HOST_FIELDS = List.of(
             "mToken", "mMainThread", "mInstrumentation", "mActivityInfo",
             "mFragments");
@@ -1458,6 +1461,14 @@ public final class ActivityFieldBridge {
                 "FLAG_ALLOW_TASK_REPARENTING");
         if (component.supportsPictureInPicture()) flags |= staticInt(ActivityInfo.class,
                 "FLAG_SUPPORTS_PICTURE_IN_PICTURE");
+        // Activity.attach() consumes the ActivityInfo bit to seed WindowManager's hardware
+        // acceleration flag.  Preserve the virtual application manifest's decision when the
+        // API37 framework transaction path creates the Guest Activity directly; otherwise the
+        // Guest falls back to Surface.lockCanvas software rendering on the physical window.
+        if (info.applicationInfo != null
+                && (info.applicationInfo.flags & ApplicationInfo.FLAG_HARDWARE_ACCELERATED) != 0) {
+            flags |= staticInt(ActivityInfo.class, "FLAG_HARDWARE_ACCELERATED");
+        }
         setOptionalObjectUnchecked(info, "flags", flags);
     }
 

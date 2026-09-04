@@ -63,6 +63,7 @@ import com.warden.controlledsandbox.framework.service.ContextHubServiceHook;
 import com.warden.controlledsandbox.framework.service.PersistentDataBlockServiceHook;
 import com.warden.controlledsandbox.framework.service.SystemUpdateServiceHook;
 import com.warden.controlledsandbox.framework.service.CaptioningManagerHook;
+import com.warden.controlledsandbox.framework.service.UiModeManagerHook;
 
 
 import android.content.Context;
@@ -144,7 +145,8 @@ public final class FrameworkHooks implements AutoCloseable {
                 () -> InputMethodManagerHook.install(hostServiceContext, identity));
         attempt("display", installed, failures, hooks,
                 () -> DisplayManagerHook.install(hostServiceContext, identity));
-        attempt("appOps", installed, failures, hooks, () -> AppOpsManagerHook.install(guestContext, identity));
+        attempt("appOps", installed, failures, hooks,
+                () -> AppOpsManagerHook.install(guestContext, hostServiceContext, identity));
         attempt("permission", installed, failures, hooks, () -> PermissionManagerHook.install(guestContext, identity));
         attempt("notification", installed, failures, hooks, () -> NotificationManagerHook.install(identity));
         attempt("jobScheduler", installed, failures, hooks, () -> JobSchedulerHook.install(guestContext, identity));
@@ -168,7 +170,7 @@ public final class FrameworkHooks implements AutoCloseable {
         attempt("settingsIdentity", installed, failures, hooks, bindingDetails,
                 () -> DeviceServiceBindingRegistry.install(guestContext, identity, "settingsIdentity"));
         attempt("webViewUpdate", installed, failures, hooks,
-                () -> WebViewUpdateServiceHook.install(identity));
+                () -> WebViewUpdateServiceHook.install(guestContext, identity));
         attempt("deviceIdentifiers", installed, failures, hooks,
                 () -> DeviceIdentifiersServiceHook.install(identity));
         com.warden.controlledsandbox.contract.VirtualGoogleServicesProfileSnapshot googleProfile =
@@ -236,6 +238,8 @@ public final class FrameworkHooks implements AutoCloseable {
                 () -> AccessibilityManagerServiceHook.install(hostServiceContext, identity));
         attempt("captioning", installed, failures, hooks,
                 () -> CaptioningManagerHook.install(guestContext));
+        attempt("uiMode", installed, failures, hooks,
+                () -> UiModeManagerHook.install(guestContext));
         attempt("autofill", installed, failures, hooks,
                 () -> AutofillManagerServiceHook.install(hostServiceContext, identity));
         attempt("biometric", installed, failures, hooks,

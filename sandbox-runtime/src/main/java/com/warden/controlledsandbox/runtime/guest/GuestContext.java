@@ -289,6 +289,11 @@ public final class GuestContext extends GuestHostOperationDenyContext {
                 .equals(serviceClass.getName())) return "batterymanager";
         if (serviceClass != null && "android.telecom.TelecomManager"
                 .equals(serviceClass.getName())) return "telecom";
+        // Android 17's WebViewFactory obtains WebViewUpdateManager from the
+        // Application Context. API36 and earlier used the ServiceManager
+        // binder directly, so this mapping is required for API37 convergence.
+        if (serviceClass != null && "android.webkit.WebViewUpdateManager"
+                .equals(serviceClass.getName())) return "webviewupdate";
         return null;
     }
     @Override public ApplicationInfo getApplicationInfo() { return new ApplicationInfo(applicationInfo); }

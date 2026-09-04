@@ -406,11 +406,11 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
                 // authoritative record is still created per filtered Intent; only the callback
                 // falls back to onBind when no prior onUnbind(true) exists.
                 binding = record.bindings.bind(intent, record.service::onBind);
-                publishService(record.token, hostIntent, binding.binder());
+                publishService(data, record.token, hostIntent, binding.binder());
             }
         } else {
             binding = record.bindings.bind(intent, record.service::onBind);
-            publishService(record.token, hostIntent, binding.binder());
+            publishService(data, record.token, hostIntent, binding.binder());
         }
         record.lastBinder = binding.binder();
         recordFrameworkEvent(record, lifecycleRoute(record, hostIntent), ComponentOperations.FRAMEWORK_SERVICE_EVENT_BIND,
@@ -440,16 +440,15 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
         boolean rebind = lastClient && record.service.onUnbind(intent);
         FrameworkServiceBindingLedger.UnbindResult unbound =
                 record.bindings.unbindAndReport(intent, rebind);
-        // Android 15 split the completion contract: a rebind request still uses
-        // unbindFinished(), while an ordinary onUnbind(false) uses the API35+
-        // serviceDoneExecuting(..., serviceIntent) transaction. Android 16 changes
-        // unbindFinished() to carry only the filtered Intent instead of the
-        // Intent/rebind boolean pair, so preserve both shapes at this boundary.
+        // API35/36 use the serviceDoneExecuting(..., serviceIntent) completion for an
+        // ordinary onUnbind(false), while a rebind request uses unbindFinished(). API36
+        // narrows unbindFinished() to the filtered Intent; API37 keys both transactions
+        // by BindServiceData.bindToken, so preserve each framework shape at this boundary.
         boolean rebindRequested = unbound.lastClient() && unbound.rebindPending();
         if (Build.VERSION.SDK_INT >= 35 && !rebindRequested) {
             serviceDone(record.token, serviceDoneExecutingUnbindType(), 0, 0, hostIntent);
         } else {
-            unbindFinished(record.token, hostIntent, rebindRequested);
+            unbindFinished(data, record.token, hostIntent, rebindRequested);
         }
         recordFrameworkEvent(record, lifecycleRoute(record, hostIntent), ComponentOperations.FRAMEWORK_SERVICE_EVENT_UNBIND,
                 0, 0);
@@ -736,10 +735,19 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
     private void serviceDone(IBinder token, int type, int startId, int result,
                              Intent serviceIntent) throws Exception {
         if (Build.VERSION.SDK_INT >= 35) {
-            invokeActivityManager("serviceDoneExecuting", token, type, startId, result, serviceIntent);
-        } else {
-            invokeActivityManager("serviceDoneExecuting", token, type, startId, result);
+            try {
+                // API35/36 expose the service Intent in this completion transaction. API37's
+                // framework contract uses the original four-argument transaction again; keep
+                // the lookup at this boundary so the Guest Service never crashes while
+                // acknowledging CREATE_SERVICE/SERVICE_ARGS/UNBIND_SERVICE.
+                invokeActivityManager("serviceDoneExecuting", token, type, startId, result,
+                        serviceIntent);
+                return;
+            } catch (NoSuchMethodException api37Shape) {
+                if (Build.VERSION.SDK_INT < 37) throw api37Shape;
+            }
         }
+        invokeActivityManager("serviceDoneExecuting", token, type, startId, result);
     }
 
     private static int serviceDoneExecutingUnbindType() {
@@ -748,12 +756,23 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
                 : SERVICE_DONE_EXECUTING_UNBIND_API35;
     }
 
-    private void publishService(IBinder token, Intent intent, IBinder binder) throws Exception {
-        invokeActivityManager("publishService", token, intent, binder);
+    private void publishService(Object data, IBinder token, Intent intent, IBinder binder)
+            throws Exception {
+        if (Build.VERSION.SDK_INT >= 37) {
+            // API37 keys publishService/unbindFinished by BindServiceData.bindToken and
+            // changes the middle argument from the filtered Intent to that Binder token.
+            invokeActivityManager("publishService", token, optionalBinderField(data, "bindToken"),
+                    binder);
+        } else {
+            invokeActivityManager("publishService", token, intent, binder);
+        }
     }
 
-    private void unbindFinished(IBinder token, Intent intent, boolean rebind) throws Exception {
-        if (Build.VERSION.SDK_INT >= 36) {
+    private void unbindFinished(Object data, IBinder token, Intent intent, boolean rebind)
+            throws Exception {
+        if (Build.VERSION.SDK_INT >= 37) {
+            invokeActivityManager("unbindFinished", token, optionalBinderField(data, "bindToken"));
+        } else if (Build.VERSION.SDK_INT >= 36) {
             // The API36 runtime image used by this lane carries no bindToken field in its
             // ActivityThread.BindServiceData. Its unbindFinished transaction is keyed by the
             // filtered Intent, while API35 and earlier also carry the rebind boolean.
@@ -857,6 +876,12 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
         } catch (ReflectiveOperationException | RuntimeException ignored) {
             return 0;
         }
+    }
+
+    private static IBinder optionalBinderField(Object target, String name) {
+        Object value = field(target, name);
+        if (value == null || value instanceof IBinder) return (IBinder) value;
+        throw new IllegalStateException("SERVICE_FIELD_TYPE_UNAVAILABLE:" + name);
     }
 
     private static boolean booleanField(Object target, String name) { return Boolean.TRUE.equals(field(target, name)); }

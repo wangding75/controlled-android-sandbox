@@ -379,9 +379,21 @@ final class InteractionServiceInvocationInterceptor {
                 && "com.android.internal.inputmethod.InputMethodInfoSafeList".equals(type.getName())) {
             HiddenApiAccess.ensureExemptions();
             try {
-                Method empty = type.getDeclaredMethod("empty");
-                empty.setAccessible(true);
-                Object result = empty.invoke(null);
+                // API37 replaced the zero-argument empty() factory with the
+                // public create(List) factory. Keep the API35/36 path for the
+                // older framework shape, but always return the framework-owned
+                // wrapper instead of a plain collection or null.
+                Method factory;
+                Object result;
+                try {
+                    factory = type.getDeclaredMethod("create", List.class);
+                    factory.setAccessible(true);
+                    result = factory.invoke(null, Collections.emptyList());
+                } catch (NoSuchMethodException legacyApi) {
+                    factory = type.getDeclaredMethod("empty");
+                    factory.setAccessible(true);
+                    result = factory.invoke(null);
+                }
                 if (type.isInstance(result)) return result;
                 throw new IllegalStateException("INPUT_METHOD_SAFE_LIST_EMPTY_TYPE_MISMATCH");
             } catch (ReflectiveOperationException | RuntimeException error) {

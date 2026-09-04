@@ -88,6 +88,7 @@ final class GuestSystemServiceBoundary {
         result.put("device_policy", "devicePolicy");
         result.put("accessibility", "accessibility");
         result.put("captioning", "captioning");
+        result.put("uimode", "uiMode");
         result.put("autofill", "autofill");
         result.put("biometric", "biometric");
         result.put("sensor_privacy", "sensorPrivacy");
@@ -115,6 +116,11 @@ final class GuestSystemServiceBoundary {
         result.put("sensor", "sensorCatalog");
         result.put("audio", "audioCapture");
         result.put("bluetooth", "bluetooth");
+        // API37 WebViewFactory resolves the IPC wrapper through the Guest
+        // Application Context rather than directly through ServiceManager.
+        // Keep this identity-bearing manager behind the same installed-hook
+        // boundary; a missing hook must never fall back to the Host manager.
+        result.put("webviewupdate", "webViewUpdate");
         return Collections.unmodifiableMap(result);
     }
 }

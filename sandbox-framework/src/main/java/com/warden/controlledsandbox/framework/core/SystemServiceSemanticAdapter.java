@@ -48,4 +48,8 @@ public final class SystemServiceSemanticAdapter {
     public boolean containsHostAttribution(Object[] arguments) {
         return AttributionSourceChain.contains(arguments, identity.hostPackageName(), identity.hostUid());
     }
+
+    public boolean containsHostPackageAttribution(Object[] arguments) {
+        return AttributionSourceChain.containsPackage(arguments, identity.hostPackageName());
+    }
 }

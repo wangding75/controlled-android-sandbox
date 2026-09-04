@@ -15,6 +15,18 @@ public final class BuildIdentityHook implements AutoCloseable {
     private BuildIdentityHook(List<RestoredField> fields) { this.fields = fields; }
 
     public static AutoCloseable install(GuestIdentity identity) throws Exception {
+        // Android 17 exposes the Build identity surface as static-final constants that are
+        // treated as immutable by ART.  Reflection writes here are both unsupported and can
+        // poison the process if the runtime changes its constant-folding policy.  The guest
+        // identity contract is already projected through Context/ApplicationInfo, package
+        // queries, identifier services, and the framework service proxies, so this optional
+        // process-global projection is deliberately disabled on API37+.
+        if (android.os.Build.VERSION.SDK_INT >= 37) {
+            android.util.Log.i("CS_BUILD_IDENTITY",
+                    "BUILD_STATIC_FINAL_PROJECTION_DISABLED api="
+                            + android.os.Build.VERSION.SDK_INT);
+            return () -> { };
+        }
         VirtualDeviceIdentitySnapshot profile = identity.virtualServices().deviceServiceProfile().identity();
         VirtualOemProfileSnapshot oem = null;
         try { oem = identity.virtualServices().compatibilityProfile().oem(); } catch (IllegalStateException ignored) { }

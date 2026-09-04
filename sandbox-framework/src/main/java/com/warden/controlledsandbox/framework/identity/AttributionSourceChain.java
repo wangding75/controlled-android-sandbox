@@ -52,6 +52,17 @@ public final class AttributionSourceChain {
         return false;
     }
 
+    /** Returns true when an argument graph contains the requested package identity. */
+    public static boolean containsPackage(Object[] arguments, String packageName) {
+        if (arguments == null || packageName == null) return false;
+        Set<Object> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (Object argument : arguments) {
+            if (packageName.equals(argument)
+                    || containsPackage(argument, packageName, visited, 0)) return true;
+        }
+        return false;
+    }
+
     private static boolean matchesScalar(Object value, String packageName, int uid) {
         return (packageName != null && packageName.equals(value))
                 || (value instanceof Integer number && number == uid);
@@ -85,6 +96,36 @@ public final class AttributionSourceChain {
                 }
                 if (nextField(field)
                         && contains(nested, packageName, uid, visited, depth + 1)) return true;
+            } catch (Throwable ignored) { }
+        }
+        return false;
+    }
+
+    private static boolean containsPackage(Object value, String packageName,
+                                            Set<Object> visited, int depth) {
+        if (value == null || depth > 10) return false;
+        if (value instanceof String || value instanceof Number || value instanceof Boolean
+                || value.getClass().isEnum()) return false;
+        if (!visited.add(value)) return false;
+        Class<?> type = value.getClass();
+        if (type.isArray()) {
+            int length = Math.min(Array.getLength(value), 128);
+            for (int index = 0; index < length; index++) {
+                if (containsPackage(Array.get(value, index), packageName, visited, depth + 1)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (!(type.getName().contains("Attribution")
+                || type.getName().contains("AttributionSource"))) return false;
+        for (Field field : fields(type)) {
+            try {
+                field.setAccessible(true);
+                Object nested = field.get(value);
+                if (isPackageField(field) && packageName.equals(nested)) return true;
+                if (nextField(field)
+                        && containsPackage(nested, packageName, visited, depth + 1)) return true;
             } catch (Throwable ignored) { }
         }
         return false;

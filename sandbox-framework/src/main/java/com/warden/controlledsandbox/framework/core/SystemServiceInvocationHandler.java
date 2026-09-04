@@ -413,6 +413,9 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
 
     private Object appOpsDecision(Method method, Object[] arguments) {
         String methodName = method.getName();
+        if (semanticAdapter.containsHostPackageAttribution(arguments)) {
+            throw new SecurityException("VIRTUAL_APPOPS_HOST_PACKAGE_HIDDEN");
+        }
         if (semanticAdapter.containsHostAttribution(arguments) && !targetsGuest(arguments)) {
             // AppOpsManager on API 31+ carries the process' transport AttributionSource in
             // otherwise Guest-addressed calls. That source is Host-shaped because the manager

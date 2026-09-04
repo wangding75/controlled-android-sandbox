@@ -1678,6 +1678,13 @@ public final class VirtualPackageMetadata {
         if (component.alwaysRetainTaskState()) flags |= staticInt(ActivityInfo.class, "FLAG_ALWAYS_RETAIN_TASK_STATE");
         if (component.allowTaskReparenting()) flags |= staticInt(ActivityInfo.class, "FLAG_ALLOW_TASK_REPARENTING");
         if (component.supportsPictureInPicture()) flags |= staticInt(ActivityInfo.class, "FLAG_SUPPORTS_PICTURE_IN_PICTURE");
+        // Activity.attach() consumes the ActivityInfo bit to seed WindowManager's hardware
+        // acceleration flag.  The application-level bit alone is not sufficient for a
+        // framework-created Guest Activity, especially on API37's transaction path.
+        if (info.applicationInfo != null
+                && (info.applicationInfo.flags & ApplicationInfo.FLAG_HARDWARE_ACCELERATED) != 0) {
+            flags |= staticInt(ActivityInfo.class, "FLAG_HARDWARE_ACCELERATED");
+        }
         setField(info, "flags", flags);
         setField(info, "resizeMode", resizeMode(component.resizeMode()));
     }

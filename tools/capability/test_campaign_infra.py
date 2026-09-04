@@ -128,6 +128,24 @@ class CampaignInfraTests(unittest.TestCase):
         self.assertEqual(classification, "NEW_REGRESSION")
         self.assertEqual(matched, [])
 
+    def test_audit_matches_structured_issue_evidence(self) -> None:
+        from run_local_capability_audit import classify_gate
+
+        gate = {"known_issue_ids": ["KI-STRUCTURED"]}
+        issues = [{
+            "issue_id": "KI-STRUCTURED",
+            "status": "RECORDED",
+            "match_patterns": [{"Permission Denial": "com.example.SYSTEM_HOLDER"}],
+        }]
+        classification, matched = classify_gate(
+            gate,
+            "W/ActivityManager: Permission Denial: com.example.SYSTEM_HOLDER",
+            1,
+            issues,
+        )
+        self.assertEqual(classification, "KNOWN_ISSUE")
+        self.assertEqual(matched, ["KI-STRUCTURED"])
+
 
 if __name__ == "__main__":
     unittest.main()

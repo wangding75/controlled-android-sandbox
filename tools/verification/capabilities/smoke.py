@@ -40,6 +40,21 @@ FRAMEWORK_PROBE_COMPONENT = "com.warden.controlledsandbox.fixture.FrameworkProbe
 GUEST_SERVICE_COMPONENT = "com.warden.controlledsandbox.fixture.FixtureService"
 GUEST_PROVIDER_COMPONENT = "com.warden.controlledsandbox.fixture.FixtureProvider"
 
+# The API37 Google APIs x86_64 image used by C6-T01F can render a real WMS
+# surface while its emulator-side screencap readback aborts in the color-buffer
+# DMA path. This exact API37-only fallback is accepted only when WMS independently
+# proves that the requested package owns a drawn, ready, visible surface.
+API37_SCREENCAP_COLOR_BUFFER_DMA_ERROR = (
+    b"Assertion failed: !rcEnc->featureInfo()->hasReadColorBufferDma"
+)
+API37_WINDOW_FRAME_MARKERS = (
+    "mHasSurface=true",
+    "isReadyForDisplay()=true",
+    "Surface: shown=true",
+    "mDrawState=HAS_DRAWN",
+    "isVisible=true",
+)
+
 
 @dataclass
 class SmokeContext:
@@ -198,6 +213,10 @@ def _s01(context: SmokeContext, attempt_dir: Path, _attempt: int) -> AttemptExec
         installs.append(row)
         require(result.ok, "APK_INSTALL_FAILED", f"{name}: {row}")
     context.setup_installs = installs
+    package_update_idle = _wait_for_package_update_idle(context.device)
+    debug_component_ready = _wait_for_component(
+        context.device, DEBUG_COMPONENT, timeout_sec=15.0
+    )
     host_teardown = _fence_host_before_start(context.device, force_stop=True)
     context.device.clear_logcat()
     started = context.device.start_activity(
@@ -205,10 +224,10 @@ def _s01(context: SmokeContext, attempt_dir: Path, _attempt: int) -> AttemptExec
         flags="0x10000000",
         timeout_sec=context.timeout_policy.seconds(TimeoutKind.COLD_LAUNCH),
     )
-    evidence = _capture(context, attempt_dir, "host")
+    evidence = _capture(context, attempt_dir, "host", package_hint=HOST_PACKAGE)
     require(started.ok, "HOST_LAUNCH_FAILED", _command_dict(started))
     require(
-        evidence["screen"].get("non_black") is True,
+        _has_displayed_frame(evidence["screen"]),
         "BLACK_SCREEN_OR_SCREENSHOT_UNAVAILABLE",
         f"Host screenshot={evidence['screen']}",
     )
@@ -220,6 +239,8 @@ def _s01(context: SmokeContext, attempt_dir: Path, _attempt: int) -> AttemptExec
     actual = {
         "installs": installs,
         "omitted_apks": dict(context.setup_omissions),
+        "package_update_idle": package_update_idle,
+        "debug_component_ready": debug_component_ready,
         "host_start": _command_dict(started),
         "host_teardown": host_teardown,
         **evidence,
@@ -455,7 +476,9 @@ def _s08(context: SmokeContext, attempt_dir: Path, _attempt: int) -> AttemptExec
     )
     for marker in markers:
         require_marker(logcat, marker, artifacts=observation.artifacts)
-    refreshed = _capture(context, attempt_dir / "post-markers", "framework-probe")
+    refreshed = _capture(
+        context, attempt_dir / "post-markers", "framework-probe", package_hint=GUEST_PACKAGE
+    )
     actual = {
         "peer_import": peer.actual,
         "probe": observation.actual,
@@ -663,6 +686,9 @@ def _invoke_debug(
 ) -> CommandObservation:
     device = context.device
     attempt_dir.mkdir(parents=True, exist_ok=True)
+    debug_component_ready = _wait_for_component(
+        device, DEBUG_COMPONENT, timeout_sec=15.0
+    )
     host_teardown = _fence_host_before_start(device, force_stop=force_stop_host)
     device.run_as_remove(HOST_PACKAGE, "files/debug-command-result.json")
     device.clear_logcat()
@@ -694,7 +720,9 @@ def _invoke_debug(
         timeout_artifacts: list[str] = []
         timeout_evidence: dict[str, Any] = {"logcat": ""}
         try:
-            timeout_evidence = _capture(context, attempt_dir, f"{command}-timeout")
+            timeout_evidence = _capture(
+                context, attempt_dir, f"{command}-timeout", package_hint=package
+            )
             timeout_artifacts = timeout_evidence["artifacts"]
         except Exception as capture_error:  # preserve the primary timeout diagnosis
             timeout_artifacts = []
@@ -715,9 +743,10 @@ def _invoke_debug(
     teardown_path.write_text(
         json.dumps(host_teardown, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
-    evidence = _capture(context, attempt_dir, command)
+    evidence = _capture(context, attempt_dir, command, package_hint=package)
     actual = {
         "request_id": request_id,
+        "debug_component_ready": debug_component_ready,
         "command_start": _command_dict(start),
         "host_teardown": host_teardown,
         "debug_result": debug_result,
@@ -734,6 +763,67 @@ def _invoke_debug(
         screen=evidence["screen"],
         package_revision=_package_revision(debug_result),
     )
+
+
+def _wait_for_component(
+    device: AdbDevice, component: str, *, timeout_sec: float
+) -> dict[str, Any]:
+    """Fence API37 package-manager component publication after streamed installs."""
+
+    deadline = time.monotonic() + max(0.0, timeout_sec)
+    last = ""
+    while True:
+        resolved = device.shell(
+            ["cmd", "package", "resolve-activity", "--brief", component],
+            timeout_sec=30.0,
+        )
+        last = resolved.text().strip()
+        if resolved.ok and component in last:
+            return {
+                "component": component,
+                "resolved": True,
+                "output": last,
+            }
+        remaining = deadline - time.monotonic()
+        if remaining <= 0.0:
+            raise VerificationFailure(
+                "DEBUG_ACTIVITY_NOT_READY",
+                f"component={component} resolve={last!r}",
+                FailureClass.HARNESS_DEFECT,
+            )
+        time.sleep(min(0.25, remaining))
+
+
+def _wait_for_package_update_idle(
+    device: AdbDevice, *, timeout_sec: float = 30.0
+) -> dict[str, Any]:
+    """Fence the asynchronous PackageUpdateActivity after streamed installs."""
+
+    deadline = time.monotonic() + max(0.0, timeout_sec)
+    quiet_since: float | None = None
+    last = ""
+    while True:
+        activity_dump = device.shell(
+            ["dumpsys", "activity", "activities"], timeout_sec=60.0
+        )
+        last = activity_dump.text()
+        if activity_dump.ok and "PackageUpdateActivity" not in last:
+            quiet_since = quiet_since or time.monotonic()
+            if time.monotonic() - quiet_since >= 1.0:
+                return {
+                    "package_update_activity_idle": True,
+                    "quiet_ms": int(round((time.monotonic() - quiet_since) * 1000)),
+                }
+        else:
+            quiet_since = None
+        remaining = deadline - time.monotonic()
+        if remaining <= 0.0:
+            raise VerificationFailure(
+                "PACKAGE_UPDATE_ACTIVITY_NOT_IDLE",
+                last[-1200:].replace("\n", " "),
+                FailureClass.HARNESS_DEFECT,
+            )
+        time.sleep(min(0.2, remaining))
 
 
 def _fence_host_before_start(
@@ -773,6 +863,12 @@ def _host_activity_teardown_state(
     windows = device.shell(["dumpsys", "window", "windows"], timeout_sec=60.0)
 
     def activity_line(line: str) -> bool:
+        stripped = line.lstrip()
+        # API37 can retain the input-method parent reference after the ActivityRecord and its
+        # window are gone.  This is a relationship field, not a live Host ActivityRecord; using
+        # it as a teardown witness blocks the next warm launch indefinitely.
+        if stripped.startswith("mImeParent="):
+            return False
         return HOST_PACKAGE in line and (
             include_guest_activities or "DebugCommandActivity" in line
         ) and not line.lstrip().startswith("mLastPausedActivity:") and any(
@@ -829,7 +925,33 @@ def _wait_for_host_activity_teardown(
         time.sleep(min(0.1, remaining))
 
 
-def _capture(context: SmokeContext, attempt_dir: Path, label: str) -> dict[str, Any]:
+def _has_displayed_frame(screen: dict[str, Any]) -> bool:
+    """Return true for pixels or the narrowly-scoped API37 WMS witness."""
+
+    return screen.get("non_black") is True or screen.get("displayed_frame") is True
+
+
+def _window_manager_frame_evidence(window_dump: str, package: str) -> dict[str, Any]:
+    """Find a complete drawn/ready/visible WMS window block for ``package``."""
+
+    if not package:
+        return {"present": False, "package": package, "markers": []}
+    for block in window_dump.split("Window #"):
+        if package not in block:
+            continue
+        markers = [marker for marker in API37_WINDOW_FRAME_MARKERS if marker in block]
+        if len(markers) == len(API37_WINDOW_FRAME_MARKERS):
+            return {"present": True, "package": package, "markers": markers}
+    return {"present": False, "package": package, "markers": []}
+
+
+def _capture(
+    context: SmokeContext,
+    attempt_dir: Path,
+    label: str,
+    *,
+    package_hint: str = "",
+) -> dict[str, Any]:
     device = context.device
     attempt_dir.mkdir(parents=True, exist_ok=True)
     logcat = device.logcat(timeout_sec=60.0)
@@ -851,6 +973,22 @@ def _capture(context: SmokeContext, attempt_dir: Path, label: str) -> dict[str, 
         "non_black": False,
         "error": _command_dict(screenshot),
     }
+    if (
+        context.metadata.get("api_level") == 37
+        and not bool(screen.get("valid_png"))
+        and screen_path.is_file()
+        and API37_SCREENCAP_COLOR_BUFFER_DMA_ERROR in screen_path.read_bytes()
+    ):
+        window_frame = _window_manager_frame_evidence(window_dump, package_hint)
+        screen.update(
+            {
+                "capture_degraded": True,
+                "capture_mode": "WINDOW_MANAGER_SURFACE_DRAWN",
+                "capture_unavailable_reason": "ANDROID_SCREENCAP_READ_COLOR_BUFFER_DMA_UNSUPPORTED",
+                "window_frame": window_frame,
+                "displayed_frame": bool(window_frame.get("present")),
+            }
+        )
     artifacts = [
         _relative(context.root, path)
         for path in (log_path, window_path, activity_path, process_path)

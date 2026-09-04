@@ -273,7 +273,11 @@ bool install_hidden_api_bridge(JNIEnv* env) {
             // Android 15 changes the InputMethodManager list result from List to this
             // framework-owned safe-list value. Exempt only the concrete type needed to create
             // the empty Guest result; do not open the internal inputmethod package broadly.
-            "Lcom/android/internal/inputmethod/InputMethodInfoSafeList;"
+            "Lcom/android/internal/inputmethod/InputMethodInfoSafeList;",
+            // Android 17's Wi-Fi module shades ParceledListSlice into a distinct hidden
+            // framework type.  The public List constructor is the only audited adapter path;
+            // exempt that concrete class rather than the whole modules-utils namespace.
+            "Lcom/android/wifi/x/com/android/modules/utils/ParceledListSlice;"
     };
     constexpr jsize prefix_count = static_cast<jsize>(sizeof(prefixes) / sizeof(prefixes[0]));
     jobjectArray values = env->NewObjectArray(prefix_count, string_class, nullptr);

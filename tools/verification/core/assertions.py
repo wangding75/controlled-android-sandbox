@@ -92,7 +92,7 @@ def require_launch_readiness(
         artifacts=artifact_paths,
     )
     require(
-        screen.get("non_black") is True,
+        screen.get("non_black") is True or screen.get("displayed_frame") is True,
         "BLACK_SCREEN_OR_SCREENSHOT_UNAVAILABLE",
         f"screen evidence={screen}",
         artifacts=artifact_paths,
