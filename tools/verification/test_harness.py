@@ -38,6 +38,7 @@ if __package__ in {None, ""}:
         classify_exit,
         classify_recovery,
     )
+    from tools.verification.matrix_validator import MatrixAccountingError, validate_cells, validate_report
     from tools.verification.reporting.summary import build_summary, render_compact_report
     from tools.verification.run_api33_capabilities import _merge_case_logcat
 else:
@@ -60,6 +61,7 @@ else:
         classify_exit,
         classify_recovery,
     )
+    from .matrix_validator import MatrixAccountingError, validate_cells, validate_report
     from .reporting.summary import build_summary, render_compact_report
     from .run_api33_capabilities import _merge_case_logcat
 
@@ -273,6 +275,55 @@ class HarnessContractTests(unittest.TestCase):
             classify_recovery(process_died=True, cleanup_ok=False, restarted=True),
             "PRODUCT_DEFECT",
         )
+
+    def test_matrix_validator_closes_the_eight_previous_accounting_gaps(self) -> None:
+        report = (
+            Path(__file__).resolve().parents[2]
+            / "reports"
+            / "t57-r03"
+            / "c6"
+            / "C6_T01G_CROSS_API_CLOSURE_REPORT.md"
+        )
+        summaries = validate_report(report)
+        unified = summaries["unified"]
+        version_specific = summaries["version_specific"]
+        self.assertEqual(unified.total, 48)
+        self.assertEqual(unified.count("PASS"), 35)
+        self.assertEqual(unified.count("NOT_IN_CURRENT_SCOPE"), 6)
+        self.assertEqual(unified.count("DEFERRED_ENVIRONMENT"), 7)
+        self.assertEqual(version_specific.total, 31)
+        self.assertEqual(version_specific.count("PASS"), 27)
+        self.assertEqual(version_specific.count("NOT_IN_CURRENT_SCOPE"), 2)
+        self.assertEqual(version_specific.count("DEFERRED_ENVIRONMENT"), 2)
+
+    def test_matrix_validator_rejects_duplicate_and_missing_cells(self) -> None:
+        with self.assertRaisesRegex(MatrixAccountingError, "duplicate id"):
+            validate_cells(
+                "duplicate",
+                [
+                    {"id": "same", "status": "PASS"},
+                    {"id": "same", "status": "PASS"},
+                ],
+            )
+        with self.assertRaisesRegex(MatrixAccountingError, "no status"):
+            validate_cells("missing", [{"id": "cell"}])
+
+    def test_matrix_validator_rejects_unknown_status_and_bad_total(self) -> None:
+        with self.assertRaisesRegex(MatrixAccountingError, "unknown status"):
+            validate_cells("unknown", [{"id": "cell", "status": "SOFT_PASS"}])
+        with self.assertRaisesRegex(MatrixAccountingError, "total mismatch"):
+            validate_cells(
+                "total",
+                [{"id": "cell", "status": "PASS"}],
+                expected_total=2,
+            )
+
+    def test_matrix_validator_requires_reasons_for_deferred_cells(self) -> None:
+        with self.assertRaisesRegex(MatrixAccountingError, "deferred without reason"):
+            validate_cells(
+                "deferred",
+                [{"id": "cell", "status": "DEFERRED_ENVIRONMENT"}],
+            )
 
 
 if __name__ == "__main__":

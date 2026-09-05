@@ -136,16 +136,16 @@ permission/AppOps/AttributionSource, Activity/Task/window transport, Service/Bro
 Provider/PendingIntent, Job/Alarm/Notification/FGS, network/media/DNS/VPN,
 Shortcut/Launcher, split/ClassLoader, WebView and native/JNI basic paths.
 
-| Capability case | API32 | API33 | API34 | API35 | API36 | API37 |
-|---|---|---|---|---|---|---|
-| PMS / visibility / Permission / AppOps / Attribution | PASS | PASS | PASS | PASS | PASS | DEFERRED_ENVIRONMENT |
-| framework transport / Activity / Task / identity | PASS | PASS | PASS | PASS | PASS | DEFERRED_ENVIRONMENT |
-| Service / Broadcast / PendingIntent / scheduling / FGS | PASS | PASS | PASS | PASS | PASS | DEFERRED_ENVIRONMENT |
-| network / media / DNS / VPN | PASS | PASS | PASS | PASS | PASS | DEFERRED_ENVIRONMENT |
-| Shortcut / Launcher / environment | PASS | PASS | PASS | PASS | PASS | DEFERRED_ENVIRONMENT |
-| split APK / ClassLoader | PASS | PASS | PASS | PASS | PASS | DEFERRED_ENVIRONMENT |
-| AppWidget dynamic | NOT_IN_CURRENT_SCOPE | NOT_IN_CURRENT_SCOPE | NOT_IN_CURRENT_SCOPE | NOT_IN_CURRENT_SCOPE | NOT_IN_CURRENT_SCOPE | NOT_IN_CURRENT_SCOPE |
-| WebView / ClassLoader / native | PASS | PASS | PASS | PASS | PASS | DEFERRED_ENVIRONMENT |
+| Capability case | API32 | API33 | API34 | API35 | API36 | API37 | Reason |
+|---|---|---|---|---|---|---|---|
+| PMS / visibility / Permission / AppOps / Attribution | PASS | PASS | PASS | PASS | PASS | DEFERRED_ENVIRONMENT | API37 package/graphics environment prevented a valid final cell |
+| framework transport / Activity / Task / identity | PASS | PASS | PASS | PASS | PASS | DEFERRED_ENVIRONMENT | API37 package/graphics environment prevented a valid final cell |
+| Service / Broadcast / PendingIntent / scheduling / FGS | PASS | PASS | PASS | PASS | PASS | DEFERRED_ENVIRONMENT | API37 package/graphics environment prevented a valid final cell |
+| network / media / DNS / VPN | PASS | PASS | PASS | PASS | PASS | DEFERRED_ENVIRONMENT | API37 package/graphics environment prevented a valid final cell |
+| Shortcut / Launcher / environment | PASS | PASS | PASS | PASS | PASS | DEFERRED_ENVIRONMENT | API37 package/graphics environment prevented a valid final cell |
+| split APK / ClassLoader | PASS | PASS | PASS | PASS | PASS | DEFERRED_ENVIRONMENT | API37 package/graphics environment prevented a valid final cell |
+| AppWidget dynamic | NOT_IN_CURRENT_SCOPE | NOT_IN_CURRENT_SCOPE | NOT_IN_CURRENT_SCOPE | NOT_IN_CURRENT_SCOPE | NOT_IN_CURRENT_SCOPE | NOT_IN_CURRENT_SCOPE | dynamic AppWidget is outside the current fixture scope |
+| WebView / ClassLoader / native | PASS | PASS | PASS | PASS | PASS | DEFERRED_ENVIRONMENT | API37 package/graphics environment prevented a valid final cell |
 
 ~~~text
 UNIFIED_CAPABILITY_TOTAL=48
@@ -446,3 +446,208 @@ NEXT_TASK=BLOCKED
 
 Because API37 did not complete the current clean-headless final contract, the exact
 conditional closure is C6-T01G=BLOCKED and C6-T01=BLOCKED. C6-T02A is not started.
+
+## 14. C6-T01G-R02 Headless vs Windowed Diagnostic Closure
+
+### 14.1 Frozen API37 environment
+
+The R02 start head is `4604152334f06f14428f85a1b59dadd01be28823` on
+`feature/t57-r03-va-pro-capability-campaign`. The API37 environment was frozen before
+the comparison. `Android emulator version 37.1.11.0 (build_id 15917651)` is the installed
+stable emulator and the installed stable API37 image is
+`system-images;android-37.0;google_apis;x86_64`, revision `6`. The available 37.0 stable
+entry matched revision 6; no Beta or Canary image was used as final evidence.
+
+| Field | Frozen value |
+|---|---|
+| AVD | `C6_T01F_API37_GoogleApis_x86_64` |
+| RAM / CPU | 4 GiB / x86_64 / 4 cores |
+| AVD graphics config | `hw.gpu.enabled=no`, `hw.gpu.mode=auto`; emulator backend `gfxstream` |
+| PAGE_SIZE | 4096 |
+| Android / API | Android 17 / API 37 |
+| ABI / ABI list | x86_64 / x86_64, arm64-v8a |
+| Manufacturer / model | Google / sdk_gphone64_x86_64 |
+| Fingerprint | `google/sdk_gphone64_x86_64/emu64xa:17/CE2A.260420.019/15611780:userdebug/dev-keys` |
+| Kernel | `Linux localhost 6.12.58-android16-6-gccafb60de224-ab14828483 #1 SMP PREEMPT Tue Feb 3 03:46:47 UTC 2026 x86_64 Toybox` |
+
+### 14.2 Minimum headless/windowed comparison
+
+Each row used one clean boot and the same frozen Harness contract. `software` and `auto`
+were both supported by this emulator, so no backend was marked `UNSUPPORTED_BACKEND`.
+The first R02 attempt used abbreviated selectors for D03/D04; that malformed invocation
+was excluded from accepted evidence. The corrected runs used the full testcase IDs.
+
+| Mode | Backend | D01 boot-only | D02 Host-only | D03 Guest cold | D04 Guest warm | D05 WebView | Result |
+|---|---|---|---|---|---|---|---|
+| headless | software | DEFERRED_ENVIRONMENT; boot complete, alive, `readColorBufferDma` | DEFERRED_ENVIRONMENT; Host start not stable | DEFERRED_ENVIRONMENT; no valid first frame | DEFERRED_ENVIRONMENT; no valid first frame | DEFERRED_ENVIRONMENT; blocked before WebView | DEFERRED_ENVIRONMENT |
+| headless | auto/host | DEFERRED_ENVIRONMENT; boot complete, alive, `readColorBufferDma` | DEFERRED_ENVIRONMENT; Host start not stable | DEFERRED_ENVIRONMENT; no valid first frame | DEFERRED_ENVIRONMENT; no valid first frame | DEFERRED_ENVIRONMENT; blocked before WebView | DEFERRED_ENVIRONMENT |
+| windowed | software | DEFERRED_ENVIRONMENT; boot complete, alive, `readColorBufferDma` | DEFERRED_ENVIRONMENT; Host start not stable | DEFERRED_ENVIRONMENT; no valid first frame | DEFERRED_ENVIRONMENT; no valid first frame | DEFERRED_ENVIRONMENT; blocked before WebView | DEFERRED_ENVIRONMENT |
+| windowed | auto/host | DEFERRED_ENVIRONMENT; boot complete, alive, `readColorBufferDma` | DEFERRED_ENVIRONMENT; Host start not stable | DEFERRED_ENVIRONMENT; no valid first frame | DEFERRED_ENVIRONMENT; no valid first frame | DEFERRED_ENVIRONMENT; blocked before WebView | DEFERRED_ENVIRONMENT |
+
+In all four D01 runs, CAS was not installed. The emulator reached boot-complete and stayed
+alive long enough for observation, but emitted `readColorBufferDma` and corresponding
+graphics-crash markers. D02 then showed the same instability before a stable CAS Host
+launch; the targeted D03/D04 attempts were blocked by the unstable package/graphics
+environment, and D05 could not be accepted. There is therefore no stable windowed lane
+that can serve as API37 final evidence.
+
+This is Case B, with the more specific boot-only classification
+`EMULATOR_GRAPHICS_ENVIRONMENT`: the failure is present in both headless and windowed
+modes and in both tested backends, before CAS Guest first-frame observation. It is not a
+headless-only limitation, Harness framebuffer/readback failure, or CAS Runtime/Product
+defect. `FIRST_FRAME_DRAWN` was not weakened; it remained the required launch gate and
+was simply not observable in this environment. No product code or emulator framework was
+modified.
+
+```text
+HEADLESS_SOFTWARE=DEFERRED_ENVIRONMENT
+HEADLESS_AUTO_HOST=DEFERRED_ENVIRONMENT
+WINDOWED_SOFTWARE=DEFERRED_ENVIRONMENT
+WINDOWED_AUTO_HOST=DEFERRED_ENVIRONMENT
+READ_COLOR_BUFFER_DMA_HEADLESS=YES
+READ_COLOR_BUFFER_DMA_WINDOWED=YES
+GRAPHICS_CLASSIFICATION=EMULATOR_GRAPHICS_ENVIRONMENT
+API37_FINAL_MODE=NONE
+API37_HEADLESS_AUTOMATION=DEFERRED_ENVIRONMENT
+API37_RUNTIME=DEFERRED_ENVIRONMENT
+FIRST_FRAME_OBSERVATION=NOT_COMPLETED_ENVIRONMENT; FIRST_FRAME_DRAWN contract unchanged
+```
+
+### 14.3 API37 final gate and accounting closure
+
+Because no tested lane completed D01–D05 stably, R02 does not claim an API37 S01–S10 or
+capability PASS. The historical T01F visible/workaround `10/10` is retained as product
+path evidence only and does not cover this clean environment gate. The API37 matrix cell
+accounting is explicit: seven common capability cells are environment-deferred and the
+AppWidget cell is `NOT_IN_CURRENT_SCOPE`.
+
+```text
+API37_CORE_TOTAL=10
+API37_CORE_PASS=0
+API37_CORE_FAIL=0
+API37_CORE_DEFERRED=10
+API37_CAPABILITY_TOTAL=8
+API37_CAPABILITY_PASS=0
+API37_CAPABILITY_FAIL=0
+API37_CAPABILITY_SKIP=0
+API37_CAPABILITY_NOT_IN_SCOPE=1
+API37_CAPABILITY_DEFERRED=7
+```
+
+The prior accounting exposed eight rows in the tables but omitted them from the status
+totals. R02 closes those exact gaps: six Unified Capability `AppWidget dynamic` cells
+(API32–37) are counted as `NOT_IN_CURRENT_SCOPE`, and two Version-Specific cells (API36
+MediaStore version lockdown and API37 URI grant) are counted as `NOT_IN_CURRENT_SCOPE`.
+The new `tools/verification/matrix_validator.py` parses these tables and rejects duplicate
+IDs, missing or unknown statuses, total mismatches, unclassified rows, and deferred cells
+without reasons.
+
+```text
+MATRIX_ACCOUNTING=PASS
+MATRIX_VALIDATOR=PASS
+UNIFIED_CAPABILITY_TOTAL=48
+UNIFIED_CAPABILITY_PASS=35
+UNIFIED_CAPABILITY_FAIL=0
+UNIFIED_CAPABILITY_SKIP=0
+UNIFIED_CAPABILITY_EXPECTED=0
+UNIFIED_CAPABILITY_UNSUPPORTED=0
+UNIFIED_CAPABILITY_NOT_IN_SCOPE=6
+UNIFIED_CAPABILITY_DEFERRED=7
+VERSION_SPECIFIC_TOTAL=31
+VERSION_SPECIFIC_PASS=27
+VERSION_SPECIFIC_FAIL=0
+VERSION_SPECIFIC_SKIP=0
+VERSION_SPECIFIC_EXPECTED=0
+VERSION_SPECIFIC_UNSUPPORTED=0
+VERSION_SPECIFIC_NOT_IN_SCOPE=2
+VERSION_SPECIFIC_DEFERRED=2
+```
+
+R02 changed only the API37 environment diagnostic, report accounting, and validator
+self-tests. It did not change first-frame semantics, timeout, retry policy, result model,
+failure classification, or common runtime/testcase behavior. The existing API32–36
+`50/50` core regression therefore remains valid and no API32–36 rerun was required.
+
+### 14.4 R02 verification and final status
+
+The API37 Memory Limiter remains `DEFERRED_ENVIRONMENT`; R02 did not retry M05, inject a
+config, simulate LMK, use `kill -9`, or modify Android framework. Import/cold/warm timing
+for API37 has no accepted value because no stable lane completed; this is recorded as
+`DEFERRED_ENVIRONMENT`, not a performance PASS. AVD processes were stopped after each
+comparison and no emulator evidence is tracked by Git.
+
+```text
+C6-T01G-R02
+RESULT=BLOCKED_ENV
+START_HEAD=4604152334f06f14428f85a1b59dadd01be28823
+FINAL_HEAD=HEAD
+
+EMULATOR_VERSION=37.1.11.0
+API37_SYSTEM_IMAGE=system-images;android-37.0;google_apis;x86_64
+API37_SYSTEM_IMAGE_REVISION=6
+
+HEADLESS_SOFTWARE=DEFERRED_ENVIRONMENT
+HEADLESS_AUTO_HOST=DEFERRED_ENVIRONMENT
+WINDOWED_SOFTWARE=DEFERRED_ENVIRONMENT
+WINDOWED_AUTO_HOST=DEFERRED_ENVIRONMENT
+
+READ_COLOR_BUFFER_DMA_HEADLESS=YES
+READ_COLOR_BUFFER_DMA_WINDOWED=YES
+GRAPHICS_CLASSIFICATION=EMULATOR_GRAPHICS_ENVIRONMENT
+
+API37_FINAL_MODE=NONE
+API37_HEADLESS_AUTOMATION=DEFERRED_ENVIRONMENT
+API37_RUNTIME=DEFERRED_ENVIRONMENT
+FIRST_FRAME_OBSERVATION=NOT_COMPLETED_ENVIRONMENT
+
+API37_CORE_TOTAL=10
+API37_CORE_PASS=0
+API37_CORE_FAIL=0
+API37_CORE_DEFERRED=10
+
+UNIFIED_CAPABILITY_TOTAL=48
+UNIFIED_CAPABILITY_PASS=35
+UNIFIED_CAPABILITY_FAIL=0
+UNIFIED_CAPABILITY_SKIP=0
+UNIFIED_CAPABILITY_EXPECTED=0
+UNIFIED_CAPABILITY_UNSUPPORTED=0
+UNIFIED_CAPABILITY_NOT_IN_SCOPE=6
+UNIFIED_CAPABILITY_DEFERRED=7
+
+VERSION_SPECIFIC_TOTAL=31
+VERSION_SPECIFIC_PASS=27
+VERSION_SPECIFIC_FAIL=0
+VERSION_SPECIFIC_SKIP=0
+VERSION_SPECIFIC_EXPECTED=0
+VERSION_SPECIFIC_UNSUPPORTED=0
+VERSION_SPECIFIC_NOT_IN_SCOPE=2
+VERSION_SPECIFIC_DEFERRED=2
+
+MATRIX_ACCOUNTING=PASS
+MATRIX_VALIDATOR=PASS
+MEMORY_LIMITER=DEFERRED_ENVIRONMENT
+
+API32_36_EXISTING_REGRESSION_VALID=PASS
+API32_36_RERUN_REQUIRED=NO
+HARNESS_TESTS=PASS (12/12)
+GRADLE_PROJECTS=PASS
+ASSEMBLE_DEBUG=PASS
+UNIT_TESTS=PASS
+FALSE_PASS_CHECK=PASS
+PERFORMANCE_SANITY=DEFERRED_ENVIRONMENT; API37 lane did not complete
+EVIDENCE_GIT_HYGIENE=PASS
+
+TARGET_SDK=35
+COMPAT_OVERRIDES_RESET=PASS
+REF_STATUS=UNCHANGED
+REPORT=reports/t57-r03/c6/C6_T01G_CROSS_API_CLOSURE_REPORT.md
+GIT_STATUS=CLEAN
+
+C6_T01G_FINAL_STATUS=BLOCKED
+C6_T01_STATUS=BLOCKED
+NEXT_TASK=BLOCKED
+```
+
+The allowed Path A/Path B PASS conditions are not met: headless is not stable, and no
+windowed lane is stable. Accordingly, `C6-T01G-R02=BLOCKED_ENV`, `C6-T01G=BLOCKED`, and
+`C6-T01=BLOCKED`. C6-T02A is not started.

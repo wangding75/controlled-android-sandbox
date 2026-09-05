@@ -4491,3 +4491,46 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   CORE_SMOKE_FAIL=0、CORE_SMOKE_DEFERRED=10；Unified Capability FAIL=0，但 API37
   environment deferred 未满足全量 Gate，故 C6-T01 不标记 DONE，C6-T02A 未启动。
 - **报告**：reports/t57-r03/c6/C6_T01G_CROSS_API_CLOSURE_REPORT.md。
+
+### C6-T01G-R02：API37 Headless vs Windowed Diagnostic Closure（2026-09-06）
+
+- **开始基线**：分支 `feature/t57-r03-va-pro-capability-campaign`，
+  `START_HEAD=4604152334f06f14428f85a1b59dadd01be28823`。本轮只做 API37 环境对照、
+  Matrix accounting、validator 与最终 Gate 收口；未修改 sandbox-runtime/framework/native，
+  未进入 C6-T02、ARM64、16 KB dynamic、Companion32、OEM 或 C4-R05。
+- **环境冻结**：Android Emulator `37.1.11.0 (build_id 15917651)`；稳定 API37 image
+  `system-images;android-37.0;google_apis;x86_64` revision `6`；AVD
+  `C6_T01F_API37_GoogleApis_x86_64`；4 GiB RAM、x86_64/4 cores、`PAGE_SIZE=4096`、
+  `gfxstream`，fingerprint
+  `google/sdk_gphone64_x86_64/emu64xa:17/CE2A.260420.019/15611780:userdebug/dev-keys`。
+  未使用 Beta/Canary 作为正式证据。
+- **四组对照**：headless/software、headless/auto-host、windowed/software、
+  windowed/auto-host 均完成一次 clean boot 最小诊断。四组 D01 都是
+  `boot_complete=YES`、emulator alive，但都出现 `readColorBufferDma` 与 graphics
+  crash marker；D02 Host-only 继续不稳定，D03/D04 未获得可采信 first frame，D05
+  无法接受。四组均记 `DEFERRED_ENVIRONMENT`，没有 `UNSUPPORTED_BACKEND`。
+- **分类**：这是 Case B，具体为 `EMULATOR_GRAPHICS_ENVIRONMENT`，且在 headless/windowed
+  及 software/auto 两种组合均发生，故不是 headless-only、Harness readback 或 CAS
+  Runtime/Product defect。API37 headless 自动化与 windowed 正式 lane 均保持环境延期，
+  未降低 `FIRST_FRAME_DRAWN` gate；没有稳定 windowed lane 可用于 API37 final regression。
+- **API37 状态**：`API37_FINAL_MODE=NONE`、`API37_RUNTIME=DEFERRED_ENVIRONMENT`、
+  `API37_HEADLESS_AUTOMATION=DEFERRED_ENVIRONMENT`；当前 R02 不声称新的 API37
+  S01-S10 或 capability PASS。T01F visible/workaround `10/10` 仍只作为历史产品路径
+  证据，不覆盖 R02 clean environment gate。Memory Limiter 继续为
+  `DEFERRED_ENVIRONMENT`，未重试 M05、未注入配置、未 kill -9/模拟 LMK、未改 framework。
+- **Matrix accounting**：新增通用 `tools/verification/matrix_validator.py`，解析现有
+  Closure Report 的 Unified/Version-Specific 表，并检查 duplicate id、missing/unknown
+  status、total mismatch、unclassified row 及 deferred reason。已补齐此前未计入的 8 项：
+  Unified 的 API32–37 `AppWidget dynamic` 六项为 `NOT_IN_CURRENT_SCOPE`；Version-Specific
+  的 API36 MediaStore 与 API37 URI grant 两项为 `NOT_IN_CURRENT_SCOPE`。结果：
+  `UNIFIED=48 (PASS35, FAIL0, SKIP0, EXPECTED0, UNSUPPORTED0, NOT_IN_SCOPE6, DEFERRED7)`；
+  `VERSION_SPECIFIC=31 (PASS27, FAIL0, SKIP0, EXPECTED0, UNSUPPORTED0, NOT_IN_SCOPE2, DEFERRED2)`；
+  `MATRIX_ACCOUNTING=PASS`、`MATRIX_VALIDATOR=PASS`，无 `UNCLASSIFIED`。
+- **重跑边界**：R02 未改变 first-frame semantics、timeout、retry、result model、failure
+  classification 或 common testcase semantics；API32–36 既有 `50/50 PASS` 回归仍有效，
+  `API32_36_RERUN_REQUIRED=NO`。首次 R02 的缩写 D03/D04 selector 调用未产生有效结果，
+  已改用完整 testcase ID 重做并排除该 malformed invocation。
+- **结果**：`C6-T01G-R02=BLOCKED_ENV`；因 headless 与 windowed 均无稳定 API37 lane，
+  `C6-T01G=BLOCKED`、`C6-T01=BLOCKED`。`C6-T02A` 未启动，`NEXT_TASK=BLOCKED`。
+- **报告**：已更新 `reports/t57-r03/c6/C6_T01G_CROSS_API_CLOSURE_REPORT.md`，新增
+  `C6-T01G-R02 Headless vs Windowed Diagnostic Closure` 与 authoritative receipt。
