@@ -1,4 +1,4 @@
-"""Run the API33/API34/API35/API36/API37 extension capability suite and persist compact local evidence.
+"""Run the API32/API33/API34/API35/API36/API37 extension capability suite and persist compact local evidence.
 
 The suite deliberately reuses the same DebugCommandActivity surface and fixture
 components as the S01-S10 contract.  It records complete device evidence under
@@ -313,9 +313,8 @@ def _split_case(context: SmokeContext, run_dir: Path, expected_api: int) -> dict
             raise FileNotFoundError(
                 f"split fixture APKs are missing: {SPLIT_BASE_APK}, {SPLIT_FEATURE_APK}"
             )
-        install = context.device.run(
-            ["install-multiple", "-r", str(SPLIT_BASE_APK), str(SPLIT_FEATURE_APK)],
-            timeout_sec=120.0,
+        install = context.device.install_multiple(
+            [SPLIT_BASE_APK, SPLIT_FEATURE_APK], timeout_sec=120.0
         )
         if not install.ok:
             raise RuntimeError(
@@ -396,9 +395,12 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
     run_id = args.run_id or dt.datetime.now().strftime("%Y%m%dT%H%M%SZ")
     run_dir = (Path(args.output_root).resolve() / run_id)
     run_dir.mkdir(parents=True, exist_ok=True)
-    if sum(bool(value) for value in (args.api34, args.api35, args.api36, args.api37)) > 1:
-        raise DeviceMetadataError("API34_API35_API36_API37_FLAGS_ARE_MUTUALLY_EXCLUSIVE")
-    expected_api = 37 if args.api37 else 36 if args.api36 else 35 if args.api35 else 34 if args.api34 else 33
+    if sum(bool(value) for value in (args.api32, args.api34, args.api35, args.api36, args.api37)) > 1:
+        raise DeviceMetadataError("API32_API33_API34_API35_API36_API37_FLAGS_ARE_MUTUALLY_EXCLUSIVE")
+    expected_api = (
+        37 if args.api37 else 36 if args.api36 else 35 if args.api35 else
+        34 if args.api34 else 32 if args.api32 else 33
+    )
     device = AdbDevice(args.serial, root=ROOT)
     _wait_for_android_services(device)
     apk_paths = _apk_paths(include_companion32=False)
@@ -422,8 +424,7 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
         setup_installs=installs,
         setup_omissions={
             "companion32": (
-                f"UNSUPPORTED_PLATFORM: API{expected_api} x86_64 AVD has no 32-bit ABI; "
-                "cross-bitness is deferred to C6-T02"
+                "NOT_IN_CURRENT_SCOPE: Companion32/cross-bitness coverage is deferred to C6-T02"
             )
         },
     )
@@ -535,7 +536,7 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
     widget_case = {
         "case_id": "CAP-APPWIDGET-DYNAMIC",
         "component": None,
-        "status": "SKIP",
+        "status": "NOT_IN_CURRENT_SCOPE",
         "reason": f"NOT_COVERED_BY_API{expected_api}_DYNAMIC_SUITE",
         "required_markers": [],
         "observed_markers": [],
@@ -571,6 +572,7 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
         "pass": sum(item["status"] == "PASS" for item in cases),
         "fail": sum(item["status"] == "FAIL" for item in cases),
         "skip": sum(item["status"] == "SKIP" for item in cases),
+        "not_in_current_scope": sum(item["status"] == "NOT_IN_CURRENT_SCOPE" for item in cases),
     }
     payload = {
         "run_id": run_id,
@@ -584,7 +586,7 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
         "summary": summary,
         "limitations": [
             f"API{expected_api} device contract is validated from system properties, not AVD name.",
-            "AppWidget dynamic host/provider fixture is not present and is explicit SKIP.",
+            "AppWidget dynamic host/provider fixture is not present and is explicit NOT_IN_CURRENT_SCOPE.",
             f"32-bit Companion/cross-bitness is deferred to C6-T02; fixture32 x86_64 is used for identity routing on API{expected_api}.",
             f"API{expected_api} NOT_EXPORTED dynamic receiver is exercised by a same-Guest send; adb-shell external delivery is not treated as equivalent.",
         ],
@@ -599,6 +601,7 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--serial", required=True)
     parser.add_argument("--instance-name", default="C6_T01B_API33_GoogleApis_x86_64")
+    parser.add_argument("--api32", action="store_true", help="Require API 32 x86_64/4096 device contract")
     parser.add_argument("--api34", action="store_true", help="Require API 34 x86_64/4096 device contract")
     parser.add_argument("--api35", action="store_true", help="Require API 35 x86_64/4096 device contract")
     parser.add_argument("--api36", action="store_true", help="Require API 36 x86_64/4096 device contract")

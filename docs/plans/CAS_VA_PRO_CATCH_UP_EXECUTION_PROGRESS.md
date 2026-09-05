@@ -4354,8 +4354,9 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
 
 ### C6-T01F-R01：API37 Memory Limiter Environment & Recovery Closure（2026-09-04）
 
-- **状态**：`BLOCKED_ENV`；C6-T01F 仍为 `BLOCKED`。本轮没有修改产品源码，不进入
-  C6-T01G/C6-T02。
+- **R01 历史状态**：`BLOCKED_ENV`；该记录当时停止在环境前置条件。C6-T01G 收口时正式
+  将 C6-T01F 修订为 `PASS_WITH_ENVIRONMENT_DEFERRED`；R01 证明的是 limiter/recovery
+  环境条件未满足，不是 CAS 产品缺陷。
 - **开始基线**：`START_HEAD=70055637ac33e60e3af774142a86186f85fa4aff`；仅处理
   Memory Limiter environment、M05 前置和 renderer environment。
 - **Headless AVD**：`C6_T01F_API37_GoogleApis_x86_64` / `emulator-5574`，
@@ -4365,14 +4366,15 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   `/proc/cgroups` 的 memory controller enabled；但 root 及 system/system_ext/product/
   vendor/odm 搜索均未找到 `memory-limiter-config.xml`，且 `am memory-limiter status`
   仍为 `disabled`。4 GiB 已使 RAM 生效，未盲目升至 6 GiB；
-  `MEMORY_LIMITER_ENV=BLOCKED_ENV`。
+  `MEMORY_LIMITER_DYNAMIC=DEFERRED_ENVIRONMENT`。
 - **M05**：因 limiter ENABLED 前置不成立，未设置 manual limit、未杀进程、未读取
   ApplicationExitInfo，也未伪造 MemoryLimiter termination 或 recovery。PID/UID、
   stale-state cleanup、relaunch/new PID 均为 `NOT_RUN_ENVIRONMENT_BLOCKED`。
 - **Renderer**：纯 headless 依次测试 `-gpu software` 和非废弃的 `-gpu swiftshader`；
   两者均触发 `readColorBufferDma`。设置 `debug.sf.luma_sampling=0` 并精确重启
   SurfaceFlinger 后短时稳定，但 TaskSnapshotPersist/direct screencap 仍 abort；
-  `RENDERER_ENVIRONMENT=BLOCKED_ENV`。未关闭 window/first-frame gate，未修改 system image。
+  `API37_RENDERER=KNOWN_EMULATOR_ENVIRONMENT_LIMITATION`。未关闭 window/first-frame
+  gate，未修改 system image。
 - **验证**：当前 HEAD 的 Gradle projects、assembleDebug、test、Harness `8/8`、
   false-pass、ref unchanged 和 evidence hygiene 均 PASS；API37 原有 smoke `10/10`、
   capability `7/0/1`、MessageQueue/reset、API32-36 regression 继续有效。
@@ -4387,9 +4389,9 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
 
 ### C6-T01F：Android API37 / Android 17 Platform Convergence（2026-09-04）
 
-- **状态**：`BLOCKED`；API37 runtime 收敛和大部分验证已完成，但严格 PASS gate 被
-  API37 memory-limiter 设备能力和 clean default renderer 两项环境条件阻塞；不进入
-  C6-T01G。task book 未修改。
+- **历史 Gate 状态**：`BLOCKED`（截至 T01F）。在 C6-T01G 的统一收口记录中，正式状态
+  修订为 `PASS_WITH_ENVIRONMENT_DEFERRED`；API37 memory-limiter 与 clean renderer
+  仍按环境延期，不重新分类为 CAS 产品缺陷。task book 未修改。
 - **开始基线**：分支 `feature/t57-r03-va-pro-capability-campaign`，
   `START_BASELINE_HEAD=50648d6a247d4c05c9777cd35d0d45603e4c909b`；先执行未改生产源码的
   API37 baseline，S01-S10 为 `10 total / 0 PASS / 10 FAIL / 0 SKIP`。首因是
@@ -4421,7 +4423,8 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   `0 FAIL / 1 SKIP`，唯一 skip 是 `NOT_COVERED_BY_API37_DYNAMIC_SUITE` AppWidget。
 - **Clean renderer 边界**：v9/v10/v11 的 default renderer runs 因
   `readColorBufferDma` assertion 触发 TaskSnapshotPersist/SurfaceFlinger/system_server
-  崩溃，统一分类 `ENVIRONMENT_BLOCKED`，未折算为产品 PASS 或产品 defect。
+  崩溃，统一分类 `KNOWN_EMULATOR_ENVIRONMENT_LIMITATION`，未折算为产品 PASS 或产品
+  defect。
 - **Lane B MessageQueue**：对实际 sandbox debug package/UID 单独启用 ChangeId
   `421623328 USE_NEW_MESSAGEQUEUE`，执行 S03-S10 及 multi-process/WebView 路径，结果
   `TARGET37_MESSAGEQUEUE_PROBE=PASS`；S01-S10 `10/10 PASS`，完成 disable/reset 并
@@ -4429,8 +4432,8 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
 - **Memory Limiter P0**：新增 `tools/verification/memory_limiter.py` 和分类单测；
   普通 crash 与 `REASON_OTHER + MemoryLimiter:AnonSwap` 不混淆。当前 2 GiB API37 image
   `am memory-limiter status` 为 disabled，M01-M04 仅为无 limiter 的生命周期/能力观察，
-  M05 `MANUAL_CONSTRAINED=BLOCKED_UNSUPPORTED_DEVICE`，真实 kill/recovery 未伪造，
-  `MEMORY_LIMITER_RECOVERY=NOT_PROVEN_BLOCKED`。probe 后 ignore/status 已恢复，随后
+  M05 `DEFERRED_ENVIRONMENT`，真实 kill/recovery 未伪造，
+  `MEMORY_LIMITER_RECOVERY=NOT_PROVEN_ENVIRONMENT`。probe 后 ignore/status 已恢复，随后
   wipe-data 并停止 AVD。
 - **Target37 scope**：static-final/JNI probe PASS；ACCESS_LOCAL_NETWORK 未有独立
   dynamic proof；ECH、URI grant、Bluetooth RFCOMM EOF 和 AppWidget memory limit 均按
@@ -4448,3 +4451,43 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   `reports/t57-r03/c6/C6_T01F_API37_CONVERGENCE_REPORT.md`。关闭 blocker 需要具备
   至少 3.2 GiB 且 limiter enabled 的 API37 设备完成 M05 fail-closed recovery，并取得
   clean default renderer/TaskSnapshot 证据；完成前保持 `NEXT_TASK=BLOCKED`。
+
+### C6-T01G：API32–37 Cross-API Final Closure（2026-09-05）
+
+- **START_HEAD**：48aad5810f4217d93991a576983b52b03cd5b142；**FINAL_HEAD=HEAD**。
+- **统一 Harness**：冻结为当前 run_rd_smoke.py、run_api33_capabilities.py、
+  capabilities/smoke.py、device/adb.py 及其依赖的最终版本；API32–36 使用同一套
+  S01–S10 与 capability contract，API37 也使用同一套 headless contract。FIRST_FRAME_DRAWN
+  仍是 launch 核心 Gate，诊断 retry 不覆盖 first failure，异常/timeout 不会转成 PASS。
+- **C6-T01F 正式状态**：C6-T01F=PASS_WITH_ENVIRONMENT_DEFERRED。
+- **Memory Limiter**：MEMORY_LIMITER_DYNAMIC=DEFERRED_ENVIRONMENT；
+  MEMORY_LIMITER_RECOVERY=NOT_PROVEN_ENVIRONMENT。当前 API37 公开 AVD 为 4 GiB、
+  Guest MemTotal 约 4008496 kB，cgroup v2/memory controller 正常，但
+  /system/etc/memory-limiter-config.xml 不存在且 am memory-limiter status=disabled。
+  未注入配置、未 kill -9/模拟 LMK、未修改 framework 强制开启。
+- **Renderer**：API37 software 与 swiftshader 均出现 readColorBufferDma，伴随
+  headless SurfaceFlinger/RegionSampling abort；登记
+  API37_RENDERER=KNOWN_EMULATOR_ENVIRONMENT_LIMITATION，不归类为 CAS PRODUCT_DEFECT，
+  不在 T01G 继续调 emulator renderer。
+- **API32–36 当前最终 Harness**：每个 API 的 S01–S10 为 10/10 PASS；每个 capability
+  suite 为 7 PASS、0 FAIL、AppWidget=NOT_IN_CURRENT_SCOPE。API32 的 S04–S09 六项
+  historical defect regression 均在最终 HEAD PASS；API36 Job/FGS lock inversion
+  与 API33 WebView/ContentResolver attribution 问题已修复并分别完成受影响 lane
+  rerun。
+- **API37 当前 clean headless closure**：PackageManager transport 与 renderer 在同一
+  公共 AVD 上不稳定，未形成可接受的完整 S01–S10/capability run；T01F 的 visible/
+  workaround 10/10 只作为产品路径证据，不覆盖 T01G 的 clean headless environment
+  gate。因此 API37 当前 cell 记 DEFERRED_ENVIRONMENT，不能计入 60/60。
+- **C6-D01**：Android 17 Memory Limiter Dynamic Recovery Evidence =
+  DEFERRED_ENVIRONMENT。触发条件为获得 status=enabled 的正式 API37 Emulator、
+  Android 17 Cuttlefish、可控 AOSP/GSI，或 limiter enabled 的 Android 17 ARM64 真机；
+  届时补真实 termination、CAS cleanup 与 recovery evidence。
+- **Known Limitations 分类**：Deferred to C6-T02 包括 ARM64 dynamic、16 KB dynamic、
+  Companion32/cross-bitness、ARM32 scope；Environment Deferred 包括 API37 Memory
+  Limiter recovery 与 graphics backend；Target Migration 包括 target36 onBackPressed
+  migration 与 future target37 behavior；Product Scope 包括 dynamic AppWidget、
+  external runtime DEX 等未纳入 fixture 能力。
+- **T01G 结果**：BLOCKED。CORE_SMOKE_TOTAL=60、CORE_SMOKE_PASS=50、
+  CORE_SMOKE_FAIL=0、CORE_SMOKE_DEFERRED=10；Unified Capability FAIL=0，但 API37
+  environment deferred 未满足全量 Gate，故 C6-T01 不标记 DONE，C6-T02A 未启动。
+- **报告**：reports/t57-r03/c6/C6_T01G_CROSS_API_CLOSURE_REPORT.md。

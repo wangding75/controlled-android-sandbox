@@ -379,9 +379,11 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
             resolver_snapshot, device = _resolve_device(args)
             _wait_for_android_services(device)
             platform_lane = ""
-            if sum(bool(value) for value in (args.api33, args.api34, args.api35, args.api36, args.api37)) > 1:
-                raise DeviceMetadataError("API33_API34_API35_API36_API37_FLAGS_ARE_MUTUALLY_EXCLUSIVE")
-            if args.api33:
+            if sum(bool(value) for value in (args.api32, args.api33, args.api34, args.api35, args.api36, args.api37)) > 1:
+                raise DeviceMetadataError("API32_API33_API34_API35_API36_API37_FLAGS_ARE_MUTUALLY_EXCLUSIVE")
+            if args.api32:
+                platform_lane = "API32"
+            elif args.api33:
                 platform_lane = "API33"
             elif args.api34:
                 platform_lane = "API34"
@@ -408,7 +410,9 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
                     f"device metadata incomplete: {metadata.get('missing_fields')}",
                 )
             else:
-                if platform_lane == "API33":
+                if platform_lane == "API32":
+                    _validate_api_device(metadata, 32)
+                elif platform_lane == "API33":
                     _validate_api_device(metadata, 33)
                 elif platform_lane == "API34":
                     _validate_api_device(metadata, 34)
@@ -426,8 +430,7 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
                     setup_omissions=(
                         {
                             "companion32": (
-                                f"UNSUPPORTED_PLATFORM: {platform_lane} x86_64 AVD has no 32-bit ABI; "
-                                "32-bit compatibility/cross-bitness coverage is deferred to C6-T02"
+                                "NOT_IN_CURRENT_SCOPE: Companion32/cross-bitness coverage is deferred to C6-T02"
                             )
                         }
                         if platform_lane
@@ -478,6 +481,7 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--instance-name", default="RD测试")
     parser.add_argument("--serial", default="", help="Use this ADB serial instead of the RD resolver")
+    parser.add_argument("--api32", action="store_true", help="Require API 32 x86_64/4096 device contract")
     parser.add_argument("--api33", action="store_true", help="Require API 33 x86_64/4096 device contract")
     parser.add_argument("--api34", action="store_true", help="Require API 34 x86_64/4096 device contract")
     parser.add_argument("--api35", action="store_true", help="Require API 35 x86_64/4096 device contract")

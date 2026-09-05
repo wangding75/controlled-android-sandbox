@@ -150,9 +150,13 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         this.storageNames = new GuestStorageNameCodec(instanceRoot, capabilityBackedStorage);
         this.applicationInfo = GuestApplicationInfoFactory.create(spec, dataRoot.getAbsolutePath(),
                 applicationMetadata, appComponentFactory, parsedApplicationInfo);
-        // ContentResolver captures its Context attribution source at construction time. Reuse
-        // Android's concrete ApplicationContentResolver implementation with this Guest Context;
-        // an anonymous ContentResolver cannot implement API32's hidden provider lifecycle hooks.
+        // ContentResolver captures its Context attribution source at construction time. Use the
+        // physical Host context for the platform-facing resolver: Android 12+ validates the
+        // first AttributionSource against the real Binder caller and rejects a virtual UID when
+        // a Guest framework path reaches a non-virtual provider (WebView does this through
+        // Settings during first-frame initialization). Guest-owned providers still receive the
+        // virtual caller from GuestRuntimeBrokerBridge/GuestComponentRuntime, so this does not
+        // widen the Guest identity boundary.
         this.contentResolver = createGuestContentResolver();
         this.dynamicReceivers = sharedState.dynamicReceivers;
         this.mainThread = sharedState.mainThread;
@@ -372,7 +376,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
             java.lang.reflect.Constructor<?> constructor = resolverType.getDeclaredConstructor(
                     Context.class, activityThreadType);
             constructor.setAccessible(true);
-            return (ContentResolver) constructor.newInstance(this, mainThread);
+            return (ContentResolver) constructor.newInstance(hostServiceContext, mainThread);
         } catch (Throwable error) {
             if (error instanceof ThreadDeath) throw (ThreadDeath) error;
             // Host-side framework self-tests run without android.jar's concrete ContextImpl.

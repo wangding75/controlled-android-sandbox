@@ -538,6 +538,16 @@ def _s09(context: SmokeContext, attempt_dir: Path, _attempt: int) -> AttemptExec
     )
     run_step("delete", "delete", kind=TimeoutKind.RECOVERY, expected_operation="DELETED")
     run_step("re-add", "import-only", kind=TimeoutKind.ADD_IMPORT, expected_operation="IMPORTED")
+    relaunch_after_readd = run_step(
+        "relaunch-after-readd", "launch", kind=TimeoutKind.COLD_LAUNCH
+    )
+    require_launch_readiness(
+        relaunch_after_readd["debug_result"],
+        relaunch_after_readd["screen"],
+        relaunch_after_readd["logcat"],
+        expected_component=GUEST_MAIN_COMPONENT,
+        artifacts=relaunch_after_readd.get("artifacts", []),
+    )
     return AttemptExecution(
         ResultState.PASS,
         {"steps": steps, "step_count": len(steps)},

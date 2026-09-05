@@ -280,8 +280,16 @@ final class GuestJobServiceBridge implements AutoCloseable {
             this.completion = completion == null ? () -> { } : completion;
         }
         synchronized boolean active() { return active && execution.active(); }
-        synchronized void finish(boolean needsReschedule) {
-            if (!active) return; active = false;
+        void finish(boolean needsReschedule) {
+            // Do not invoke the completion callback while holding this monitor. The Job
+            // start path holds GuestJobServiceBridge.this while it checks callback.active();
+            // completion removes the job from that same bridge. Keeping both locks held in
+            // opposite order deadlocks the ActivityThread main looper when JobServiceEngine
+            // delivers jobFinished synchronously (API36 made this timing readily observable).
+            synchronized (this) {
+                if (!active) return;
+                active = false;
+            }
             try { execution.finish(needsReschedule); }
             finally { completion.run(); }
         }
