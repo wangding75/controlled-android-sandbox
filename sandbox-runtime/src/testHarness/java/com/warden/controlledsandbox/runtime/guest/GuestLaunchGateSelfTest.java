@@ -4,7 +4,7 @@ import android.os.Bundle;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 
 public final class GuestLaunchGateSelfTest {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
         require(!GuestLaunchGate.isLaunchPass(GuestLaunchGate.prepareStatus(true)),
                 "PREPARE_PASS is not LAUNCH_PASS");
         require(GuestLaunchGate.isLaunchAccepted(GuestLaunchGate.LAUNCH_ACCEPTED),

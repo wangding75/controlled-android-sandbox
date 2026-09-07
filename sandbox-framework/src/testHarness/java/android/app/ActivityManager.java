@@ -18,6 +18,10 @@ public final class ActivityManager {
         return new ArrayList<>(runningProcesses);
     }
 
+    public List<AppTask> getAppTasks() {
+        return List.of();
+    }
+
     public static void setRunningProcessesForTest(List<RunningAppProcessInfo> processes) {
         runningProcesses = new ArrayList<>(processes == null ? List.of() : processes);
     }

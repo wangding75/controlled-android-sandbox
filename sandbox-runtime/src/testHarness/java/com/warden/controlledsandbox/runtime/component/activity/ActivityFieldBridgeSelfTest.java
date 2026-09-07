@@ -54,7 +54,7 @@ public final class ActivityFieldBridgeSelfTest {
         expectFailure(() -> ActivityFieldBridge.installFields(host, new MissingRequired(),
                 List.of("required"), List.of(), Map.of(), 36), "missing required field must fail closed");
         expectFailure(() -> ActivityFieldBridge.installFields(host, guest,
-                List.of("required"), List.of(), Map.of(), 37), "unknown API must fail closed");
+                List.of("required"), List.of(), Map.of(), 38), "unknown API must fail closed");
         expectFailure(() -> ActivityFieldBridge.installFields(new WrongTypeHost(), new WrongTypeTarget(),
                 List.of("required"), List.of(), Map.of(), 36), "type mismatch must fail closed");
     }
@@ -283,4 +283,3 @@ public final class ActivityFieldBridgeSelfTest {
     private static final class WrongTypeHost { String required = "wrong"; }
     private static final class WrongTypeTarget { Integer required = 1; }
 }
-

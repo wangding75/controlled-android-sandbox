@@ -3,6 +3,7 @@ package com.warden.controlledsandbox.domain.packageinfo;
 import com.warden.controlledsandbox.domain.packageinfo.manifest.ManifestModel;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -68,19 +69,42 @@ public final class SharedLibraryResolver {
         }
     }
 
-    private final Map<String, AvailableLibrary> available;
+    private final Map<String, List<AvailableLibrary>> available;
 
     public SharedLibraryResolver(List<AvailableLibrary> available) {
-        Map<String, AvailableLibrary> values = new LinkedHashMap<>();
+        Map<String, List<AvailableLibrary>> values = new LinkedHashMap<>();
         for (AvailableLibrary item : available == null ? List.<AvailableLibrary>of() : available) {
-            AvailableLibrary previous = values.put(item.key(), item);
-            if (previous != null && (!previous.certificateDigest().equals(item.certificateDigest())
-                    || previous.version() != item.version()
-                    || !previous.providerPackage().equals(item.providerPackage()))) {
-                throw new IllegalArgumentException("Conflicting available library: " + item.name());
+            List<AvailableLibrary> versions = values.computeIfAbsent(item.key(), ignored -> new ArrayList<>());
+            for (AvailableLibrary previous : versions) {
+                if (previous.version() == item.version()) {
+                    if (sameIdentity(previous, item)) {
+                        item = null;
+                        break;
+                    }
+                    if (isFallbackProvider(previous) && !isFallbackProvider(item)) {
+                        int index = versions.indexOf(previous);
+                        versions.set(index, item);
+                        item = null;
+                        break;
+                    }
+                    if (!isFallbackProvider(previous) || !isFallbackProvider(item)) {
+                        throw new IllegalArgumentException("Conflicting available library: " + item.name()
+                                + " version=" + item.version());
+                    }
+                    item = null;
+                    break;
+                }
             }
+            if (item != null) versions.add(item);
         }
-        this.available = Collections.unmodifiableMap(values);
+        for (List<AvailableLibrary> versions : values.values()) {
+            versions.sort(Comparator.comparingLong(AvailableLibrary::version).reversed());
+        }
+        Map<String, List<AvailableLibrary>> immutable = new LinkedHashMap<>();
+        for (Map.Entry<String, List<AvailableLibrary>> entry : values.entrySet()) {
+            immutable.put(entry.getKey(), List.copyOf(entry.getValue()));
+        }
+        this.available = Collections.unmodifiableMap(immutable);
     }
 
     public Resolution resolve(List<ManifestModel.SharedLibraryDependency> dependencies) {
@@ -90,7 +114,7 @@ public final class SharedLibraryResolver {
         List<String> errors = new ArrayList<>();
         for (ManifestModel.SharedLibraryDependency dependency
                 : dependencies == null ? List.<ManifestModel.SharedLibraryDependency>of() : dependencies) {
-            AvailableLibrary candidate = available.get(dependency.key());
+            AvailableLibrary candidate = select(dependency);
             if (candidate == null) {
                 (dependency.required() ? missingRequired : missingOptional).add(dependency);
                 if (dependency.required()) errors.add("missing " + dependency.key());
@@ -115,7 +139,35 @@ public final class SharedLibraryResolver {
         return new Resolution(resolved, missingRequired, missingOptional, errors);
     }
 
-    public List<AvailableLibrary> available() { return List.copyOf(available.values()); }
+    public List<AvailableLibrary> available() {
+        List<AvailableLibrary> result = new ArrayList<>();
+        for (List<AvailableLibrary> versions : available.values()) result.addAll(versions);
+        return List.copyOf(result);
+    }
+
+    private AvailableLibrary select(ManifestModel.SharedLibraryDependency dependency) {
+        List<AvailableLibrary> versions = available.get(dependency.key());
+        if (versions == null || versions.isEmpty()) return null;
+        for (AvailableLibrary candidate : versions) {
+            if (dependency.version() > 0 && candidate.version() != dependency.version()) continue;
+            if (!dependency.certificateDigest().isEmpty()
+                    && !dependency.certificateDigest().equals(candidate.certificateDigest())) continue;
+            return candidate;
+        }
+        // Preserve a useful version/certificate mismatch diagnostic by returning the best
+        // version candidate when no exact candidate satisfies the dependency.
+        return versions.get(0);
+    }
+
+    private static boolean sameIdentity(AvailableLibrary left, AvailableLibrary right) {
+        return left.certificateDigest().equals(right.certificateDigest())
+                && left.providerPackage().equals(right.providerPackage());
+    }
+
+    /** The synthetic android provider is only a fallback for a concrete host provider. */
+    private static boolean isFallbackProvider(AvailableLibrary library) {
+        return "android".equals(library.providerPackage());
+    }
 
     private static String required(String value, String name) {
         String normalized = value(value);

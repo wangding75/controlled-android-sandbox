@@ -594,13 +594,15 @@ public final class DebugCommandActivity extends Activity {
                 operation = started;
             } else if ("prepare".equals(command) || "import-prepare".equals(command)) {
                 operation = runtime.prepare(record, virtualUserId);
-                requireStatus("prepare", operation, "PREPARED", "ALREADY_PREPARED");
+                requireStatus("prepare", operation, "PREPARED", "ALREADY_PREPARED",
+                        "PREPARED_DEGRADED", "ALREADY_PREPARED_DEGRADED");
             } else if ("hold-prepare".equals(command)) {
                 // RD crash/recovery probe only: keep the RuntimeClient/Broker binding alive long
                 // enough for the external harness to SIGKILL the concrete Guest process before
                 // the normal client teardown path releases the slot.
                 operation = runtime.prepare(record, virtualUserId);
-                requireStatus("hold-prepare", operation, "PREPARED", "ALREADY_PREPARED");
+                requireStatus("hold-prepare", operation, "PREPARED", "ALREADY_PREPARED",
+                        "PREPARED_DEGRADED", "ALREADY_PREPARED_DEGRADED");
                 String kickoffComponent = extras.getString("launchComponent", "").trim();
                 if (!kickoffComponent.isEmpty()) {
                     Bundle kickoff = runtime.launchComponent(record, virtualUserId, kickoffComponent);

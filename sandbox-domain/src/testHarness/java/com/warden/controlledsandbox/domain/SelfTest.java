@@ -321,7 +321,10 @@ public final class SelfTest {
                         "org.apache.http.legacy", 0, "", "android"),
                 new SharedLibraryResolver.AvailableLibrary(
                         ManifestModel.SharedLibraryDependency.Kind.SDK,
-                        "com.example.sdk", 3, digest, "com.example.provider")));
+                        "com.example.sdk", 3, digest, "com.example.provider"),
+                new SharedLibraryResolver.AvailableLibrary(
+                        ManifestModel.SharedLibraryDependency.Kind.SDK,
+                        "com.example.sdk", 5, digest, "com.example.provider")));
         SharedLibraryResolver.Resolution success = resolver.resolve(java.util.List.of(
                 new ManifestModel.SharedLibraryDependency(
                         ManifestModel.SharedLibraryDependency.Kind.JAVA,
@@ -335,6 +338,14 @@ public final class SelfTest {
         require(success.successful(), "required shared libraries resolve");
         require(success.resolved().size() == 2 && success.missingOptional().size() == 1,
                 "optional shared library is recorded without blocking");
+
+        SharedLibraryResolver.Resolution newest = resolver.resolve(java.util.List.of(
+                new ManifestModel.SharedLibraryDependency(
+                        ManifestModel.SharedLibraryDependency.Kind.SDK,
+                        "com.example.sdk", true, 0, digest)));
+        require(newest.successful() && newest.resolved().size() == 1
+                        && newest.resolved().get(0).version() == 5,
+                "unversioned shared library selects newest available revision");
 
         SharedLibraryResolver.Resolution failure = resolver.resolve(java.util.List.of(
                 new ManifestModel.SharedLibraryDependency(

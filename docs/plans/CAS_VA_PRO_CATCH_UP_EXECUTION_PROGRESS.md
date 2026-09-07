@@ -4636,3 +4636,20 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
 - **证据与报告**：原始 device metadata、runner JSON、capability matrix 和静态 audit 均在 ignored `out/verification/`；没有生成或跟踪 APK、`.so`、logcat、device dump、screenshot；false-pass gate、`ref/` unchanged 均 PASS。正式报告为 `reports/t57-r03/c6/C6_T02C_ARM64_PHYSICAL_DYNAMIC_VALIDATION_REPORT.md`。
 - **提交/推送**：本任务唯一最终提交主题为 `C6-T02C: validate ARM64 runtime on physical device`；最终 Git gate 要求自 `START_HEAD` 仅 1 个提交、工作树 CLEAN、本地与 `origin/feature/t57-r03-va-pro-capability-campaign` 一致。
 - **下一任务**：`C6-T02D`；本轮到此停止，不自动执行 T02D。
+
+### REAL_APP_COMPATIBILITY：REALAPP-COMPAT-01 Chrome / 夸克真实商业 App 兼容收敛（2026-09-07）
+
+- 状态：BLOCKED。本节是独立的真实商业 App 状态，不改写上方 C6-T02C 的 Fixture/ARM64 PASS。
+- 开始基线：分支 feature/t57-r03-va-pro-capability-campaign，START_HEAD=bd315b2758bfdf3d4df0d346aefd6d3bb3700c4b；ref/开始时保持 unchanged。最终 FINAL_HEAD=HEAD 指向本节所在的唯一最终提交，精确 SHA 由最终 Git gate 回执给出。
+- 真实设备：serial 192.168.137.210:33259，Xiaomi 25019PNF3C，Android 16 / API 36，arm64-v8a，PAGE_SIZE=4096。
+- 冻结目标：Chrome com.android.chrome 148.0.7778.180 / code 777818033，3 splits、2 native libraries、static Trichrome dependency；夸克 com.quark.browser 10.15.5.1130 / code 1130，0 splits、64 native libraries，main com.ucpro.MainActivity。原始冻结记录与所有 device evidence 在 ignored out/verification/realapp-compat-01-final-20260907/。
+- Chrome initial failure：clean import 因 missing STATIC:com.google.android.trichromelibrary 失败，定位为 GENERIC_SHARED_LIBRARY_DEFECT。修复把宿主 PackageManager shared-library catalog 和 ApplicationInfo.sharedLibraryFiles 的 static provider projection 纳入通用 import resolver；没有 if chrome 特判。
+- Chrome final：import operation DONE/SUCCEEDED，base/splits/ABI/native/signature metadata/package metadata/shared-library/publish/catalog 全部 PASS，CHROME_IMPORT=PASS、CHROME_PACKAGE_COMPLETE=PASS。随后独立 cold launch 失败于 SHARED_LIBRARY_PROVIDER_PROJECTION_MISSING:com.google.android.trichromelibrary，仍归 GENERIC_SHARED_LIBRARY_DEFECT；CHROME_FIRST_FRAME_DRAWN=NOT_TESTED。
+- 夸克 final：import DONE/SUCCEEDED，package complete PASS；process create、bindApplication、LoadedApk/AppComponentFactory、ClassLoader、arm64 NativeLoader、Provider prepare、Activity resume、Window 和 CAS internal first frame 均 PASS。QUARK_LAST_SUCCESSFUL_LAUNCH_STAGE=FIRST_FRAME_DRAWN。
+- 夸克 smoke：执行 hold-prepare 60s 及 03s/10s/late 采样；首帧后出现 FATAL EXCEPTION: Thread-27、NO_GUEST_SERVICE_MATCH（GuestIntentResolver/GuestContextComponentRouter.bindService）及 CONTENT_PROVIDER_AUTHORITY_NOT_VIRTUALIZED。物理 top activity 回到 MIUI Launcher，无法完成基础页面/返回主页闭环，QUARK_BASIC_SMOKE=FAIL。分类为 GENERIC_PMS_DEFECT + GENERIC_PROVIDER_DEFECT，没有 app-specific patch。
+- VA/NBB 对照结论：VA 的 PackageParserEx / VPackageManagerService / VAppManagerService 在 package parser/PMS/install 层承载 split、nativeLibraryDir、host sharedLibraryFiles 和虚拟 metadata；NBB 的 PackageParser / BPackageManagerService / BActivityThread / IOCore 覆盖 split model、bindApplication、ClassLoader、Provider、Activity 和 native path。CAS 当前缺口是通用 metadata projection 与 runtime component/provider routing，不是 Chrome/夸克私有协议。
+- 回归：./gradlew projects、assembleDebug、test、tools/static_android_compile.py 均 PASS；S01-S10 10/10 PASS。ABI/ELF validator 保持 PASS，Harness/Unit/FALSE_PASS 均 PASS。独立 capability extension 本轮为 12 total / 8 PASS / 2 FAIL / 1 EXPECTED_LIMITATION / 1 NOT_IN_CURRENT_SCOPE，失败 case 单独保留，不被商业 App gate 隐藏。
+- Gate ledger：CHROME_IMPORT=PASS、CHROME_PACKAGE_COMPLETE=PASS；QUARK_IMPORT=PASS、QUARK_PACKAGE_COMPLETE=PASS、QUARK_PROCESS_CREATE=PASS、QUARK_BIND_APPLICATION=PASS、QUARK_CLASSLOADER=PASS、QUARK_NATIVE_LOADER=PASS、QUARK_PROVIDER_INIT=PASS、QUARK_ACTIVITY_RESUME=PASS、QUARK_FIRST_FRAME_DRAWN=PASS、QUARK_BASIC_SMOKE=FAIL；所以 REAL_APP_COMPAT_01=BLOCKED。
+- 正式报告：reports/t57-r03/c6/REALAPP_COMPAT_01_CHROME_QUARK_REPORT.md。Evidence 只在 ignored out/verification/...，未提交 APK、logcat、截图、package dump 或临时文件。
+- 提交/推送：本任务唯一最终提交主题必须为 REALAPP-COMPAT-01: diagnose Chrome and Quark compatibility blockers；最终 Git gate 要求从 START_HEAD 仅 1 个提交、ref/ unchanged、工作树 CLEAN、本地 HEAD 与 origin/feature/t57-r03-va-pro-capability-campaign 一致。
+- 下一任务：REALAPP-COMPAT-02；不进入 C6-T02D，不自动执行下一任务。

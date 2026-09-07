@@ -17,6 +17,7 @@ import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.SharedLibraryInfo;
 import android.content.pm.Signature;
 import android.os.Build;
 import android.os.Bundle;
@@ -112,7 +113,8 @@ final class VirtualPackageStateBuilder {
                     group.flags()));
         }
 
-        SharedLibraryResolver resolver = new SharedLibraryResolver(availableLibraries(catalog));
+        SharedLibraryResolver resolver = new SharedLibraryResolver(availableLibraries(catalog,
+                record.packageName, set.sharedLibraryDependencies));
         SharedLibraryResolver.Resolution libraryResolution = resolver.resolve(set.sharedLibraryDependencies);
         libraryResolution.requireSuccessful();
         List<VirtualSharedLibrarySnapshot> librarySnapshots = new ArrayList<>();
@@ -369,8 +371,10 @@ final class VirtualPackageStateBuilder {
     }
 
     private List<SharedLibraryResolver.AvailableLibrary> availableLibraries(
-            SandboxCatalogState catalog) throws Exception {
+            SandboxCatalogState catalog, String packageName,
+            List<ManifestModel.SharedLibraryDependency> dependencies) throws Exception {
         List<SharedLibraryResolver.AvailableLibrary> available = baseAvailableLibraries();
+        appendHostSharedLibraries(available, context, packageName, dependencies);
         if (catalog != null) {
             for (SandboxRecord installed : catalog.records()) {
                 ManifestSet installedSet = manifestsByRevision.get(installed.sha256);
@@ -384,11 +388,13 @@ final class VirtualPackageStateBuilder {
         return available;
     }
 
-    static void requireInstallableSharedLibraries(SandboxRecord candidate,
+    static void requireInstallableSharedLibraries(Context context, SandboxRecord candidate,
                                                    SandboxCatalogState current) throws Exception {
         if (candidate == null) throw new IllegalArgumentException("candidate is required");
         ManifestSet candidateSet = parse(candidate);
         List<SharedLibraryResolver.AvailableLibrary> available = baseAvailableLibraries();
+        appendHostSharedLibraries(available, context, candidate.packageName,
+                candidateSet.sharedLibraryDependencies);
         if (current != null) {
             for (SandboxRecord installed : current.records()) {
                 if (candidate.packageName.equals(installed.packageName)) continue;
@@ -398,6 +404,147 @@ final class VirtualPackageStateBuilder {
         appendProvidedLibraries(available, candidateSet, candidate.packageName);
         new SharedLibraryResolver(available).resolve(candidateSet.sharedLibraryDependencies)
                 .requireSuccessful();
+    }
+
+    /**
+     * Android's PackageManager owns the active shared-library revision set.  A Guest package
+     * must resolve against that set during import as well; hard-coding a small framework list
+     * rejects real static libraries such as Trichrome even though PMS has already accepted the
+     * package.  The returned provider identity is retained for the later Guest loader contract;
+     * no package-name special case is used here.
+     */
+    private static void appendHostSharedLibraries(
+            List<SharedLibraryResolver.AvailableLibrary> available, Context context,
+            String packageName, List<ManifestModel.SharedLibraryDependency> dependencies) {
+        if (context == null || Build.VERSION.SDK_INT < 26) return;
+        try {
+            PackageManager packageManager = context.getPackageManager();
+            List<SharedLibraryInfo> libraries = packageManager.getSharedLibraries(0);
+            if (libraries != null) {
+                for (SharedLibraryInfo library : libraries) {
+                    if (library == null || library.getName() == null
+                            || library.getName().trim().isEmpty()) continue;
+                    ManifestModel.SharedLibraryDependency.Kind kind = sharedLibraryKind(library);
+                    long version = library.getLongVersion();
+                    if (version < 0) version = 0;
+                    String provider = "android";
+                    if (library.getDeclaringPackage() != null
+                            && library.getDeclaringPackage().getPackageName() != null
+                            && !library.getDeclaringPackage().getPackageName().trim().isEmpty()) {
+                        provider = library.getDeclaringPackage().getPackageName();
+                    }
+                    String certificate = "";
+                    List<String> digests = library.getCertDigests();
+                    if (digests != null) {
+                        for (String digest : digests) {
+                            String normalized = digest == null ? ""
+                                    : digest.replace(":", "").trim();
+                            if (normalized.matches("[0-9a-fA-F]{64}")) {
+                                certificate = normalized;
+                                break;
+                            }
+                        }
+                    }
+                    available.add(new SharedLibraryResolver.AvailableLibrary(
+                            kind, library.getName(), version, certificate, provider));
+                    android.util.Log.i("CS_SHARED_LIBRARY", "host name=" + library.getName()
+                            + " kind=" + kind + " version=" + version + " provider=" + provider);
+                }
+            }
+            appendHostSharedLibraryFiles(available, packageManager, packageName, dependencies);
+        } catch (RuntimeException unavailable) {
+            // A device that cannot expose the host catalog remains fail-closed for required
+            // declarations.  Optional libraries still retain their explicit unresolved state.
+            android.util.Log.w("CS_SHARED_LIBRARY", "host shared-library catalog unavailable",
+                    unavailable);
+        }
+    }
+
+    /**
+     * Static libraries are not returned by getSharedLibraries(0) on every Android 14+ build.
+     * PackageManager still publishes the resolved provider APKs through the importing package's
+     * ApplicationInfo.sharedLibraryFiles when GET_SHARED_LIBRARY_FILES is requested.  Use the
+     * dependency kind/certificate from the trusted manifest and recover the provider/version
+     * from the PMS-owned APK path; this keeps the import check tied to the host's accepted graph.
+     */
+    private static void appendHostSharedLibraryFiles(
+            List<SharedLibraryResolver.AvailableLibrary> available, PackageManager packageManager,
+            String packageName, List<ManifestModel.SharedLibraryDependency> dependencies) {
+        if (packageName == null || packageName.trim().isEmpty() || dependencies == null
+                || dependencies.isEmpty()) return;
+        try {
+            PackageInfo packageInfo = packageManager.getPackageInfo(
+                    packageName, PackageManager.GET_SHARED_LIBRARY_FILES);
+            String[] files = packageInfo.applicationInfo == null
+                    ? null : packageInfo.applicationInfo.sharedLibraryFiles;
+            android.util.Log.i("CS_SHARED_LIBRARY", "host package=" + packageName
+                    + " sharedLibraryFiles=" + (files == null ? 0 : files.length));
+            if (files == null) return;
+            for (String file : files) {
+                HostSharedLibraryPath provider = parseHostSharedLibraryPath(file);
+                if (provider == null) continue;
+                for (ManifestModel.SharedLibraryDependency dependency : dependencies) {
+                    if (!dependency.name().equals(provider.name)) continue;
+                    long version = provider.version > 0 ? provider.version : dependency.version();
+                    available.add(new SharedLibraryResolver.AvailableLibrary(
+                            dependency.kind(), dependency.name(), version,
+                            dependency.certificateDigest(), provider.packageName));
+                    android.util.Log.i("CS_SHARED_LIBRARY", "host file name="
+                            + dependency.name() + " kind=" + dependency.kind() + " version="
+                            + version + " provider=" + provider.packageName + " path=" + file);
+                }
+            }
+        } catch (Exception unavailable) {
+            android.util.Log.w("CS_SHARED_LIBRARY",
+                    "host shared-library file projection unavailable package=" + packageName,
+                    unavailable);
+        }
+    }
+
+    private static HostSharedLibraryPath parseHostSharedLibraryPath(String path) {
+        if (path == null || path.trim().isEmpty()) return null;
+        File file = new File(path);
+        File parent = file.getParentFile();
+        if (parent == null) return null;
+        String directory = parent.getName();
+        int hyphen = directory.lastIndexOf('-');
+        int underscore = hyphen < 0 ? -1 : directory.lastIndexOf('_', hyphen);
+        if (underscore <= 0 || hyphen <= underscore + 1) return null;
+        String name = directory.substring(0, underscore);
+        long version;
+        try {
+            version = Long.parseLong(directory.substring(underscore + 1, hyphen));
+        } catch (NumberFormatException invalidVersion) {
+            return null;
+        }
+        return new HostSharedLibraryPath(name, version, name);
+    }
+
+    private static final class HostSharedLibraryPath {
+        final String name;
+        final long version;
+        final String packageName;
+
+        HostSharedLibraryPath(String name, long version, String packageName) {
+            this.name = name;
+            this.version = version;
+            this.packageName = packageName;
+        }
+    }
+
+    private static ManifestModel.SharedLibraryDependency.Kind sharedLibraryKind(
+            SharedLibraryInfo library) {
+        if (library.getType() == SharedLibraryInfo.TYPE_STATIC) {
+            return ManifestModel.SharedLibraryDependency.Kind.STATIC;
+        }
+        if (library.getType() == SharedLibraryInfo.TYPE_SDK_PACKAGE) {
+            return ManifestModel.SharedLibraryDependency.Kind.SDK;
+        }
+        String name = library.getName();
+        if (name != null && name.startsWith("lib") && name.endsWith(".so")) {
+            return ManifestModel.SharedLibraryDependency.Kind.NATIVE;
+        }
+        return ManifestModel.SharedLibraryDependency.Kind.JAVA;
     }
 
     private static List<SharedLibraryResolver.AvailableLibrary> baseAvailableLibraries() {

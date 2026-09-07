@@ -505,7 +505,7 @@ final class SandboxPackageLifecycle {
                                          RevisionCommitBarrier barrier,
                                          Integer ensureVirtualUserId) throws Exception {
         try {
-            VirtualPackageStateBuilder.requireInstallableSharedLibraries(imported, current);
+            VirtualPackageStateBuilder.requireInstallableSharedLibraries(context, imported, current);
         } catch (Exception error) {
             try {
                 deletePublishedRevisionIfUnreferenced(current, imported);
