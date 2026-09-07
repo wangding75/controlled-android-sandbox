@@ -65,6 +65,7 @@ class SmokeContext:
     apk_paths: dict[str, Path] = field(default_factory=dict)
     setup_installs: list[dict[str, Any]] = field(default_factory=list)
     setup_omissions: dict[str, str] = field(default_factory=dict)
+    lane: str = ""
 
 
 @dataclass
@@ -211,7 +212,24 @@ def _s01(context: SmokeContext, attempt_dir: Path, _attempt: int) -> AttemptExec
         row = _command_dict(result)
         row.update({"name": name, "path": str(path)})
         installs.append(row)
-        require(result.ok, "APK_INSTALL_FAILED", f"{name}: {row}")
+        install_text = f"{result.text()} {result.text('stderr')}"
+        install_classification = classify_failure_text(install_text)
+        if not result.ok and install_classification is FailureClass.ENVIRONMENT:
+            return AttemptExecution(
+                ResultState.BLOCKED_ENV,
+                {
+                    "installs": installs,
+                    "omitted_apks": dict(context.setup_omissions),
+                    "blocked_install": row,
+                },
+                artifacts=[],
+            )
+        require(
+            result.ok,
+            "APK_INSTALL_FAILED",
+            f"{name}: {row}",
+            classification=install_classification,
+        )
     context.setup_installs = installs
     package_update_idle = _wait_for_package_update_idle(context.device)
     debug_component_ready = _wait_for_component(
@@ -432,32 +450,39 @@ def _s07(context: SmokeContext, attempt_dir: Path, _attempt: int) -> AttemptExec
 
 
 def _s08(context: SmokeContext, attempt_dir: Path, _attempt: int) -> AttemptExecution:
-    peer = _invoke_debug(
-        context,
-        attempt_dir / "peer-import",
-        command="import-only",
-        package=PEER_GUEST_PACKAGE,
-        timeout_kind=TimeoutKind.ADD_IMPORT,
-        force_stop_host=True,
-    )
-    require_command_pass(peer.actual["debug_result"], "IMPORTED", artifacts=peer.artifacts)
+    peer: CommandObservation | None = None
+    if context.lane != "ARM64_PHYSICAL":
+        peer = _invoke_debug(
+            context,
+            attempt_dir / "peer-import",
+            command="import-only",
+            package=PEER_GUEST_PACKAGE,
+            timeout_kind=TimeoutKind.ADD_IMPORT,
+            force_stop_host=True,
+        )
+        require_command_pass(peer.actual["debug_result"], "IMPORTED", artifacts=peer.artifacts)
     observation = _invoke_debug(
         context,
         attempt_dir,
         command="launch-component",
         package=GUEST_PACKAGE,
         timeout_kind=TimeoutKind.RECOVERY,
-        extras={"component": FRAMEWORK_PROBE_COMPONENT},
+        extras={
+            "component": FRAMEWORK_PROBE_COMPONENT,
+            "skipCrossPackageProbes": context.lane == "ARM64_PHYSICAL",
+        },
         force_stop_host=True,
     )
-    markers = (
+    markers = [
         "FRAMEWORK_PROBE_PENDING_INTENT_PASS",
         "FRAMEWORK_PROBE_PENDING_INTENT_BINDER_PASS",
         "FRAMEWORK_PROBE_PENDING_INTENT_CALLBACK_PASS",
-        "FRAMEWORK_PROBE_CROSS_PENDING_INTENT_PASS",
-    )
+    ]
+    if context.lane != "ARM64_PHYSICAL":
+        markers.append("FRAMEWORK_PROBE_CROSS_PENDING_INTENT_PASS")
+    markers_tuple = tuple(markers)
     logcat = _wait_for_markers(
-        context.device, markers, context.timeout_policy.seconds(TimeoutKind.FIRST_FRAME)
+        context.device, markers_tuple, context.timeout_policy.seconds(TimeoutKind.FIRST_FRAME)
     )
     debug_result = observation.actual["debug_result"]
     require_command_pass(debug_result, artifacts=observation.artifacts)
@@ -474,18 +499,25 @@ def _s08(context: SmokeContext, attempt_dir: Path, _attempt: int) -> AttemptExec
         f"expected component={FRAMEWORK_PROBE_COMPONENT!r} operation={operation}",
         artifacts=observation.artifacts,
     )
-    for marker in markers:
+    for marker in markers_tuple:
         require_marker(logcat, marker, artifacts=observation.artifacts)
     refreshed = _capture(
         context, attempt_dir / "post-markers", "framework-probe", package_hint=GUEST_PACKAGE
     )
     actual = {
-        "peer_import": peer.actual,
+        "peer_import": peer.actual if peer is not None else {
+            "status": "NOT_IN_CURRENT_SCOPE",
+            "reason": "ARM64 physical lane excludes compat32/cross-bitness fixture",
+        },
         "probe": observation.actual,
-        "pending_intent_markers": list(markers),
+        "pending_intent_markers": list(markers_tuple),
         "post_marker_capture": refreshed,
     }
-    artifacts = list(dict.fromkeys(peer.artifacts + observation.artifacts + refreshed["artifacts"]))
+    artifacts = list(dict.fromkeys(
+        (peer.artifacts if peer is not None else [])
+        + observation.artifacts
+        + refreshed["artifacts"]
+    ))
     return AttemptExecution(
         ResultState.PASS,
         actual,

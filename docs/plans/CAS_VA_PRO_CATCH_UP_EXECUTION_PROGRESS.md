@@ -6,9 +6,9 @@
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C6`（IN_PROGRESS；按用户明确指令提前进入 C6，C4-R05 正式关门及 C1/C2/C4 合并回归延后至完整回归处理）
-当前任务：`C6-T02C`（PENDING；C6-T02B 已完成）
-下一任务：`C6-T02C`
-最后完成任务：`C6-T02B`
+当前任务：`C6-T02C`（DONE；最终 ARM64 physical dynamic validation RESULT=PASS）
+下一任务：`C6-T02D`（PENDING；本轮不自动执行）
+最后完成任务：`C6-T02C`
 
 ## 1. 使用规则
 
@@ -85,6 +85,7 @@
 | C6-T01G | API32-37 Cross-API Final Closure | PASS_WITH_ENVIRONMENT_DEFERRED | C6-T01F | `HEAD`（精确 SHA 见 §5 C6-T01G-R02 回执） | §5 C6-T01G-R02 |
 | C6-T02A | ABI / ELF / Native Packaging Static Convergence | DONE | C6-T01,C3-T03 | `HEAD`（本任务唯一提交；精确 SHA 见 §5 C6-T02A 回执） | §5 C6-T02A |
 | C6-T02B | 16 KB Page Size Dynamic Validation | DONE | C6-T02A,C6-T01 | `HEAD`（本任务唯一提交；精确 SHA 见 §5 C6-T02B 回执） | §5 C6-T02B |
+| C6-T02C | ARM64 Physical Device Dynamic Validation | DONE | C6-T02A,C6-T02B | `HEAD`（本任务唯一提交；精确 SHA 见 §5 C6-T02C 回执） | §5 C6-T02C |
 | C6-T02 | ARM/跨宽度/16KB | PENDING | C3-T03,C6-T01 | - | - |
 | C6-T03 | Android Matrix 发布门禁 | PENDING | C6-T01,C6-T02 | - | - |
 | C7-T01 | OEM 优先级与代表设备 | PENDING | C6 | - | - |
@@ -4621,3 +4622,17 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   `C6-T02B: validate native runtime on 16KB page size`；精确 SHA 以最终 Git gate
   回执为准，本地与远端 HEAD 必须一致且工作区 CLEAN。
 - **下一任务**：`C6-T02C`；本轮不自动执行 T02C。
+
+### C6-T02C：ARM64 Physical Device Dynamic Validation（2026-09-07）
+
+- **状态**：`DONE`，最终报告 RESULT=PASS。设备真实性 Gate 通过：通过 `adb devices -l` 动态发现一台非 emulator 的 Xiaomi 真机，manufacturer `Xiaomi`、model `25019PNF3C`、Android `16` / API `36`、`PRIMARY_ABI=arm64-v8a`、`ABI_LIST=arm64-v8a`、PAGE_SIZE `4096`；不把 4 KB 误报为 ARM64+16KB 组合。
+- **开始基线**：分支 `feature/t57-r03-va-pro-capability-campaign`，`START_HEAD=f92a9c0c9c5d9c9c7c27094e1cf22e4b8c613f29`，开始时工作树 CLEAN、`ref/` 未修改。基线 `./gradlew projects`、`assembleDebug`、`test` 均 PASS。
+- **最终核心动态**：权威 run 为 `out/verification/c6-t02c-arm64-core-final-3-20260907/run.json`，S01-S10 `10/10 PASS`、FAIL=0。Host/Guest install、first frame、cold/warm、Service/Broadcast/Provider、同 Guest PendingIntent/Binder、package lifecycle、旧 PID 退出/新 PID recovery first frame 均有证据。
+- **最终 capability**：`out/verification/c6-t02c-arm64-capabilities-final-20260907/capability-matrix.json` 为 `12 total / 9 PASS / 0 FAIL / 2 EXPECTED_LIMITATION / 1 NOT_IN_CURRENT_SCOPE`。Split APK/ClassLoader、WebView/native、PMS/AppOps/attribution、framework identity、scheduling、network/media/DNS/VPN、native loader/JNI/hooks、proc/fd 均通过；AppWidget 明确不在当前 fixture scope。
+- **Native 与 enforcement POC**：四个 ARM64 runtime load contract `4/4 PASS`，包括 `libcontrolled_sandbox_native.so`、`libcontrolled_sandbox_fixture.so`、`libfixture_adv_payload.so` 和 debug-only `libcas_native_enf.so`。isolated POC 记录 `abi=arm64-v8a`、`jniAvailable=true`、`pocValid=true`、`production=false`；native hook refresh 的 `patchFailures=0`。raw/seccomp adversarial boundary 保留为 EXPECTED_LIMITATION，不转换为 false PASS。
+- **静态、构建与回归**：ABI/ELF audit 为 13 个 APK/AAR、29/29 ELF PASS、静态 16 KB 为 29/29、APK native packaging 为 25/25；Gradle projects/assembleDebug/unit tests、Harness `16/16` 均 PASS。shared native 改动后 API35 x86_64 4 KB 回归 S01-S10 `10/10 PASS`。
+- **实现与分类**：本轮保留通用 bounded procfs snapshot cap、DNS `EAI_NODATA` 环境兼容分类及 truthful capability accounting 修正；没有 OEM-specific patch，没有改系统设置、root、SELinux、system partition 或真实用户应用数据。ARM64-specific defects=NONE，general defects=NONE。
+- **历史阻断的覆盖**：设备解锁前的 HyperOS `INSTALL_FAILED_USER_RESTRICTED` 和 Dozing 运行仅作为中间环境证据保留，不作为最终结果；解锁后的最终运行已安装并执行完整 ARM64 Guest lane。
+- **证据与报告**：原始 device metadata、runner JSON、capability matrix 和静态 audit 均在 ignored `out/verification/`；没有生成或跟踪 APK、`.so`、logcat、device dump、screenshot；false-pass gate、`ref/` unchanged 均 PASS。正式报告为 `reports/t57-r03/c6/C6_T02C_ARM64_PHYSICAL_DYNAMIC_VALIDATION_REPORT.md`。
+- **提交/推送**：本任务唯一最终提交主题为 `C6-T02C: validate ARM64 runtime on physical device`；最终 Git gate 要求自 `START_HEAD` 仅 1 个提交、工作树 CLEAN、本地与 `origin/feature/t57-r03-va-pro-capability-campaign` 一致。
+- **下一任务**：`C6-T02D`；本轮到此停止，不自动执行 T02D。

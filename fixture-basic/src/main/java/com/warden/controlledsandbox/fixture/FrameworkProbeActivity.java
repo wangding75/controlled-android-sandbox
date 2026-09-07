@@ -38,6 +38,7 @@ public final class FrameworkProbeActivity extends Activity {
     private static final String TAG = "CS_FIXTURE";
     private boolean serviceConnected;
     private boolean crossPackageServiceConnected;
+    private boolean skipCrossPackageProbes;
     private ServiceConnection connection;
     private ServiceConnection crossPackageConnection;
     private Intent remoteServiceIntent;
@@ -49,6 +50,8 @@ public final class FrameworkProbeActivity extends Activity {
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         Log.i(TAG, "FRAMEWORK_PROBE_BEGIN package=" + getPackageName());
+        skipCrossPackageProbes = getIntent() != null
+                && getIntent().getBooleanExtra("skipCrossPackageProbes", false);
         dynamicReceiver = new DynamicFixtureReceiver();
         IntentFilter dynamicFilter = new IntentFilter(getPackageName() + ".DYNAMIC_PING");
         if (Build.VERSION.SDK_INT >= 33) {
@@ -73,10 +76,16 @@ public final class FrameworkProbeActivity extends Activity {
         frameworkOrderedReceiverProbe();
         frameworkOrderedAsyncReceiverProbe();
         serviceBindingProbe();
-        packageUniverseProbe();
+        if (skipCrossPackageProbes) {
+            Log.i(TAG, "FRAMEWORK_PROBE_CROSS_PACKAGE_SKIPPED");
+        } else {
+            packageUniverseProbe();
+        }
         startActivity(new Intent(this, PersistableProbeActivity.class)
                 .setAction(getPackageName() + ".PERSISTABLE_ACTIVITY_PROBE"));
-        crossPackageComponentProbe();
+        if (!skipCrossPackageProbes) {
+            crossPackageComponentProbe();
+        }
         multiProcessProbe();
         new Handler(Looper.getMainLooper()).postDelayed(this::finishProbe, 5000L);
     }
@@ -715,17 +724,20 @@ public final class FrameworkProbeActivity extends Activity {
 
     private void finishProbe() {
         if (!serviceConnected) throw new AssertionError("SERVICE_BIND_CALLBACK_MISSING");
-        if (!crossPackageServiceConnected) {
+        if (!skipCrossPackageProbes && !crossPackageServiceConnected) {
             throw new AssertionError("CROSS_PACKAGE_SERVICE_BIND_CALLBACK_MISSING");
         }
         if (remoteServiceIntent != null && !stopService(remoteServiceIntent)) {
             throw new AssertionError("REMOTE_SERVICE_STOP_FAILED");
         }
         Log.i(TAG, "FRAMEWORK_PROBE_REMOTE_STOP_PASS");
-        if (crossPackageServiceIntent != null && !stopService(crossPackageServiceIntent)) {
+        if (!skipCrossPackageProbes && crossPackageServiceIntent != null
+                && !stopService(crossPackageServiceIntent)) {
             throw new AssertionError("CROSS_PACKAGE_SERVICE_STOP_FAILED");
         }
-        Log.i(TAG, "FRAMEWORK_PROBE_CROSS_STOP_PASS");
+        if (!skipCrossPackageProbes) {
+            Log.i(TAG, "FRAMEWORK_PROBE_CROSS_STOP_PASS");
+        }
         if (connection != null) {
             unbindService(connection);
             connection = null;

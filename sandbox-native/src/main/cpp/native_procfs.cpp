@@ -25,8 +25,11 @@
 namespace controlled_sandbox {
 namespace {
 
-constexpr std::size_t kMaxMapsBytes = 2U * 1024U * 1024U;
-constexpr std::size_t kMaxProcBytes = 2U * 1024U * 1024U;
+// Physical ARM64 processes can expose substantially larger smaps snapshots than the
+// small x86_64 test image. Keep the materialization bounded while allowing the sanitizer
+// to inspect a complete real-device snapshot instead of returning EFBIG mid-probe.
+constexpr std::size_t kMaxMapsBytes = 8U * 1024U * 1024U;
+constexpr std::size_t kMaxProcBytes = 8U * 1024U * 1024U;
 
 enum class ProcKind { None, File, Directory, Fd, FdInfo, MapFile };
 

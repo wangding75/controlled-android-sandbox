@@ -979,6 +979,9 @@ public final class DebugCommandActivity extends Activity {
 
     private static Bundle componentIntentExtras(Bundle extras) {
         Bundle result = new Bundle();
+        if (extras.getBoolean("skipCrossPackageProbes", false)) {
+            result.putBoolean("skipCrossPackageProbes", true);
+        }
         String mode = text(extras, "componentMode", "");
         if (!mode.isEmpty()) result.putString("c2t04Mode", mode);
         String c2t05Mode = text(extras, "c2t05Mode", "");

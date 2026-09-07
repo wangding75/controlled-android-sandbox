@@ -5,7 +5,8 @@ Usage from the repository root::
     python tools/verification/run_rd_smoke.py --instance-name RD测试
 
 For an explicitly verified API33/API34/API35/API36/API37 AVD, use the matching lane flag
-with an explicit serial.
+with an explicit serial.  For a real ARM64 device, use ``--arm64-physical`` with a
+dynamically selected serial; that lane excludes Companion32 and cross-bitness fixtures.
 
 The default run performs the required Gradle acceptance commands first.  Use
 ``--skip-build`` only when those commands were already run and their results
@@ -127,7 +128,9 @@ def _find_apk(module: str, preferred: str) -> Path | None:
     return candidates[0] if len(candidates) == 1 else None
 
 
-def _apk_paths(*, include_companion32: bool = True) -> dict[str, Path]:
+def _apk_paths(
+    *, include_companion32: bool = True, include_fixture32: bool = True
+) -> dict[str, Path]:
     requested = {
         "host": ("app", "app-debug.apk"),
         "companion32": ("sandbox-companion32", "sandbox-companion32-debug.apk"),
@@ -136,6 +139,8 @@ def _apk_paths(*, include_companion32: bool = True) -> dict[str, Path]:
     }
     if not include_companion32:
         requested.pop("companion32")
+    if not include_fixture32:
+        requested.pop("fixture32")
     paths: dict[str, Path] = {}
     for name, (module, preferred) in requested.items():
         found = _find_apk(module, preferred)
@@ -177,6 +182,23 @@ def _validate_api_device(
     if mismatches:
         raise DeviceMetadataError(
             f"API{expected_api}_DEVICE_CONTRACT_MISMATCH: " + ", ".join(mismatches)
+        )
+
+
+def _validate_arm64_physical_device(metadata: dict[str, Any]) -> None:
+    """Validate the ARM64 physical lane without imposing a page-size gate."""
+
+    mismatches: list[str] = []
+    serial = str(metadata.get("serial", "")).strip().lower()
+    if serial.startswith("emulator-"):
+        mismatches.append(f"serial={metadata.get('serial')!r} is an emulator")
+    if metadata.get("abi") != "arm64-v8a":
+        mismatches.append(f"abi={metadata.get('abi')!r}")
+    if "arm64-v8a" not in (metadata.get("abi_list") or []):
+        mismatches.append(f"abi_list={metadata.get('abi_list')!r}")
+    if mismatches:
+        raise DeviceMetadataError(
+            "ARM64_PHYSICAL_DEVICE_CONTRACT_MISMATCH: " + ", ".join(mismatches)
         )
 
 
@@ -384,8 +406,13 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
             resolver_snapshot, device = _resolve_device(args)
             _wait_for_android_services(device)
             platform_lane = ""
-            if sum(bool(value) for value in (args.api32, args.api33, args.api34, args.api35, args.api36, args.api37)) > 1:
-                raise DeviceMetadataError("API32_API33_API34_API35_API36_API37_FLAGS_ARE_MUTUALLY_EXCLUSIVE")
+            if sum(bool(value) for value in (
+                args.api32, args.api33, args.api34, args.api35, args.api36, args.api37,
+                args.arm64_physical,
+            )) > 1:
+                raise DeviceMetadataError(
+                    "PLATFORM_LANE_FLAGS_ARE_MUTUALLY_EXCLUSIVE"
+                )
             if args.api32:
                 platform_lane = "API32"
             elif args.api33:
@@ -398,7 +425,13 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
                 platform_lane = "API36"
             elif args.api37:
                 platform_lane = "API37"
-            apk_paths = _apk_paths(include_companion32=not platform_lane)
+            elif args.arm64_physical:
+                platform_lane = "ARM64_PHYSICAL"
+            run_payload["platform_lane"] = platform_lane or "DEFAULT"
+            apk_paths = _apk_paths(
+                include_companion32=not platform_lane,
+                include_fixture32=not args.arm64_physical,
+            )
             metadata = collect_device_metadata(
                 device,
                 instance_name=args.instance_name,
@@ -415,29 +448,42 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
                     f"device metadata incomplete: {metadata.get('missing_fields')}",
                 )
             else:
-                expected_api = int(platform_lane[3:]) if platform_lane else None
+                expected_api = (
+                    int(platform_lane[3:]) if platform_lane.startswith("API") else None
+                )
                 if expected_api is not None:
                     _validate_api_device(metadata, expected_api, args.expected_page_size)
+                elif args.arm64_physical:
+                    _validate_arm64_physical_device(metadata)
+                setup_omissions: dict[str, str] = {}
+                if args.arm64_physical:
+                    setup_omissions = {
+                        "companion32": (
+                            "NOT_IN_CURRENT_SCOPE: Companion32/ARM32 coverage is deferred to C6-T02D"
+                        ),
+                        "fixture32": (
+                            "NOT_IN_CURRENT_SCOPE: cross-bitness/compat32 coverage is deferred to C6-T02"
+                        ),
+                    }
+                elif platform_lane:
+                    setup_omissions = {
+                        "companion32": (
+                            "NOT_IN_CURRENT_SCOPE: Companion32/cross-bitness coverage is deferred to C6-T02"
+                        )
+                    }
                 context = SmokeContext(
                     root=ROOT,
                     device=device,
                     metadata=metadata,
                     apk_paths=apk_paths,
-                    setup_omissions=(
-                        {
-                            "companion32": (
-                                "NOT_IN_CURRENT_SCOPE: Companion32/cross-bitness coverage is deferred to C6-T02"
-                            )
-                        }
-                        if platform_lane
-                        else {}
-                    ),
+                    setup_omissions=setup_omissions,
+                    lane=platform_lane,
                 )
                 retry_policy = RetryPolicy(
                     max_diagnostic_retries=0 if args.no_diagnostic_retry else 1
                 )
                 case_device = _case_device(metadata)
-                for spec in specs:
+                for index, spec in enumerate(specs):
                     case = run_case(
                         spec,
                         context=context,
@@ -447,6 +493,23 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
                         executor=smoke_executor(spec),
                     )
                     cases.append(case.to_dict())
+                    # S01 establishes the install and Host-controller precondition for every
+                    # later smoke case.  If that setup case does not PASS, preserve its exact
+                    # result and mark the dependent cases blocked instead of manufacturing
+                    # product failures from missing Guest state.
+                    if (
+                        spec.testcase_id == "S01-host-build-install-launch"
+                        and case.result is not ResultState.PASS
+                    ):
+                        cases.extend(
+                            _blocked_cases(
+                                specs[index + 1:],
+                                run_dir,
+                                metadata,
+                                "S01 install/Host setup did not PASS; dependent Guest smoke cases were not executed",
+                            )
+                        )
+                        break
         except (DeviceMetadataError, FileNotFoundError, OSError, RuntimeError) as error:
             reason = f"{error.__class__.__name__}: {error}"
             write_json(run_dir / "environment-blocked.json", {"reason": reason})
@@ -483,6 +546,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--api35", action="store_true", help="Require API 35 x86_64 device contract")
     parser.add_argument("--api36", action="store_true", help="Require API 36 x86_64 device contract")
     parser.add_argument("--api37", action="store_true", help="Require API 37 x86_64 device contract")
+    parser.add_argument(
+        "--arm64-physical",
+        action="store_true",
+        help="Require a real ARM64 device and exclude Companion32/cross-bitness fixtures",
+    )
     parser.add_argument(
         "--expected-page-size",
         type=int,

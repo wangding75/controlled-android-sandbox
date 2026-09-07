@@ -190,6 +190,10 @@ class HarnessContractTests(unittest.TestCase):
             _timeout_classification("no result yet", "guest.pkg"),
             FailureClass.ENVIRONMENT,
         )
+        self.assertEqual(
+            classify_failure_text("INSTALL_FAILED_USER_RESTRICTED: Install canceled by user"),
+            FailureClass.ENVIRONMENT,
+        )
         self.assertEqual(_session({"operation": {"sessionId": "s1"}}), "s1")
 
     def test_retry_can_strengthen_final_failure_class_without_changing_fail(self) -> None:

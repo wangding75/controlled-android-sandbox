@@ -153,6 +153,9 @@ def classify_failure_text(text: str, *, harness_error: bool = False) -> FailureC
         "RD_ENVIRONMENT_RESOLUTION_BLOCKED",
         "DEBUG_RESULT_TIMEOUT",
         "BOOT_NOT_COMPLETED",
+        "INSTALL_FAILED_USER_RESTRICTED",
+        "INSTALL_CANCELED_BY_USER",
+        "INSTALL_FAILED_VERIFICATION_FAILURE",
     )):
         return FailureClass.ENVIRONMENT
     if any(token in normalized for token in (

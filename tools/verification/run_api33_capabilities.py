@@ -39,6 +39,7 @@ from tools.verification.run_rd_smoke import (  # noqa: E402
     _apk_paths,
     _git,
     _wait_for_android_services,
+    _validate_arm64_physical_device,
     _validate_api_device,
 )
 
@@ -63,6 +64,8 @@ def _install_required(device: AdbDevice, apk_paths: dict[str, Path]) -> list[dic
     # compat32 fixture includes an x86_64 variant only so package/PMS/cross-package
     # identity can still be tested; cross-bitness remains C6-T02 scope.
     for name in ("host", "fixture", "fixture32"):
+        if name not in apk_paths:
+            continue
         apk = apk_paths[name]
         result = device.install(apk, timeout_sec=120.0)
         row = {
@@ -323,7 +326,7 @@ def _debug_command_case(
         )
         status = (
             expected_limitation_status
-            if limitation_observed
+            if limitation_observed and not errors
             else "PASS" if not errors else "FAIL"
         )
     except Exception as error:  # preserve the result and continue with later capabilities
@@ -414,6 +417,23 @@ def _framework_case(context: SmokeContext, run_dir: Path) -> dict[str, Any]:
         "FRAMEWORK_PROBE_PASS",
         "VIRTUAL_PENDING_INTENT_DELIVERY status=BROADCAST_DELIVERED",
     )
+    if context.lane == "ARM64_PHYSICAL":
+        cross_package_markers = {
+            "FRAMEWORK_PROBE_PACKAGE_UNIVERSE_PASS",
+            "FRAMEWORK_PROBE_PACKAGE_IDENTITY_PASS",
+            "FRAMEWORK_PROBE_COMPONENT_METADATA_PASS",
+            "FRAMEWORK_PROBE_PACKAGE_CONTEXT_PASS",
+            "FRAMEWORK_PROBE_CROSS_PROVIDER_PASS",
+            "FRAMEWORK_PROBE_CROSS_PROVIDER_OBSERVER_DELIVERED",
+            "FRAMEWORK_PROBE_CROSS_PROVIDER_OBSERVER_PASS",
+            "FRAMEWORK_PROBE_CROSS_ACTIVITY_PASS",
+            "FRAMEWORK_PROBE_CROSS_SERVICE_BIND_PASS",
+            "FRAMEWORK_PROBE_CROSS_PENDING_INTENT_PASS",
+            "FRAMEWORK_PROBE_CROSS_STOP_PASS",
+            "VIRTUAL_PENDING_INTENT_DELIVERY status=BROADCAST_DELIVERED",
+        }
+        required = tuple(marker for marker in required if marker not in cross_package_markers)
+        required += ("FRAMEWORK_PROBE_CROSS_PACKAGE_SKIPPED",)
     forbidden = (
         "FRAMEWORK_PROBE_TASK_REUSE_FAIL",
         "FRAMEWORK_PROBE_PENDING_INTENT_BINDER_FAIL",
@@ -431,6 +451,7 @@ def _framework_case(context: SmokeContext, run_dir: Path) -> dict[str, Any]:
         case_id="CAP-FRAMEWORK-TRANSPORT-IDENTITY",
         component=FRAMEWORK_PROBE_COMPONENT,
         required=required,
+        extras={"skipCrossPackageProbes": context.lane == "ARM64_PHYSICAL"},
         any_required=(
             "FRAMEWORK_PROBE_NOTIFICATION_PERMISSION_DENIED_EXPECTED",
             "FRAMEWORK_PROBE_NOTIFICATION_READBACK_PASS",
@@ -441,7 +462,7 @@ def _framework_case(context: SmokeContext, run_dir: Path) -> dict[str, Any]:
     return case
 
 
-def _split_case(context: SmokeContext, run_dir: Path, expected_api: int) -> dict[str, Any]:
+def _split_case(context: SmokeContext, run_dir: Path, expected_api: int | None) -> dict[str, Any]:
     """Exercise the existing installed split fixture through the virtual import path."""
 
     case_id = "CAP-SPLIT-APK-CLASSLOADER"
@@ -549,15 +570,21 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
     run_id = args.run_id or dt.datetime.now().strftime("%Y%m%dT%H%M%SZ")
     run_dir = (Path(args.output_root).resolve() / run_id)
     run_dir.mkdir(parents=True, exist_ok=True)
-    if sum(bool(value) for value in (args.api32, args.api34, args.api35, args.api36, args.api37)) > 1:
-        raise DeviceMetadataError("API32_API33_API34_API35_API36_API37_FLAGS_ARE_MUTUALLY_EXCLUSIVE")
+    if sum(bool(value) for value in (
+        args.api32, args.api34, args.api35, args.api36, args.api37,
+        args.arm64_physical,
+    )) > 1:
+        raise DeviceMetadataError("CAPABILITY_LANE_FLAGS_ARE_MUTUALLY_EXCLUSIVE")
     expected_api = (
         37 if args.api37 else 36 if args.api36 else 35 if args.api35 else
-        34 if args.api34 else 32 if args.api32 else 33
+        34 if args.api34 else 32 if args.api32 else None if args.arm64_physical else 33
     )
     device = AdbDevice(args.serial, root=ROOT)
     _wait_for_android_services(device)
-    apk_paths = _apk_paths(include_companion32=False)
+    apk_paths = _apk_paths(
+        include_companion32=False,
+        include_fixture32=not args.arm64_physical,
+    )
     metadata = collect_device_metadata(
         device,
         instance_name=args.instance_name,
@@ -565,7 +592,10 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
         cas_commit=start_head,
         apk_paths=apk_paths.values(),
     )
-    _validate_api_device(metadata, expected_api, args.expected_page_size)
+    if args.arm64_physical:
+        _validate_arm64_physical_device(metadata)
+    else:
+        _validate_api_device(metadata, expected_api, args.expected_page_size)
     (run_dir / "device-metadata.json").write_text(
         json.dumps(metadata, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
@@ -579,14 +609,23 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
         setup_omissions={
             "companion32": (
                 "NOT_IN_CURRENT_SCOPE: Companion32/cross-bitness coverage is deferred to C6-T02"
-            )
+            ),
+            **({
+                "fixture32": (
+                    "NOT_IN_CURRENT_SCOPE: cross-bitness/compat32 coverage is deferred to C6-T02"
+                )
+            } if args.arm64_physical else {}),
         },
+        lane="ARM64_PHYSICAL" if args.arm64_physical else f"API{expected_api}",
     )
 
     # Import both virtual packages up front.  The peer is required by the package-universe,
     # cross-provider, cross-service and cross-PendingIntent identity checks.
     setup: list[dict[str, Any]] = []
-    for package in (GUEST_PACKAGE, FIXTURE32):
+    setup_packages = [GUEST_PACKAGE]
+    if "fixture32" in apk_paths:
+        setup_packages.append(FIXTURE32)
+    for package in setup_packages:
         observation = _invoke_debug(
             context,
             run_dir / "setup" / package.rsplit(".", 1)[-1],
@@ -706,6 +745,28 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
     )
     cases.append(widget_case)
 
+    lane_name = "ARM64_PHYSICAL" if args.arm64_physical else f"API{expected_api}"
+    native_abi = "arm64-v8a" if args.arm64_physical else "x86_64"
+    native_page_size = metadata.get("page_size") if args.arm64_physical else args.expected_page_size
+    native_media_required = (
+        f"C3_T03_NATIVE_MEDIA_RESULT_END status=PASS abi={native_abi} pageSize={native_page_size}",
+    )
+    native_media_limitations: tuple[str, ...] = ()
+    if args.arm64_physical:
+        # The physical Xiaomi image has no usable AVC encoder for this app, but the
+        # ARM64 late-dlopen and ImageReader/native-surface path still execute.  Require
+        # those sub-results and retain codec unavailability as an environment limitation.
+        native_media_required = (
+            "C3_T03_NATIVE_MEDIA_RESULT",
+            '"lateDlopen":{"status":"PASS"',
+            '"surface":{"nativeStatus":"PASS"',
+            '"imageStatus":"PASS"',
+            f"C3_T03_NATIVE_MEDIA_RESULT_END status=FAIL abi={native_abi} pageSize={native_page_size}",
+        )
+        native_media_limitations = (
+            '"codec":{"status":"ENVIRONMENT_NOT_AVAILABLE"',
+        )
+
     # MainActivity is the existing WebView smoke and FixtureApplication emits the JNI load
     # marker before Activity creation.  This verifies initialization/class-loader/native load
     # without introducing an ABI/cross-bitness assertion into the API33/API34/API35 task.
@@ -783,9 +844,7 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
             case_id="CAP-NATIVE-MEDIA-16K",
             command="c3-t03-native-media",
             package=GUEST_PACKAGE,
-            required=(
-                f"C3_T03_NATIVE_MEDIA_RESULT_END status=PASS abi=x86_64 pageSize={args.expected_page_size}",
-            ),
+            required=native_media_required,
             forbidden=(
                 "C3_T03_NATIVE_MEDIA_FAIL",
                 "JNI_UNAVAILABLE",
@@ -793,6 +852,7 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
                 "ANR in",
             ),
             expected_operations=("LAUNCH_PASS", "LAUNCH_ACCEPTED"),
+            expected_limitation_markers=native_media_limitations,
             wait_seconds=75.0,
         )
     )
@@ -829,6 +889,7 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
     payload = {
         "run_id": run_id,
         "start_head": start_head,
+        "lane": lane_name,
         "final_head": start_head,
         "expected_page_size": args.expected_page_size,
         "started_at": _now(),
@@ -838,10 +899,15 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
         "capabilities": cases,
         "summary": summary,
         "limitations": [
-            f"API{expected_api} device contract is validated from system properties, not AVD name.",
+            f"{lane_name} device contract is validated from system properties, not display name.",
             "AppWidget dynamic host/provider fixture is not present and is explicit NOT_IN_CURRENT_SCOPE.",
-            f"32-bit Companion/cross-bitness is deferred to C6-T02; fixture32 x86_64 is used for identity routing on API{expected_api}.",
-            f"API{expected_api} NOT_EXPORTED dynamic receiver is exercised by a same-Guest send; adb-shell external delivery is not treated as equivalent.",
+            (
+                "Companion32, cross-bitness and ARM32 are not in the ARM64 physical scope; "
+                "fixture32 is omitted."
+                if args.arm64_physical
+                else f"32-bit Companion/cross-bitness is deferred to C6-T02; fixture32 x86_64 is used for identity routing on API{expected_api}."
+            ),
+            f"{lane_name} NOT_EXPORTED dynamic receiver is exercised by a same-Guest send; adb-shell external delivery is not treated as equivalent.",
             "Native adversarial raw-syscall BYPASS_CONFIRMED observations are retained as an expected boundary limitation, not converted into a product PASS claim.",
         ],
         "evidence_root": run_dir.relative_to(ROOT).as_posix(),
@@ -860,6 +926,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--api35", action="store_true", help="Require API 35 x86_64 device contract")
     parser.add_argument("--api36", action="store_true", help="Require API 36 x86_64 device contract")
     parser.add_argument("--api37", action="store_true", help="Require API 37 x86_64 device contract")
+    parser.add_argument(
+        "--arm64-physical",
+        action="store_true",
+        help="Require a real ARM64 device and exclude compat32/cross-bitness fixtures",
+    )
     parser.add_argument(
         "--expected-page-size",
         type=int,

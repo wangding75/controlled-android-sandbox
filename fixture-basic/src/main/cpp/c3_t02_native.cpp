@@ -315,7 +315,11 @@ std::string case_network() {
             reinterpret_cast<sockaddr*>(&local), &local_length);
     const int getsockname_errno = getsockname_rc < 0 ? errno : 0;
     if (fd >= 0) (void) ::close(fd);
-    const bool pass = dns_ok || dns_rc == EAI_AGAIN || dns_rc == EAI_NONAME;
+    bool dns_runtime_limit = dns_rc == EAI_AGAIN || dns_rc == EAI_NONAME;
+#ifdef EAI_NODATA
+    dns_runtime_limit = dns_runtime_limit || dns_rc == EAI_NODATA;
+#endif
+    const bool pass = dns_ok || dns_runtime_limit;
     return case_json("C3-T02-NET-001", pass ? "PASS_COMPAT" : "ERROR",
             "dns_rc=" + std::to_string(dns_rc)
             + ";dns_class=" + (dns_ok ? "RESOLVED" : "EXPECTED_RUNTIME_LIMIT")
