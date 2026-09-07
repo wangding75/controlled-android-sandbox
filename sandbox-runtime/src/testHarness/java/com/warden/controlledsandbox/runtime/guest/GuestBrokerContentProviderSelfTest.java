@@ -216,8 +216,30 @@ public final class GuestBrokerContentProviderSelfTest {
                 "modern getContentProvider signature resolves authority immediately before user id");
         interceptor.close();
 
+        providerRoutingFixture();
+
         providerCreationIsSingleFlight();
         System.out.println("PASS standard ContentProvider Broker bridge self-test");
+    }
+
+    /** Generic Provider owner fixture: an external system package may route, an ordinary Host APK may not. */
+    private static void providerRoutingFixture() {
+        FakeHostPackageManager hostPms = new FakeHostPackageManager();
+        android.content.pm.ProviderInfo systemProvider =
+                HostPackageManagerBridge.resolveContentProvider(hostPms,
+                        "system.authority", 0L, 0);
+        require(systemProvider != null
+                        && "host.system.provider".equals(systemProvider.packageName)
+                        && "host.system.provider".equals(systemProvider.applicationInfo.packageName)
+                        && systemProvider.enabled && systemProvider.exported
+                        && HostPackageManagerBridge.isSystemOwner(systemProvider.applicationInfo),
+                "external system Provider projects metadata through the Host owner route");
+        android.content.pm.ProviderInfo ordinaryProvider =
+                HostPackageManagerBridge.resolveContentProvider(hostPms,
+                        "ordinary.authority", 0L, 0);
+        require(ordinaryProvider != null
+                        && !HostPackageManagerBridge.isSystemOwner(ordinaryProvider.applicationInfo),
+                "ordinary Host Provider remains outside the Host system owner route");
     }
 
     /** Provider holders are cached per authority after the bounded Broker preparation succeeds. */
@@ -263,6 +285,27 @@ public final class GuestBrokerContentProviderSelfTest {
     public interface ModernActivityManager {
         Object getContentProvider(Object caller, String callerPackage, String featureId,
                 String authority, int userId, boolean stable);
+    }
+
+    /** Mirrors the hidden IPackageManager Provider lookup contract used by ContentResolver. */
+    public static final class FakeHostPackageManager {
+        public android.content.pm.ProviderInfo resolveContentProvider(String authority,
+                                                                      long flags, int userId) {
+            if (!"system.authority".equals(authority)
+                    && !"ordinary.authority".equals(authority)) return null;
+            android.content.pm.ProviderInfo info = new android.content.pm.ProviderInfo();
+            boolean system = "system.authority".equals(authority);
+            info.packageName = system ? "host.system.provider" : "ordinary.host.provider";
+            info.name = info.packageName + ".Provider";
+            info.processName = info.packageName;
+            info.authority = authority;
+            info.enabled = true;
+            info.exported = true;
+            info.applicationInfo = new android.content.pm.ApplicationInfo();
+            info.applicationInfo.packageName = info.packageName;
+            info.applicationInfo.flags = system ? android.content.pm.ApplicationInfo.FLAG_SYSTEM : 0;
+            return info;
+        }
     }
 
     private static final class FakeBroker extends IRuntimeBroker.Stub {

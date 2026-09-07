@@ -36,6 +36,8 @@ final class GuestContextComponentRouter {
      */
     private final ExecutorService frameworkOrderedBroadcasts;
     private final IdentityHashMap<ServiceConnection, ConnectionRecord> connections = new IdentityHashMap<>();
+    private final IdentityHashMap<ServiceConnection, HostConnectionRecord> hostConnections =
+            new IdentityHashMap<>();
     private volatile boolean closed;
 
     GuestContextComponentRouter(GuestContext context, GuestPackageSpec spec,
@@ -44,7 +46,8 @@ final class GuestContextComponentRouter {
         this.context = java.util.Objects.requireNonNull(context, "context");
         this.spec = java.util.Objects.requireNonNull(spec, "spec");
         this.bridge = new GuestRuntimeBrokerBridge(spec, mainThread);
-        this.resolver = new GuestIntentResolver(spec, packageManager);
+        this.resolver = new GuestIntentResolver(spec, packageManager,
+                context.hostPackageManagerService());
         this.receivers = java.util.Objects.requireNonNull(receivers, "receivers");
         this.frameworkOrderedBroadcasts = Executors.newSingleThreadExecutor(runnable -> {
             Thread thread = new Thread(runnable,
@@ -115,6 +118,11 @@ final class GuestContextComponentRouter {
 
     ComponentName startService(Intent intent, boolean foreground) {
         GuestIntentResolver.Target target = resolver.resolveOne(intent, GuestIntentResolver.Kind.SERVICE);
+        if (target.hostOwned()) {
+            return foreground
+                    ? context.hostServiceContext().startForegroundService(intent)
+                    : context.hostServiceContext().startService(intent);
+        }
         Bundle request = bridge.baseRequest();
         request.putAll(resolver.request(intent, target));
         GuestActivityThreadServiceBridge framework = context.serviceFrameworkBridge();
@@ -127,6 +135,7 @@ final class GuestContextComponentRouter {
 
     boolean stopService(Intent intent) {
         GuestIntentResolver.Target target = resolver.resolveOne(intent, GuestIntentResolver.Kind.SERVICE);
+        if (target.hostOwned()) return context.hostServiceContext().stopService(intent);
         Bundle request = bridge.baseRequest();
         request.putAll(resolver.request(intent, target));
         GuestActivityThreadServiceBridge framework = context.serviceFrameworkBridge();
@@ -140,8 +149,38 @@ final class GuestContextComponentRouter {
             Executor executor) {
         if (closed) throw new IllegalStateException("GUEST_COMPONENT_ROUTER_CLOSED");
         if (connection == null) throw new IllegalArgumentException("connection is required");
-        if (connections.containsKey(connection)) throw new IllegalArgumentException("ServiceConnection already bound");
+        if (connections.containsKey(connection) || hostConnections.containsKey(connection)) {
+            throw new IllegalArgumentException("ServiceConnection already bound");
+        }
         GuestIntentResolver.Target target = resolver.resolveOne(intent, GuestIntentResolver.Kind.SERVICE);
+        if (target.hostOwned()) {
+            Executor callbackExecutor = executor == null ? context.getMainExecutor() : executor;
+            ComponentName component = new ComponentName(target.packageName(), target.className());
+            GuestServiceConnectionRelay relay = new GuestServiceConnectionRelay(
+                    component, connection, callbackExecutor);
+            try {
+                boolean accepted = executor == null
+                        ? context.hostServiceContext().bindService(intent, relay, flags)
+                        : context.hostServiceContext().bindService(intent, flags,
+                                callbackExecutor, relay);
+                if (!accepted) {
+                    relay.close();
+                    return false;
+                }
+                hostConnections.put(connection, new HostConnectionRecord(relay, component));
+                android.util.Log.i("CS_GUEST_SERVICE_ROUTE", "owner=HOST_SYSTEM bind=true package="
+                        + target.packageName() + " component=" + target.className()
+                        + " process=" + target.processName());
+                return true;
+            } catch (Throwable error) {
+                relay.close();
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy
+                        .rethrowIfFatal(error);
+                if (error instanceof RuntimeException runtime) throw runtime;
+                if (error instanceof Error fatal) throw fatal;
+                throw new IllegalStateException("HOST_SERVICE_BIND_FAILED", error);
+            }
+        }
         String connectionId = java.util.UUID.randomUUID().toString();
         Bundle request = bridge.baseRequest();
         request.putAll(resolver.request(intent, target));
@@ -185,6 +224,18 @@ final class GuestContextComponentRouter {
                     "late framework unbind ignored after component-router teardown");
             return;
         }
+        HostConnectionRecord hostRecord = hostConnections.remove(connection);
+        if (hostRecord != null) {
+            hostRecord.relay.close();
+            try {
+                context.hostServiceContext().unbindService(hostRecord.relay);
+            } catch (RuntimeException error) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy
+                        .rethrowIfFatal(error);
+                throw error;
+            }
+            return;
+        }
         GuestActivityThreadServiceBridge framework = context.serviceFrameworkBridge();
         if (framework != null) {
             framework.unbind(connection);
@@ -226,6 +277,16 @@ final class GuestContextComponentRouter {
         if (closed) return;
         closed = true;
         frameworkOrderedBroadcasts.shutdownNow();
+        for (HostConnectionRecord record : hostConnections.values()) {
+            record.relay.close();
+            try {
+                context.hostServiceContext().unbindService(record.relay);
+            } catch (RuntimeException error) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy
+                        .rethrowIfFatal(error);
+            }
+        }
+        hostConnections.clear();
         connections.clear();
         receivers.clear();
     }
@@ -471,4 +532,7 @@ final class GuestContextComponentRouter {
 
     private record ConnectionRecord(String connectionId, GuestIntentResolver.Target target,
                                     ComponentName component) { }
+
+    private record HostConnectionRecord(GuestServiceConnectionRelay relay,
+                                        ComponentName component) { }
 }

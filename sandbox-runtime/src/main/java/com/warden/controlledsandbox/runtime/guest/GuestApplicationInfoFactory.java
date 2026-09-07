@@ -5,6 +5,7 @@ import android.content.pm.ApplicationInfo;
 import android.os.Bundle;
 import android.os.Build;
 import java.io.File;
+import java.util.List;
 
 /** Builds Guest ApplicationInfo without copying Host-only identity or process metadata. */
 public final class GuestApplicationInfoFactory {
@@ -50,7 +51,10 @@ public final class GuestApplicationInfoFactory {
         info.nativeLibraryDir = spec.effectiveNativeLibraryDir();
         setOptionalField(info, "primaryCpuAbi", emptyToNull(spec.nativeAbi));
         setOptionalField(info, "secondaryCpuAbi", null);
-        setOptionalField(info, "sharedLibraryFiles", null);
+        List<String> sharedLibraryFiles = GuestSharedLibraryPathResolver.resolvedSharedLibraryFiles(
+                spec.packageState, spec.packageUniverse);
+        setOptionalField(info, "sharedLibraryFiles", sharedLibraryFiles.isEmpty()
+                ? null : sharedLibraryFiles.toArray(new String[0]));
         ApplicationInfo packageTemplate = spec.packageState.applicationInfo();
         if (packageTemplate != null) info.flags = packageTemplate.flags;
         info.dataDir = dataDir;

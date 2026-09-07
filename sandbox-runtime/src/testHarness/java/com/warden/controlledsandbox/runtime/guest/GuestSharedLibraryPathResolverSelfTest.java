@@ -30,6 +30,22 @@ public final class GuestSharedLibraryPathResolverSelfTest {
         require(path.contains(guest.getCanonicalPath()), "Guest APK remains first in dex path");
         require(path.contains(provider.getCanonicalPath()), "resolved provider APK is appended");
         require(path.contains(split.getCanonicalPath()), "provider split APK is appended");
+
+        VirtualPackageStateSnapshot hostState = state("guest.host", "guest-host.apk",
+                new VirtualSharedLibrarySnapshot(VirtualSharedLibrarySnapshot.KIND_STATIC,
+                        "host.library", true, 7L, "", true, "host.provider",
+                        List.of(provider.getAbsolutePath(), split.getAbsolutePath()), null));
+        String hostPath = GuestSharedLibraryPathResolver.appendResolvedLibraryPaths(
+                guest.getAbsolutePath(), hostState, List.of());
+        require(hostPath.contains(provider.getCanonicalPath())
+                        && hostPath.contains(split.getCanonicalPath()),
+                "host-owned provider source projection is appended without a Guest UID");
+        List<String> projectedFiles = GuestSharedLibraryPathResolver.resolvedSharedLibraryFiles(
+                hostState, List.of());
+        require(projectedFiles.size() == 2
+                        && projectedFiles.contains(provider.getCanonicalPath())
+                        && projectedFiles.contains(split.getCanonicalPath()),
+                "host-owned provider source projection reaches ApplicationInfo.sharedLibraryFiles");
         boolean missing = false;
         try {
             GuestSharedLibraryPathResolver.appendResolvedLibraryPaths(guest.getAbsolutePath(),

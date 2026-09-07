@@ -220,8 +220,11 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
                 return metadata.adaptCollection(Collections.emptyList(), returnType);
             case "resolveContentProvider": {
                 String authority = firstString(args);
-                return universe.provider(identity.packageName(), authority, firstLong(args, 0L),
+                ProviderInfo virtualProvider = universe.provider(identity.packageName(), authority,
+                        firstLong(args, 0L),
                         identity.permissionPolicy().effectiveGrants());
+                if (virtualProvider != null) return virtualProvider;
+                return hostSystemProvider(method, args, authority);
             }
             case "resolveIntent":
             case "resolveActivity": {
@@ -537,6 +540,76 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
                     hiddenPackageResult(methodName, returnType));
         }
         return new VisibilityDecision(targetPackage, guestTarget, NoResult.VALUE);
+    }
+
+    /**
+     * Projects only an authority-resolved, system-owned host ProviderInfo.  Arbitrary host
+     * applications remain absent, and Guest packages never fall through to their physical host
+     * installation.  The ContentResolver transport has a matching host-owner route in the
+     * runtime module, so PackageManager and provider acquisition share the same owner decision.
+     */
+    private Object hostSystemProvider(Method method, Object[] args, String authority) {
+        if (method == null || args == null || authority == null || authority.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            Object raw = method.invoke(delegate, args);
+            if (!(raw instanceof ProviderInfo provider) || !isHostSystemProvider(provider)) {
+                return null;
+            }
+            String packageName = provider.packageName == null ? "" : provider.packageName.trim();
+            if (packageName.isEmpty() || identity.packageName().equals(packageName)
+                    || universe.packageMetadata(packageName) != null) return null;
+            ProviderInfo projection = copyProviderInfo(provider);
+            if (provider.applicationInfo != null) {
+                projection.applicationInfo = new ApplicationInfo(provider.applicationInfo);
+                projection.applicationInfo.packageName = packageName;
+            }
+            projection.packageName = packageName;
+            android.util.Log.i("CS_PM_PROVIDER_ROUTE", "owner=HOST_SYSTEM authority="
+                    + authority + " package=" + packageName + " component=" + provider.name
+                    + " process=" + provider.processName + " expectedPackage="
+                    + identity.packageName());
+            return projection;
+        } catch (InvocationTargetException error) {
+            Throwable cause = error.getCause() == null ? error : error.getCause();
+            if (cause instanceof Error fatal) throw fatal;
+            if (cause instanceof RuntimeException runtime) throw runtime;
+            return null;
+        } catch (ReflectiveOperationException | RuntimeException unavailable) {
+            return null;
+        }
+    }
+
+    private static boolean isHostSystemProvider(ProviderInfo provider) {
+        return provider != null && provider.applicationInfo != null
+                && (provider.applicationInfo.flags
+                & (ApplicationInfo.FLAG_SYSTEM | UPDATED_SYSTEM_APP_FLAG)) != 0
+                && provider.enabled && provider.exported;
+    }
+
+    // Android's ApplicationInfo.FLAG_UPDATED_SYSTEM_APP is 0x80.  Some source-compile stubs
+    // intentionally expose only the stable subset of ApplicationInfo constants, so keep this
+    // shared owner classification independent of the stub surface.
+    private static final int UPDATED_SYSTEM_APP_FLAG = 0x80;
+
+    private static ProviderInfo copyProviderInfo(ProviderInfo source) {
+        ProviderInfo copy = new ProviderInfo();
+        copy.packageName = source.packageName;
+        copy.name = source.name;
+        copy.processName = source.processName;
+        copy.exported = source.exported;
+        copy.enabled = source.enabled;
+        copy.authority = source.authority;
+        copy.readPermission = source.readPermission;
+        copy.writePermission = source.writePermission;
+        copy.grantUriPermissions = source.grantUriPermissions;
+        copy.multiprocess = source.multiprocess;
+        copy.initOrder = source.initOrder;
+        copy.isSyncable = source.isSyncable;
+        copy.pathPermissions = source.pathPermissions;
+        copy.metaData = source.metaData;
+        return copy;
     }
 
     private Object virtualSystemFeature(Object[] args) {

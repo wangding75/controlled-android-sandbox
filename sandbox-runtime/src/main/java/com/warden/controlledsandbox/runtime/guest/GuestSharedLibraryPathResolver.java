@@ -34,14 +34,8 @@ final class GuestSharedLibraryPathResolver {
             if (!path.trim().isEmpty()) seen.add(canonicalOrValue(path));
         }
         ArrayList<String> paths = new ArrayList<>();
-        for (VirtualPackageProjectionSnapshot projection
-                : resolvedJavaLibraryProjections(state, universe)) {
-            String provider = projection.packageState().packageName();
-            appendArchive(paths, seen, projection.apkPath(), provider);
-            android.content.pm.ApplicationInfo info = projection.parsedApplicationInfo();
-            if (info != null && info.splitSourceDirs != null) {
-                for (String split : info.splitSourceDirs) appendArchive(paths, seen, split, provider);
-            }
+        for (String path : resolvedSharedLibraryFiles(state, universe)) {
+            appendArchive(paths, seen, path, "shared-library");
         }
         if (paths.isEmpty()) return base;
         StringBuilder result = new StringBuilder(base);
@@ -50,6 +44,53 @@ final class GuestSharedLibraryPathResolver {
             result.append(path);
         }
         return result.toString();
+    }
+
+    /**
+     * Projects the same immutable provider APK set into ApplicationInfo.sharedLibraryFiles.
+     * Chromium and other platform-aware loaders consult that field independently of the
+     * ClassLoader dex path, so leaving it null creates a split/shared-library mismatch even when
+     * the files were already appended to the loader.  The result contains only Guest projections
+     * from the virtual universe or authority-approved Host provider source files.
+     */
+    static List<String> resolvedSharedLibraryFiles(
+            VirtualPackageStateSnapshot state,
+            List<VirtualPackageProjectionSnapshot> universe) {
+        if (state == null) return List.of();
+        List<VirtualPackageProjectionSnapshot> values = universe == null ? List.of() : universe;
+        ArrayList<String> result = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        Set<String> projectedProviders = new HashSet<>();
+        for (VirtualPackageProjectionSnapshot projection
+                : resolvedJavaLibraryProjections(state, values)) {
+            String provider = projection.packageState().packageName();
+            projectedProviders.add(provider);
+            appendArchive(result, seen, projection.apkPath(), provider);
+            android.content.pm.ApplicationInfo info = projection.parsedApplicationInfo();
+            if (info != null && info.splitSourceDirs != null) {
+                for (String split : info.splitSourceDirs) {
+                    appendArchive(result, seen, split, provider);
+                }
+            }
+        }
+        // Host-owned system/static providers are not Guest packages and therefore must not be
+        // assigned a synthetic virtual UID.  Their exact PMS source projection is the only
+        // Host path allowed to cross this boundary.
+        for (VirtualSharedLibrarySnapshot library : state.sharedLibraryDetails()) {
+            if (library == null || !library.resolved() || !javaLibrary(library.kind())) continue;
+            String provider = library.providerPackage().trim();
+            if (provider.isEmpty() || provider.equals(state.packageName())
+                    || isSystemProvider(provider) || projectedProviders.contains(provider)) continue;
+            for (String source : library.providerSourceFiles()) {
+                appendArchive(result, seen, source, provider);
+            }
+            if (!library.providerSourceFiles().isEmpty()) {
+                android.util.Log.i("CS_SHARED_LIBRARY_ROUTE", "owner=HOST_SYSTEM provider="
+                        + provider + " library=" + library.name() + " sourceCount="
+                        + library.providerSourceFiles().size());
+            }
+        }
+        return List.copyOf(result);
     }
 
     /**
@@ -75,6 +116,11 @@ final class GuestSharedLibraryPathResolver {
         for (String provider : providers) {
             VirtualPackageProjectionSnapshot projection = find(values, provider);
             if (projection == null) {
+                // A resolved host-owned system/static library is represented by its immutable
+                // source projection rather than a virtual Guest package.  Ordinary processes
+                // consume those sources in appendResolvedLibraryPaths(); isolated processes
+                // require a separate fd capability and must fail with an actionable boundary.
+                if (hasHostSourceProjection(state, provider)) continue;
                 // System libraries have no virtual APK projection. A resolved Guest provider,
                 // however, must be present in the same virtual package universe; otherwise the
                 // Package Authority and Guest loader would disagree about installability.
@@ -84,6 +130,15 @@ final class GuestSharedLibraryPathResolver {
             result.add(projection);
         }
         return List.copyOf(result);
+    }
+
+    private static boolean hasHostSourceProjection(VirtualPackageStateSnapshot state,
+                                                    String provider) {
+        for (VirtualSharedLibrarySnapshot library : state.sharedLibraryDetails()) {
+            if (library != null && library.resolved() && provider.equals(library.providerPackage())
+                    && !library.providerSourceFiles().isEmpty()) return true;
+        }
+        return false;
     }
 
     private static boolean javaLibrary(String kind) {

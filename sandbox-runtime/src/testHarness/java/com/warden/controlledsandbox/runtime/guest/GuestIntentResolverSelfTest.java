@@ -116,6 +116,17 @@ public final class GuestIntentResolverSelfTest {
                         service, GuestIntentResolver.Kind.SERVICE).className()),
                 "implicit Service resolved inside virtual package");
 
+        FakeHostPackageManager hostPms = new FakeHostPackageManager();
+        GuestIntentResolver hostResolver = new GuestIntentResolver(spec, packageManager, hostPms);
+        GuestIntentResolver.Target hostService = hostResolver.resolveOne(
+                new Intent("android.soter.ISoterService").setPackage("host.system.service"),
+                GuestIntentResolver.Kind.SERVICE);
+        require(hostService.hostOwned()
+                        && hostService.owner() == GuestIntentResolver.Owner.HOST_SYSTEM
+                        && "host.system.service".equals(hostService.packageName())
+                        && "host.system.service.SoterService".equals(hostService.className()),
+                "package-constrained system Service resolves through the host owner route");
+
         Intent broadcast = new Intent("guest.action.NOTIFY").setPackage("guest.pkg");
         List<GuestIntentResolver.Target> receivers = resolver.resolveReceivers(broadcast);
         require(receivers.size() == 2
@@ -214,6 +225,26 @@ public final class GuestIntentResolverSelfTest {
             info.name = className;
             info.processName = processName;
             result.activityInfo = info;
+            return result;
+        }
+    }
+
+    /** Mirrors the hidden IPackageManager resolveService signature used by Android 12+. */
+    public static final class FakeHostPackageManager {
+        public ResolveInfo resolveService(Intent intent, String resolvedType, long flags, int userId) {
+            if (!"android.soter.ISoterService".equals(intent.getAction())
+                    || !"host.system.service".equals(intent.getPackage())) return null;
+            ResolveInfo result = new ResolveInfo();
+            ServiceInfo info = new ServiceInfo();
+            info.packageName = "host.system.service";
+            info.name = "host.system.service.SoterService";
+            info.processName = "host.system.service";
+            info.enabled = true;
+            info.exported = true;
+            info.applicationInfo = new android.content.pm.ApplicationInfo();
+            info.applicationInfo.packageName = info.packageName;
+            info.applicationInfo.flags = android.content.pm.ApplicationInfo.FLAG_SYSTEM;
+            result.serviceInfo = info;
             return result;
         }
     }

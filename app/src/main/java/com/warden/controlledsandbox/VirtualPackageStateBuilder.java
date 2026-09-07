@@ -117,6 +117,8 @@ final class VirtualPackageStateBuilder {
                 record.packageName, set.sharedLibraryDependencies));
         SharedLibraryResolver.Resolution libraryResolution = resolver.resolve(set.sharedLibraryDependencies);
         libraryResolution.requireSuccessful();
+        Map<String, HostSharedLibraryProjection> hostLibraryProjections =
+                hostSharedLibraryProjections(record.packageName, set.sharedLibraryDependencies);
         List<VirtualSharedLibrarySnapshot> librarySnapshots = new ArrayList<>();
         for (ManifestModel.SharedLibraryDependency dependency : set.sharedLibraryDependencies) {
             SharedLibraryResolver.AvailableLibrary match = null;
@@ -126,10 +128,17 @@ final class VirtualPackageStateBuilder {
                     break;
                 }
             }
+            HostSharedLibraryProjection hostProjection = hostLibraryProjections.get(dependency.name());
+            if (hostProjection != null && match != null
+                    && !hostProjection.packageName.equals(match.providerPackage())) {
+                hostProjection = null;
+            }
             librarySnapshots.add(new VirtualSharedLibrarySnapshot(dependency.kind().name(),
                     dependency.name(), dependency.required(), dependency.version(),
                     dependency.certificateDigest(), match != null,
-                    match == null ? "" : match.providerPackage()));
+                    match == null ? "" : match.providerPackage(),
+                    hostProjection == null ? List.of() : hostProjection.sourceFiles,
+                    hostProjection == null ? null : hostProjection.applicationInfo));
         }
         List<VirtualInstrumentationSnapshot> instrumentationSnapshots = new ArrayList<>();
         for (ManifestModel.Instrumentation instrumentation : set.instrumentations) {
@@ -517,18 +526,96 @@ final class VirtualPackageStateBuilder {
         } catch (NumberFormatException invalidVersion) {
             return null;
         }
-        return new HostSharedLibraryPath(name, version, name);
+        return new HostSharedLibraryPath(name, version, name, path);
     }
 
     private static final class HostSharedLibraryPath {
         final String name;
         final long version;
         final String packageName;
+        final String sourcePath;
 
-        HostSharedLibraryPath(String name, long version, String packageName) {
+        HostSharedLibraryPath(String name, long version, String packageName, String sourcePath) {
             this.name = name;
             this.version = version;
             this.packageName = packageName;
+            this.sourcePath = sourcePath;
+        }
+    }
+
+    /**
+     * Captures the host PMS source projection for a static/SDK/JAVA provider.  The normal Guest
+     * package universe contains only imported Guest packages, so a system-owned shared library
+     * cannot be represented by a synthetic Guest UID without corrupting ownership.  Keeping the
+     * immutable provider APK set beside the resolved dependency preserves the real split/source
+     * chain while leaving Package Owner and Runtime Owner distinct.
+     */
+    private Map<String, HostSharedLibraryProjection> hostSharedLibraryProjections(
+            String packageName, List<ManifestModel.SharedLibraryDependency> dependencies) {
+        Map<String, HostSharedLibraryProjection> result = new LinkedHashMap<>();
+        if (context == null || packageName == null || packageName.trim().isEmpty()
+                || dependencies == null || dependencies.isEmpty()) return result;
+        try {
+            PackageManager packageManager = context.getPackageManager();
+            PackageInfo importing = packageManager.getPackageInfo(packageName,
+                    PackageManager.GET_SHARED_LIBRARY_FILES);
+            String[] files = importing == null || importing.applicationInfo == null
+                    ? null : importing.applicationInfo.sharedLibraryFiles;
+            if (files == null) return result;
+            Set<String> wanted = new LinkedHashSet<>();
+            for (ManifestModel.SharedLibraryDependency dependency : dependencies) {
+                if (dependency != null) wanted.add(dependency.name());
+            }
+            for (String file : files) {
+                HostSharedLibraryPath parsed = parseHostSharedLibraryPath(file);
+                if (parsed == null || !wanted.contains(parsed.name)
+                        || result.containsKey(parsed.name)) continue;
+                ArrayList<String> sourceFiles = new ArrayList<>();
+                addSourceFile(sourceFiles, parsed.sourcePath);
+                ApplicationInfo provider = null;
+                try {
+                    provider = packageManager.getApplicationInfo(parsed.packageName,
+                            PackageManager.GET_SHARED_LIBRARY_FILES);
+                    if (provider != null) {
+                        addSourceFile(sourceFiles, provider.sourceDir);
+                        addSourceFiles(sourceFiles, provider.splitSourceDirs);
+                        addSourceFiles(sourceFiles, provider.splitPublicSourceDirs);
+                    }
+                } catch (PackageManager.NameNotFoundException ignored) {
+                    // The importing package's PMS path remains authoritative even when the
+                    // provider package cannot be queried through a restricted API surface.
+                }
+                result.put(parsed.name, new HostSharedLibraryProjection(parsed.packageName,
+                        sourceFiles, provider));
+            }
+        } catch (Throwable unavailable) {
+            android.util.Log.w("CS_SHARED_LIBRARY",
+                    "host provider source projection unavailable package=" + packageName,
+                    unavailable);
+        }
+        return result;
+    }
+
+    private static void addSourceFiles(List<String> target, String[] values) {
+        if (values == null) return;
+        for (String value : values) addSourceFile(target, value);
+    }
+
+    private static void addSourceFile(List<String> target, String value) {
+        if (value == null || value.trim().isEmpty() || target.contains(value.trim())) return;
+        target.add(value.trim());
+    }
+
+    private static final class HostSharedLibraryProjection {
+        final String packageName;
+        final List<String> sourceFiles;
+        final ApplicationInfo applicationInfo;
+
+        HostSharedLibraryProjection(String packageName, List<String> sourceFiles,
+                                    ApplicationInfo applicationInfo) {
+            this.packageName = packageName;
+            this.sourceFiles = List.copyOf(sourceFiles);
+            this.applicationInfo = applicationInfo == null ? null : new ApplicationInfo(applicationInfo);
         }
     }
 

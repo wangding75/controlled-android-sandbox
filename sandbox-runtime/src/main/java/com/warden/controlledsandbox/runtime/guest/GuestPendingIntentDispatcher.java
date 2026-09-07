@@ -193,7 +193,9 @@ final class GuestPendingIntentDispatcher implements PendingIntentFrameworkInterc
                 // GuestContext's PackageManager proxy is installed as part of FrameworkHooks.
                 // Constructing it during bindApplication would violate that bootstrap order;
                 // delivery is the first point at which the complete virtual PM is available.
-                current = new GuestIntentResolver(spec, context.getPackageManager());
+                Object hostPms = context instanceof GuestContext guestContext
+                        ? guestContext.hostPackageManagerService() : null;
+                current = new GuestIntentResolver(spec, context.getPackageManager(), hostPms);
                 resolver = current;
             }
             return current;

@@ -1440,14 +1440,33 @@ public final class GuestRuntimeEnvironment {
         appendDeclaredGuestClasses(classes, spec.packageState);
         for (com.warden.controlledsandbox.contract.VirtualPackageProjectionSnapshot provider
                 : GuestSharedLibraryPathResolver.resolvedJavaLibraryProjections(
-                        spec.packageState, spec.packageUniverse)) {
+                spec.packageState, spec.packageUniverse)) {
             appendDeclaredGuestClasses(classes, provider.packageState());
             // A shared-library provider may expose implementation classes that are not manifest
             // components. Add a package marker so detection filtering does not hide its package
             // namespace while the provider DEX is part of the same LoadedApk class path.
             classes.add(provider.packageState().packageName() + ".__cas_shared_library__");
         }
+        // Host-owned shared-library providers have no Guest Package Owner projection, but their
+        // DEX is still part of the verified class path. Preserve the same package detection
+        // boundary without manufacturing a virtual UID for the host provider.
+        for (com.warden.controlledsandbox.contract.VirtualSharedLibrarySnapshot library
+                : spec.packageState.sharedLibraryDetails()) {
+            if (library == null || !library.resolved()
+                    || !javaLibraryKind(library.kind())
+                    || library.providerSourceFiles().isEmpty()) continue;
+            String provider = library.providerPackage();
+            if (provider == null || provider.isEmpty() || provider.equals(spec.packageName)
+                    || provider.equals("android") || provider.startsWith("android.")) continue;
+            classes.add(provider + ".__cas_shared_library__");
+        }
         return java.util.List.copyOf(classes);
+    }
+
+    private static boolean javaLibraryKind(String kind) {
+        return com.warden.controlledsandbox.contract.VirtualSharedLibrarySnapshot.KIND_JAVA.equals(kind)
+                || com.warden.controlledsandbox.contract.VirtualSharedLibrarySnapshot.KIND_SDK.equals(kind)
+                || com.warden.controlledsandbox.contract.VirtualSharedLibrarySnapshot.KIND_STATIC.equals(kind);
     }
 
     private static void appendDeclaredGuestClasses(

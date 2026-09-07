@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 final class GuestContentProviderFrameworkInterceptor implements FrameworkCallInterceptor, AutoCloseable {
     private final GuestContext context;
     private final GuestPackageSpec spec;
+    private final Object hostPackageManagerService;
     private final Map<String, ProviderDescriptor> descriptors = new LinkedHashMap<>();
     private final Object stateLock = new Object();
     private final Map<String, Object> holders = new LinkedHashMap<>();
@@ -45,6 +46,7 @@ final class GuestContentProviderFrameworkInterceptor implements FrameworkCallInt
     GuestContentProviderFrameworkInterceptor(GuestContext context, GuestPackageSpec spec) {
         this.context = java.util.Objects.requireNonNull(context, "context");
         this.spec = java.util.Objects.requireNonNull(spec, "spec");
+        this.hostPackageManagerService = context.hostPackageManagerService();
         addDescriptors(spec.packageState, spec.packageName, spec.virtualUserId, spec.virtualUid,
                 spec.packageState.applicationInfo());
         // The Virtual PackageManager projection is already visibility-filtered by the
@@ -106,6 +108,19 @@ final class GuestContentProviderFrameworkInterceptor implements FrameworkCallInt
         if ("settings".equals(authority)) return Interception.passThrough();
         ProviderDescriptor descriptor = descriptors.get(authority);
         if (descriptor == null) {
+            ProviderInfo hostProvider = HostPackageManagerBridge.resolveContentProvider(
+                    hostPackageManagerService, authority, providerFlags(arguments),
+                    HostPackageManagerBridge.physicalUserId());
+            if (isAllowedHostProvider(hostProvider)) {
+                android.util.Log.i("CS_PROVIDER_ROUTE", "owner=HOST_SYSTEM authority="
+                        + authority + " package=" + hostProvider.packageName + " component="
+                        + hostProvider.name + " process=" + value(hostProvider.processName)
+                        + " expectedPackage=" + spec.packageName);
+                // ContentResolver was deliberately constructed from the physical Host Context;
+                // pass through so AMS returns the host-owned transport rather than attempting to
+                // instantiate a system provider inside the Guest Broker.
+                return Interception.passThrough();
+            }
             throw new SecurityException("CONTENT_PROVIDER_AUTHORITY_NOT_VIRTUALIZED:" + authority);
         }
 
@@ -328,6 +343,39 @@ final class GuestContentProviderFrameworkInterceptor implements FrameworkCallInt
         }
         if (required) throw new IllegalStateException("CONTENT_PROVIDER_HOLDER_FIELD_MISSING:" + name);
     }
+
+    private boolean isAllowedHostProvider(ProviderInfo info) {
+        if (info == null || info.applicationInfo == null || !info.enabled || !info.exported) {
+            return false;
+        }
+        String packageName = value(info.packageName);
+        String applicationPackage = value(info.applicationInfo.packageName);
+        if (packageName.isEmpty() || (!applicationPackage.isEmpty()
+                && !packageName.equals(applicationPackage))) return false;
+        if (isVirtualPackage(packageName)) return false;
+        return HostPackageManagerBridge.isSystemOwner(info.applicationInfo);
+    }
+
+    private boolean isVirtualPackage(String packageName) {
+        if (spec.packageName.equals(packageName)) return true;
+        for (VirtualPackageProjectionSnapshot projection : spec.packageUniverse) {
+            if (projection != null && packageName.equals(projection.packageState().packageName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static long providerFlags(Object[] arguments) {
+        if (arguments == null) return 0L;
+        for (Object argument : arguments) {
+            if (argument instanceof Long value) return value;
+            if (argument instanceof Integer value) return value.longValue();
+        }
+        return 0L;
+    }
+
+    private static String value(String value) { return value == null ? "" : value.trim(); }
 
     private String authority(Method method, Object[] arguments) {
         if (arguments == null) return "";

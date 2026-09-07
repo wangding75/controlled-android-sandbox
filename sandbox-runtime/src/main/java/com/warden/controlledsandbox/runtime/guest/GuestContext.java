@@ -47,6 +47,8 @@ import java.util.concurrent.Executor;
 public final class GuestContext extends GuestHostOperationDenyContext {
     private static final Object PREFERENCE_LOCK_TIE = new Object();
     private final Context hostServiceContext;
+    /** Raw host IPackageManager captured before FrameworkHooks installs the virtual PMS view. */
+    private final Object hostPackageManagerService;
     private final PackageManager packageManager;
     private final ContentResolver contentResolver;
     private final GuestPackageSpec spec;
@@ -125,6 +127,27 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         // here and getBaseContext() still returns the finite Guest-only boundary.
         super(host.getApplicationContext());
         this.hostServiceContext = host.getApplicationContext();
+        // Derived configuration/storage/display Contexts are created after FrameworkHooks has
+        // installed the virtual PackageManager proxy. Capture the physical transport once in
+        // the process-owned shared state; recapturing from a derived Context would retain the
+        // virtual $Proxy4 and make host-system Service/Provider resolution recurse into Guest
+        // visibility instead of querying the physical PMS.
+        Object capturedHostPackageManager = sharedState.hostPackageManagerService;
+        if (capturedHostPackageManager == null) {
+            capturedHostPackageManager = HostPackageManagerBridge.capture(
+                    this.hostServiceContext.getPackageManager());
+            if (capturedHostPackageManager != null) {
+                synchronized (sharedState) {
+                    if (sharedState.hostPackageManagerService == null) {
+                        sharedState.hostPackageManagerService = capturedHostPackageManager;
+                        android.util.Log.i("CS_HOST_PMS", "capture owner=HOST_SYSTEM transport="
+                                + capturedHostPackageManager.getClass().getName());
+                    }
+                    capturedHostPackageManager = sharedState.hostPackageManagerService;
+                }
+            }
+        }
+        this.hostPackageManagerService = capturedHostPackageManager;
         // The Guest APK has an independent Resources table, while AndroidX still requires a
         // non-null framework Theme during Activity.onCreate. Apply the virtual component's
         // manifest theme to a Theme created by Guest Resources; reusing the Host Theme would
@@ -238,6 +261,9 @@ public final class GuestContext extends GuestHostOperationDenyContext {
      * context; guest identity remains in the request bundle.</p>
      */
     public Context hostServiceContext() { return hostServiceContext; }
+
+    /** Internal owner-classification transport; never exposed through the Guest Context API. */
+    Object hostPackageManagerService() { return hostPackageManagerService; }
 
     @Override public String getPackageName() { return spec.packageName; }
     @Override public String getOpPackageName() { return spec.packageName; }
@@ -1041,6 +1067,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         final GuestSystemServiceBoundary systemServices = new GuestSystemServiceBoundary();
         final GuestDynamicReceiverRegistry dynamicReceivers = new GuestDynamicReceiverRegistry();
         final GuestMainThreadDispatcher mainThread;
+        volatile Object hostPackageManagerService;
         volatile Application application;
         volatile GuestActivityThreadServiceBridge serviceFrameworkBridge;
         SharedState(GuestCapabilityGate capabilityGate, ClassLoader classLoader) {
