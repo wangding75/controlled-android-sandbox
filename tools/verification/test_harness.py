@@ -38,7 +38,13 @@ if __package__ in {None, ""}:
         classify_exit,
         classify_recovery,
     )
-    from tools.verification.matrix_validator import MatrixAccountingError, validate_cells, validate_report
+    from tools.verification.matrix_validator import (
+        MatrixAccountingError,
+        validate_abi_matrix,
+        validate_cells,
+        validate_native_inventory,
+        validate_report,
+    )
     from tools.verification.reporting.summary import build_summary, render_compact_report
     from tools.verification.run_api33_capabilities import _merge_case_logcat
 else:
@@ -61,7 +67,13 @@ else:
         classify_exit,
         classify_recovery,
     )
-    from .matrix_validator import MatrixAccountingError, validate_cells, validate_report
+    from .matrix_validator import (
+        MatrixAccountingError,
+        validate_abi_matrix,
+        validate_cells,
+        validate_native_inventory,
+        validate_report,
+    )
     from .reporting.summary import build_summary, render_compact_report
     from .run_api33_capabilities import _merge_case_logcat
 
@@ -324,6 +336,85 @@ class HarnessContractTests(unittest.TestCase):
                 "deferred",
                 [{"id": "cell", "status": "DEFERRED_ENVIRONMENT"}],
             )
+
+    def test_abi_matrix_validator_requires_real_artifacts(self) -> None:
+        with self.assertRaisesRegex(MatrixAccountingError, "declared ABI missing artifact"):
+            validate_abi_matrix(
+                [{
+                    "module": "app",
+                    "abi": "arm64-v8a",
+                    "status": "DECLARED_NOT_BUILT",
+                }]
+            )
+        with self.assertRaisesRegex(MatrixAccountingError, "unknown ABI"):
+            validate_abi_matrix(
+                [{
+                    "module": "app",
+                    "abi": "mips64",
+                    "status": "BUILT",
+                    "artifact": "app.apk",
+                }]
+            )
+
+    def test_abi_matrix_validator_rejects_duplicate_and_accepts_scoped_rows(self) -> None:
+        with self.assertRaisesRegex(MatrixAccountingError, "duplicate cell"):
+            validate_abi_matrix(
+                [
+                    {"module": "fixture", "abi": "x86", "status": "TEST_ONLY", "artifact": "fixture.apk"},
+                    {"module": "fixture", "abi": "x86", "status": "TEST_ONLY", "artifact": "fixture.apk"},
+                ]
+            )
+        summary = validate_abi_matrix(
+            [
+                {"module": "app", "abi": "arm64-v8a", "status": "BUILT", "artifact": "app.apk"},
+                {"module": "companion", "abi": "armeabi-v7a", "status": "COMPANION_ONLY", "artifact": "companion.apk"},
+                {"module": "fixture", "abi": "x86", "status": "TEST_ONLY", "artifact": "fixture.apk"},
+                {"module": "fixture", "abi": "x86_64", "status": "NOT_DECLARED"},
+            ]
+        )
+        self.assertEqual(summary.total, 4)
+
+    def test_native_inventory_validator_catches_required_static_fields(self) -> None:
+        base = {
+            "artifact": "app-debug.apk",
+            "module": "app",
+            "abi": "arm64-v8a",
+            "library": "libcas_native_enf.so",
+            "classification": "first_party",
+            "alignment_status": "PASS",
+            "elf_class": "ELF64",
+            "machine": "AArch64",
+            "dependency_status": "PASS",
+        }
+        self.assertEqual(validate_native_inventory([base]).count("PASS"), 1)
+        for field, message in (
+            ("classification", "unclassified library"),
+            ("alignment_status", "16KB status missing"),
+        ):
+            broken = dict(base)
+            broken.pop(field)
+            with self.assertRaisesRegex(MatrixAccountingError, message):
+                validate_native_inventory([broken])
+
+    def test_native_inventory_validator_catches_duplicate_unknown_and_mismatch(self) -> None:
+        base = {
+            "artifact": "app-debug.apk",
+            "module": "app",
+            "abi": "arm64-v8a",
+            "library": "libcas_native_enf.so",
+            "classification": "first_party",
+            "alignment_status": "PASS",
+            "elf_class": "ELF64",
+            "machine": "AArch64",
+        }
+        with self.assertRaisesRegex(MatrixAccountingError, "duplicate native record"):
+            validate_native_inventory([base, dict(base)])
+        unknown = dict(base, abi="mips64")
+        with self.assertRaisesRegex(MatrixAccountingError, "unknown ABI"):
+            validate_native_inventory([unknown])
+        mismatch = dict(base, machine="Intel 80386")
+        with self.assertRaisesRegex(MatrixAccountingError, "ELF machine mismatch"):
+            validate_native_inventory([mismatch])
 
 
 if __name__ == "__main__":

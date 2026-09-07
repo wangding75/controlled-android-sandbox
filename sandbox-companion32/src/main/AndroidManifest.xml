@@ -2,7 +2,6 @@
     <uses-permission android:name="com.warden.controlledsandbox.permission.BIND_NATIVE_COMPANION" />
     <application
         android:allowBackup="false"
-        android:extractNativeLibs="true"
         android:label="Controlled Sandbox Native Companion"
         android:usesCleartextTraffic="false">
         <service

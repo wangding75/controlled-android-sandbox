@@ -24,6 +24,12 @@ android {
         }
         release { minifyEnabled false }
     }
+    packagingOptions {
+        jniLibs {
+            // Keep native libraries uncompressed and page-aligned for 16 KB devices.
+            useLegacyPackaging = false
+        }
+    }
     externalNativeBuild {
         cmake {
             path 'src/main/cpp/CMakeLists.txt'

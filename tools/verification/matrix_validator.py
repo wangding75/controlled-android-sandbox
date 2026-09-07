@@ -26,6 +26,20 @@ ALLOWED_STATUSES = frozenset(
     }
 )
 
+# ABI names are a validation vocabulary, not a product-support assertion.  The
+# audit derives the declared/buildable set from Gradle/CMake; this list only
+# prevents a typo or an obsolete ABI from silently entering a receipt.
+ABI_NAMES = frozenset({"armeabi-v7a", "arm64-v8a", "x86", "x86_64"})
+ABI_MATRIX_STATUSES = frozenset(
+    {"BUILT", "DECLARED_NOT_BUILT", "NOT_DECLARED", "TEST_ONLY", "COMPANION_ONLY"}
+)
+ABI_ELF_CONTRACT = {
+    "armeabi-v7a": ("ELF32", "ARM"),
+    "arm64-v8a": ("ELF64", "AArch64"),
+    "x86": ("ELF32", "Intel 80386"),
+    "x86_64": ("ELF64", "Advanced Micro Devices X86-64"),
+}
+
 
 class MatrixAccountingError(ValueError):
     """Raised when a matrix violates the frozen accounting contract."""
@@ -41,6 +55,145 @@ class MatrixSummary:
 
     def count(self, status: str) -> int:
         return self.counts.get(status, 0)
+
+
+def _required_text(
+    name: str, index: int, cell: Mapping[str, object], key: str
+) -> str:
+    value = str(cell.get(key, "")).strip()
+    if not value:
+        raise MatrixAccountingError(f"{name}: cell {index} has no {key}")
+    return value
+
+
+def _normalise_elf_value(value: object) -> str:
+    return re.sub(r"[^a-z0-9]+", "", str(value).strip().lower())
+
+
+def validate_abi_matrix(
+    cells: Iterable[Mapping[str, object]],
+    *,
+    expected_abis: Iterable[str] = ABI_NAMES,
+    name: str = "ABI Matrix",
+) -> MatrixSummary:
+    """Validate the declared/build ABI matrix and its artifact closure.
+
+    Each row is intentionally small and JSON/report friendly::
+
+        {"module": "app", "abi": "arm64-v8a", "status": "BUILT",
+         "artifact": "app-debug.apk"}
+
+    ``DECLARED_NOT_BUILT`` is rejected: a declared ABI without a real output
+    is precisely the failure this gate is meant to expose.  ``NOT_DECLARED``
+    is allowed for an explicit matrix row and does not claim support.
+    """
+
+    allowed_abis = {str(abi).strip() for abi in expected_abis}
+    if not allowed_abis.issubset(ABI_NAMES):
+        raise MatrixAccountingError(f"{name}: expected ABI vocabulary is invalid")
+    seen: set[tuple[str, str]] = set()
+    counts = {status: 0 for status in sorted(ABI_MATRIX_STATUSES)}
+    total = 0
+    for index, cell in enumerate(cells, start=1):
+        module = _required_text(name, index, cell, "module")
+        abi = _required_text(name, index, cell, "abi")
+        if abi not in allowed_abis or abi not in ABI_NAMES:
+            raise MatrixAccountingError(f"{name}: {module} has unknown ABI {abi}")
+        key = (module, abi)
+        if key in seen:
+            raise MatrixAccountingError(f"{name}: duplicate cell {module}/{abi}")
+        seen.add(key)
+
+        status = _required_text(name, index, cell, "status")
+        if status not in ABI_MATRIX_STATUSES:
+            raise MatrixAccountingError(f"{name}: {module}/{abi} has unknown status {status}")
+        if status == "DECLARED_NOT_BUILT":
+            raise MatrixAccountingError(
+                f"{name}: declared ABI missing artifact for {module}/{abi}"
+            )
+        if status in {"BUILT", "TEST_ONLY", "COMPANION_ONLY"}:
+            _required_text(name, index, cell, "artifact")
+        artifact_abi = str(cell.get("artifact_abi", "")).strip()
+        if artifact_abi and artifact_abi != abi:
+            raise MatrixAccountingError(
+                f"{name}: artifact ABI mismatch for {module}/{abi}: {artifact_abi}"
+            )
+        counts[status] += 1
+        total += 1
+    return MatrixSummary(name=name, total=total, counts=counts)
+
+
+def validate_native_inventory(
+    records: Iterable[Mapping[str, object]],
+    *,
+    expected_abis: Iterable[str] = ABI_NAMES,
+    name: str = "Native Inventory",
+) -> MatrixSummary:
+    """Validate final native records, ELF identity, and 16 KB status.
+
+    The key is ``artifact + ABI + library``.  Repeating it is rejected so a
+    duplicate Gradle/pickFirst result cannot disappear from the audit.  Every
+    record must carry a first/third-party classification and an explicit
+    16 KB alignment status; the validator therefore also catches incomplete
+    inventories instead of treating omitted fields as pass.
+    """
+
+    allowed_abis = {str(abi).strip() for abi in expected_abis}
+    if not allowed_abis.issubset(ABI_NAMES):
+        raise MatrixAccountingError(f"{name}: expected ABI vocabulary is invalid")
+    seen: set[tuple[str, str, str]] = set()
+    counts = {"PASS": 0, "FAIL": 0}
+    total = 0
+    for index, record in enumerate(records, start=1):
+        artifact = _required_text(name, index, record, "artifact")
+        abi = _required_text(name, index, record, "abi")
+        library = _required_text(name, index, record, "library")
+        if abi not in allowed_abis or abi not in ABI_NAMES:
+            raise MatrixAccountingError(f"{name}: {library} has unknown ABI {abi}")
+        key = (artifact, abi, library)
+        if key in seen:
+            raise MatrixAccountingError(
+                f"{name}: duplicate native record {artifact}/{abi}/{library}"
+            )
+        seen.add(key)
+
+        classification = str(
+            record.get("classification", record.get("party", ""))
+        ).strip().lower()
+        if classification not in {"first_party", "third_party"}:
+            raise MatrixAccountingError(
+                f"{name}: unclassified library {artifact}/{abi}/{library}"
+            )
+
+        alignment = str(
+            record.get("alignment_status", record.get("page_size_16k_status", ""))
+        ).strip().upper()
+        if not alignment:
+            raise MatrixAccountingError(
+                f"{name}: 16KB status missing for {artifact}/{abi}/{library}"
+            )
+        if alignment != "PASS":
+            raise MatrixAccountingError(
+                f"{name}: 16KB alignment failure for {artifact}/{abi}/{library}: {alignment}"
+            )
+
+        elf_class = str(record.get("elf_class", "")).strip()
+        machine = str(record.get("machine", "")).strip()
+        expected_class, expected_machine = ABI_ELF_CONTRACT[abi]
+        if elf_class != expected_class or _normalise_elf_value(machine) != _normalise_elf_value(expected_machine):
+            raise MatrixAccountingError(
+                f"{name}: ELF machine mismatch for {artifact}/{abi}/{library}: "
+                f"{elf_class}/{machine}, expected {expected_class}/{expected_machine}"
+            )
+
+        dependency = str(record.get("dependency_status", "PASS")).strip().upper()
+        if dependency != "PASS":
+            raise MatrixAccountingError(
+                f"{name}: dependency failure for {artifact}/{abi}/{library}: {dependency}"
+            )
+        counts["PASS"] += 1
+        total += 1
+    return MatrixSummary(name=name, total=total, counts=counts)
 
 
 def validate_cells(
@@ -207,21 +360,63 @@ def _print_summary(summary: MatrixSummary) -> None:
         print(f"{prefix}_{key}={summary.count(status)}")
 
 
+def _load_json_rows(path: Path, key: str) -> list[Mapping[str, object]]:
+    import json
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(payload, list):
+        rows = payload
+    elif isinstance(payload, dict) and isinstance(payload.get(key), list):
+        rows = payload[key]
+    else:
+        raise MatrixAccountingError(f"{path}: expected a list or object field {key}")
+    if not all(isinstance(row, Mapping) for row in rows):
+        raise MatrixAccountingError(f"{path}: every row must be an object")
+    return rows
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--report", required=True, type=Path)
+    parser.add_argument("--report", type=Path)
+    parser.add_argument("--abi-matrix", type=Path)
+    parser.add_argument("--native-inventory", type=Path)
     args = parser.parse_args(argv)
+    if not any((args.report, args.abi_matrix, args.native_inventory)):
+        parser.error("at least one of --report, --abi-matrix, --native-inventory is required")
     try:
-        summaries = validate_report(args.report)
-    except (OSError, MatrixAccountingError) as error:
+        summaries: dict[str, MatrixSummary] = {}
+        if args.report:
+            summaries.update(validate_report(args.report))
+        if args.abi_matrix:
+            summaries["abi"] = validate_abi_matrix(
+                _load_json_rows(args.abi_matrix, "cells")
+            )
+        if args.native_inventory:
+            summaries["native"] = validate_native_inventory(
+                _load_json_rows(args.native_inventory, "records")
+            )
+    except (OSError, MatrixAccountingError, ValueError) as error:
         print("MATRIX_ACCOUNTING=FAIL")
         print("MATRIX_VALIDATOR=FAIL")
+        if args.abi_matrix or args.native_inventory:
+            print("ABI_MATRIX_VALIDATOR=FAIL")
         print(f"MATRIX_VALIDATOR_ERROR={error}")
         return 1
     print("MATRIX_ACCOUNTING=PASS")
     print("MATRIX_VALIDATOR=PASS")
-    _print_summary(summaries["unified"])
-    _print_summary(summaries["version_specific"])
+    for key in ("unified", "version_specific", "abi", "native"):
+        if key not in summaries:
+            continue
+        if key == "abi":
+            print("ABI_MATRIX_VALIDATOR=PASS")
+            print(f"ABI_MATRIX_TOTAL={summaries[key].total}")
+            for status in sorted(ABI_MATRIX_STATUSES):
+                print(f"ABI_MATRIX_{status}={summaries[key].count(status)}")
+        elif key == "native":
+            print("NATIVE_INVENTORY_VALIDATOR=PASS")
+            print(f"NATIVE_INVENTORY_TOTAL={summaries[key].total}")
+        else:
+            _print_summary(summaries[key])
     return 0
 
 

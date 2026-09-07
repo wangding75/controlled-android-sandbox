@@ -1,14 +1,14 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：2.0
-更新时间：2026-09-03（Asia/Shanghai）
+更新时间：2026-09-07（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C6`（IN_PROGRESS；按用户明确指令提前进入 C6，C4-R05 正式关门及 C1/C2/C4 合并回归延后至完整回归处理）
-当前任务：`C6-T01D`（DONE；父任务 `C6-T01` 仍为 IN_PROGRESS）
-下一任务：`C6-T01E`
-最后完成任务：`C6-T01D`
+当前任务：`C6-T02B`（PENDING；C6-T02A 已完成，本轮停止）
+下一任务：`C6-T02B`
+最后完成任务：`C6-T02A`
 
 ## 1. 使用规则
 
@@ -74,12 +74,16 @@
 | C5-T02 | XH CAS Host/SDK 集成 | NOT_APPLICABLE | C5-T01,C4-T02 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T03 | 原始 XH/DingTalk 验收 | NOT_APPLICABLE | C5-T02,C4 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T04 | 可选 Xposed 模块验收 | NOT_APPLICABLE | C3-T06,C5-T01 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
-| C6-T01 | API33-37 回归 | IN_PROGRESS（用户授权提前进入） | C4-R05（用户授权跳过当前依赖） | - | §5 C6-T01（2026-09-02） |
+| C6-T01 | API33-37 回归 | DONE_WITH_ENVIRONMENT_DEFERRED | C4-R05（用户授权跳过当前依赖） | - | §5 C6-T01（环境延期收口） |
 | C6-T01A | Unified Android Verification Harness Foundation | DONE | C6-T01 | `6b03d5ca95f45d48bbcadab56fb0beddab3aa287` | §5 C6-T01A |
 | C6-T01A-R01 | API32 Core Smoke Defect Closure | DONE | C6-T01A | `HEAD`（本任务唯一提交；精确 SHA 见 §5 C6-T01A-R01 回执） | §5 C6-T01A-R01 |
 | C6-T01B | API33 Platform Convergence | DONE | C6-T01A-R01 | `HEAD`（本任务唯一提交；精确 SHA 见 §5 C6-T01B 回执） | §5 C6-T01B |
 | C6-T01C | API34 Platform Convergence | DONE | C6-T01B | `HEAD`（本任务唯一提交；精确 SHA 见 §5 C6-T01C 回执） | §5 C6-T01C |
 | C6-T01D | API35 Platform Convergence | DONE | C6-T01C | `HEAD`（本任务唯一提交；精确 SHA 见 §5 C6-T01D 回执） | §5 C6-T01D |
+| C6-T01E | API36 Platform Convergence | DONE | C6-T01D | `HEAD`（本任务唯一提交；精确 SHA 见 §5 C6-T01E 回执） | §5 C6-T01E |
+| C6-T01F | API37 Platform Convergence | PASS_WITH_ENVIRONMENT_DEFERRED | C6-T01E | `HEAD`（精确 SHA 见 §5 C6-T01F 回执） | §5 C6-T01F |
+| C6-T01G | API32-37 Cross-API Final Closure | PASS_WITH_ENVIRONMENT_DEFERRED | C6-T01F | `HEAD`（精确 SHA 见 §5 C6-T01G-R02 回执） | §5 C6-T01G-R02 |
+| C6-T02A | ABI / ELF / Native Packaging Static Convergence | DONE | C6-T01,C3-T03 | `HEAD`（本任务唯一提交；精确 SHA 见 §5 C6-T02A 回执） | §5 C6-T02A |
 | C6-T02 | ARM/跨宽度/16KB | PENDING | C3-T03,C6-T01 | - | - |
 | C6-T03 | Android Matrix 发布门禁 | PENDING | C6-T01,C6-T02 | - | - |
 | C7-T01 | OEM 优先级与代表设备 | PENDING | C6 | - | - |
@@ -4534,3 +4538,44 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   `C6-T01G=BLOCKED`、`C6-T01=BLOCKED`。`C6-T02A` 未启动，`NEXT_TASK=BLOCKED`。
 - **报告**：已更新 `reports/t57-r03/c6/C6_T01G_CROSS_API_CLOSURE_REPORT.md`，新增
   `C6-T01G-R02 Headless vs Windowed Diagnostic Closure` 与 authoritative receipt。
+
+### C6-T01 环境延期收口（2026-09-07）
+
+- **C6-T01**：`DONE_WITH_ENVIRONMENT_DEFERRED`。API37 不再阻塞 C6-T02 主线；不得将
+  API37 的环境延期改记为 PASS。
+- **C6-T01G**：`PASS_WITH_ENVIRONMENT_DEFERRED`。API32-36 已完成既有动态闭环，API37
+  clean headless/windowed lane 仍受稳定 Emulator 环境限制。
+- **C6-D01**：Android 17 Memory Limiter Dynamic Recovery Evidence，状态
+  `DEFERRED_ENVIRONMENT`。原因：公开 API37 镜像 `am memory-limiter status=disabled`，
+  缺少可验证 limiter 配置；真实 kill/recovery 留待具备 limiter 的环境。
+- **C6-D02**：Android 17 API37 Stable Runtime Environment Closure，状态
+  `DEFERRED_ENVIRONMENT`。已知原因：Emulator `37.1.11`、API37 Google APIs x86_64
+  revision 6 在 boot-only 即触发 `readColorBufferDma`，headless/windowed 与
+  software/auto 均复现；该问题不属于 CAS defect。
+- **边界**：C6-T02A 只执行 ABI/ELF/native packaging 静态收敛，不执行 API37、16 KB
+  正式动态、ARM64 真机或 Companion32 动态测试。
+
+### C6-T02A：ABI / ELF / Native Packaging Static Convergence（2026-09-07）
+
+- **状态**：`DONE`。当前任务只做静态 ABI/ELF/native packaging 收敛；API37、16 KB
+  正式动态、ARM64 真机、Companion32 动态和 ARM32 scope 决策均未提前执行。
+- **开始基线**：分支 `feature/t57-r03-va-pro-capability-campaign`，
+  `START_HEAD=345924455d30432dbd88c17985c9d499d6630f2c`；开始时 `git status --short`
+  为 CLEAN，`ref/` 未修改。
+- **实现**：修复 activity-scale CMake 的 16KB link option；收敛 app、compat32、
+  companion32 的 JNI packaging；新增 `tools/verification/abi_audit.py`，扩展通用
+  `tools/verification/matrix_validator.py` 并补齐 ABI/native validator tests；完整结果见
+  `reports/t57-r03/c6/C6_T02A_ABI_ELF_STATIC_CONVERGENCE_REPORT.md`。
+- **静态结果**：声明并真实构建 `armeabi-v7a, arm64-v8a, x86, x86_64`；扫描 13 个
+  APK/AAR、29 个 native package records，`ELF=29/29 PASS`、`PAGE_SIZE_16K_STATIC=29/29`
+  且 FAIL=0、APK native packaging=25/25 PASS、third-party native=0、missing dependency=0、
+  RPATH/RUNPATH=0、export contract issues=0；Companion32 static contract PASS。
+- **Build gate**：`./gradlew projects`、`clean assembleDebug`、`./gradlew test`、Python
+  harness 16/16、ABI/native inventory validator 和 companion guard 均 PASS；中间 33 个
+  native outputs 的 ELF/alignment 也全部 PASS。详细 readelf/nm/zipalign/extraction 只保留
+  在被 `.gitignore` 忽略的 `out/verification/t57-r03/c6-t02a-abi-elf-static-convergence/`。
+- **提交/推送**：本任务唯一最终提交主题为
+  `C6-T02A: converge ABI ELF and native packaging contracts`；提交后推送到
+  `origin/feature/t57-r03-va-pro-capability-campaign`，最终本地与远端 HEAD 一致，工作区
+  CLEAN。精确 SHA 以最终 Git gate 回执为准。
+- **下一任务**：`C6-T02B`；本轮完成后停止，不自动执行 T02B。
