@@ -160,7 +160,9 @@ def _resolve_device(args: argparse.Namespace) -> tuple[dict[str, Any], AdbDevice
     return resolve_rd_device(args.instance_name, root=ROOT)
 
 
-def _validate_api_device(metadata: dict[str, Any], expected_api: int) -> None:
+def _validate_api_device(
+    metadata: dict[str, Any], expected_api: int, expected_page_size: int = 4096
+) -> None:
     mismatches: list[str] = []
     if metadata.get("api_level") != expected_api:
         mismatches.append(f"api_level={metadata.get('api_level')!r}")
@@ -168,8 +170,10 @@ def _validate_api_device(metadata: dict[str, Any], expected_api: int) -> None:
         mismatches.append(f"abi={metadata.get('abi')!r}")
     if "x86_64" not in (metadata.get("abi_list") or []):
         mismatches.append(f"abi_list={metadata.get('abi_list')!r}")
-    if metadata.get("page_size") != 4096:
-        mismatches.append(f"page_size={metadata.get('page_size')!r}")
+    if metadata.get("page_size") != expected_page_size:
+        mismatches.append(
+            f"page_size={metadata.get('page_size')!r} expected={expected_page_size}"
+        )
     if mismatches:
         raise DeviceMetadataError(
             f"API{expected_api}_DEVICE_CONTRACT_MISMATCH: " + ", ".join(mismatches)
@@ -325,6 +329,7 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
         "start_head": start_head,
         "final_head": start_head,
         "branch": _git("branch", "--show-current"),
+        "expected_page_size": args.expected_page_size,
         "selected_testcases": [spec.testcase_id for spec in specs],
         "started_at": _now(),
         "evidence_root": run_dir.relative_to(ROOT).as_posix()
@@ -410,18 +415,9 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
                     f"device metadata incomplete: {metadata.get('missing_fields')}",
                 )
             else:
-                if platform_lane == "API32":
-                    _validate_api_device(metadata, 32)
-                elif platform_lane == "API33":
-                    _validate_api_device(metadata, 33)
-                elif platform_lane == "API34":
-                    _validate_api_device(metadata, 34)
-                elif platform_lane == "API35":
-                    _validate_api_device(metadata, 35)
-                elif platform_lane == "API36":
-                    _validate_api_device(metadata, 36)
-                elif platform_lane == "API37":
-                    _validate_api_device(metadata, 37)
+                expected_api = int(platform_lane[3:]) if platform_lane else None
+                if expected_api is not None:
+                    _validate_api_device(metadata, expected_api, args.expected_page_size)
                 context = SmokeContext(
                     root=ROOT,
                     device=device,
@@ -481,12 +477,18 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--instance-name", default="RD测试")
     parser.add_argument("--serial", default="", help="Use this ADB serial instead of the RD resolver")
-    parser.add_argument("--api32", action="store_true", help="Require API 32 x86_64/4096 device contract")
-    parser.add_argument("--api33", action="store_true", help="Require API 33 x86_64/4096 device contract")
-    parser.add_argument("--api34", action="store_true", help="Require API 34 x86_64/4096 device contract")
-    parser.add_argument("--api35", action="store_true", help="Require API 35 x86_64/4096 device contract")
-    parser.add_argument("--api36", action="store_true", help="Require API 36 x86_64/4096 device contract")
-    parser.add_argument("--api37", action="store_true", help="Require API 37 x86_64/4096 device contract")
+    parser.add_argument("--api32", action="store_true", help="Require API 32 x86_64 device contract")
+    parser.add_argument("--api33", action="store_true", help="Require API 33 x86_64 device contract")
+    parser.add_argument("--api34", action="store_true", help="Require API 34 x86_64 device contract")
+    parser.add_argument("--api35", action="store_true", help="Require API 35 x86_64 device contract")
+    parser.add_argument("--api36", action="store_true", help="Require API 36 x86_64 device contract")
+    parser.add_argument("--api37", action="store_true", help="Require API 37 x86_64 device contract")
+    parser.add_argument(
+        "--expected-page-size",
+        type=int,
+        default=4096,
+        help="Require this runtime page size for the selected API lane (default: 4096)",
+    )
     parser.add_argument("--run-id", default="")
     parser.add_argument("--output-root", default=str(DEFAULT_OUTPUT_ROOT))
     parser.add_argument("--skip-build", action="store_true")

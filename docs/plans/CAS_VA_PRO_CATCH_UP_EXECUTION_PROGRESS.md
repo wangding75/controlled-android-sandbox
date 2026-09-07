@@ -6,9 +6,9 @@
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C6`（IN_PROGRESS；按用户明确指令提前进入 C6，C4-R05 正式关门及 C1/C2/C4 合并回归延后至完整回归处理）
-当前任务：`C6-T02B`（PENDING；C6-T02A 已完成，本轮停止）
-下一任务：`C6-T02B`
-最后完成任务：`C6-T02A`
+当前任务：`C6-T02C`（PENDING；C6-T02B 已完成）
+下一任务：`C6-T02C`
+最后完成任务：`C6-T02B`
 
 ## 1. 使用规则
 
@@ -84,6 +84,7 @@
 | C6-T01F | API37 Platform Convergence | PASS_WITH_ENVIRONMENT_DEFERRED | C6-T01E | `HEAD`（精确 SHA 见 §5 C6-T01F 回执） | §5 C6-T01F |
 | C6-T01G | API32-37 Cross-API Final Closure | PASS_WITH_ENVIRONMENT_DEFERRED | C6-T01F | `HEAD`（精确 SHA 见 §5 C6-T01G-R02 回执） | §5 C6-T01G-R02 |
 | C6-T02A | ABI / ELF / Native Packaging Static Convergence | DONE | C6-T01,C3-T03 | `HEAD`（本任务唯一提交；精确 SHA 见 §5 C6-T02A 回执） | §5 C6-T02A |
+| C6-T02B | 16 KB Page Size Dynamic Validation | DONE | C6-T02A,C6-T01 | `HEAD`（本任务唯一提交；精确 SHA 见 §5 C6-T02B 回执） | §5 C6-T02B |
 | C6-T02 | ARM/跨宽度/16KB | PENDING | C3-T03,C6-T01 | - | - |
 | C6-T03 | Android Matrix 发布门禁 | PENDING | C6-T01,C6-T02 | - | - |
 | C7-T01 | OEM 优先级与代表设备 | PENDING | C6 | - | - |
@@ -4579,3 +4580,44 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   `origin/feature/t57-r03-va-pro-capability-campaign`，最终本地与远端 HEAD 一致，工作区
   CLEAN。精确 SHA 以最终 Git gate 回执为准。
 - **下一任务**：`C6-T02B`；本轮完成后停止，不自动执行 T02B。
+
+### C6-T02B：16 KB Page Size Dynamic Validation（2026-09-07）
+
+- **状态**：`DONE`。本轮在官方 Android 15 / API 35 Google APIs 16 KB x86_64
+  Emulator 中完成动态验证；不宣称 ARM64 真机、小米、Companion32/cross-bitness、
+  ARM32、OEM 或 API37 动态覆盖。
+- **开始基线**：分支 `feature/t57-r03-va-pro-capability-campaign`，
+  `START_HEAD=5b0a9d09cea7c12c67fef6671e962032d8432047`；开始时 `ref/` 未修改，
+  T02A 的 ABI/ELF/native packaging 静态门禁已为 PASS。
+- **真实环境**：实际从 SDK Manager 清单发现并安装
+  `system-images;android-35;google_apis_ps16k;x86_64`、revision `5`；独立 AVD
+  `C6_T02B_API35_16K_x86_64`，`HEADLESS`，Android `15` / API `35`，ABI
+  `x86_64`，`getconf PAGE_SIZE=16384`，fingerprint 为
+  `google/sdk_gphone16k_x86_64/emu64xa16k:15/AE3A.240806.043/12960925:userdebug/dev-keys`。
+  `NATIVE_16K_ENVIRONMENT=TRUE`，未观察到 page-size compatibility mode，且未修改
+  `C6_T01D_API35_GoogleApis_x86_64`。
+- **动态结果**：统一核心 baseline `10/10 PASS`、最终 `10/10 PASS`；最终扩展能力
+  `10 PASS / 0 FAIL / 1 EXPECTED_LIMITATION / 1 NOT_IN_CURRENT_SCOPE`。Host、Guest
+  import/add、cold/warm、Service/Broadcast/Provider/PendingIntent、package
+  lifecycle、process death/recovery、NativeLoader/JNI、mmap/mprotect、native hook、
+  procfs、ClassLoader、Split APK、WebView、Binder IPC 均有证据。现有
+  `native-enforcement` POC 也在 16 KB runtime 中加载 `libcas_native_enf.so` 并报告
+  `jniAvailable=true`；adversarial raw-syscall case 保留为 `EXPECTED_LIMITATION`，
+  不是产品 PASS。
+- **静态与回归**：最终 ABI/ELF validator `PASS`，ELF `29/29`、APK native packaging
+  `25/25`、zipalign `9/9`，matrix accounting `PASS`；API35 4 KB 对照核心
+  `10/10 PASS`。16 KB 与 4 KB 单轮 S01–S10 总耗时分别为 `210063 ms` 与
+  `250030 ms`，无数量级性能回归。
+- **构建与测试**：`gradlew projects`、`assembleDebug`、unit tests、Android Gradle
+  build gate、unified harness `16/16`、native ABI companion guard 均 PASS；最终
+  `git diff --check`、`ref/` 不变、生成证据均位于 ignored `out/verification/`。
+- **实现边界**：修正 debug capability 对异步 `LAUNCH_ACCEPTED` 与 degraded prepare
+  状态的合同解析，并让动态 runners 显式记录/校验 expected page size；没有修改
+  native product implementation。静态源审计记录 `1` 个受保护的 `4096` fallback
+  （`native_loader.cpp` 仅在 `sysconf` 失败时使用），16 KB active path 取到
+  `16384`，未发现 active 4 KB page assumption，`PRODUCT_DEFECT_16K_FOUND=NO`。
+- **报告**：`reports/t57-r03/c6/C6_T02B_16KB_DYNAMIC_VALIDATION_REPORT.md`。
+- **提交/推送**：本任务唯一最终提交主题为
+  `C6-T02B: validate native runtime on 16KB page size`；精确 SHA 以最终 Git gate
+  回执为准，本地与远端 HEAD 必须一致且工作区 CLEAN。
+- **下一任务**：`C6-T02C`；本轮不自动执行 T02C。

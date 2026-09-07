@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -221,6 +222,159 @@ def _check_case(
     return evidence
 
 
+def _native_log_summary(logcat: str) -> dict[str, Any]:
+    """Extract bounded native evidence without turning the full logcat into matrix data."""
+
+    lines = [line.strip() for line in logcat.splitlines() if line.strip()]
+    c3_t02 = [
+        {"id": match.group(1), "status": match.group(2)}
+        for match in re.finditer(r'"id":"(C3-T02-[^"]+)","status":"([^"]+)"', logcat)
+    ]
+    native_adv = [
+        {"id": match.group(1), "status": match.group(2)}
+        for match in re.finditer(r'"id":"(NATIVE-ADV-[^"]+)","status":"([^"]+)"', logcat)
+    ]
+    interesting = [
+        line for line in lines
+        if any(
+            marker in line
+            for marker in (
+                "CS_NATIVE_BIND",
+                "CS_NATIVE_HOOK",
+                "C3_T03_NATIVE_MEDIA_RESULT",
+                "C3_T02",
+                "CS_NATIVE_ADV",
+            )
+        )
+    ]
+    return {
+        "c3_t02_cases": c3_t02,
+        "c3_t02_error_cases": [item for item in c3_t02 if item["status"] == "ERROR"],
+        "native_adversarial_cases": native_adv,
+        "native_adversarial_bypass_cases": [
+            item for item in native_adv if item["status"] == "BYPASS_CONFIRMED"
+        ],
+        "interesting_lines": interesting[-120:],
+    }
+
+
+def _debug_command_case(
+    context: SmokeContext,
+    run_dir: Path,
+    *,
+    case_id: str,
+    command: str,
+    package: str = GUEST_PACKAGE,
+    required: tuple[str, ...] = (),
+    any_required: tuple[str, ...] = (),
+    forbidden: tuple[str, ...] = (),
+    extras: dict[str, Any] | None = None,
+    expected_operations: tuple[str, ...] = (),
+    expected_limitation_markers: tuple[str, ...] = (),
+    expected_limitation_status: str = "EXPECTED_LIMITATION",
+    wait_seconds: float = 60.0,
+) -> dict[str, Any]:
+    """Run one existing DebugCommandActivity command as a reusable capability case."""
+
+    case_dir = run_dir / "cases" / case_id
+    started = time.monotonic()
+    artifacts: list[str] = []
+    logcat = ""
+    post_marker_logcat = ""
+    result: dict[str, Any] = {}
+    errors: list[str] = []
+    try:
+        context.device.clear_logcat()
+        observation = _invoke_debug(
+            context,
+            case_dir,
+            command=command,
+            package=package,
+            timeout_kind=TimeoutKind.RECOVERY,
+            extras=extras,
+            force_stop_host=True,
+        )
+        result = observation.actual["debug_result"]
+        marker_logcat = _wait_for_all(context.device, required, wait_seconds)
+        post_marker_logcat = context.device.logcat(timeout_sec=60.0)
+        logcat = _merge_case_logcat(observation.logcat, marker_logcat, post_marker_logcat)
+        missing = [marker for marker in required if marker not in logcat]
+        if any_required and not any(marker in logcat for marker in any_required):
+            missing.append("ANY_OF:" + "|".join(any_required))
+        forbidden_seen = [marker for marker in forbidden if marker in logcat]
+        errors.extend("MISSING:" + marker for marker in missing)
+        errors.extend("FORBIDDEN:" + marker for marker in forbidden_seen)
+        if result.get("status") != "PASS":
+            errors.append("DEBUG_STATUS:" + str(result.get("status")))
+        operation_status = (result.get("operation") or {}).get("status", "")
+        if expected_operations and operation_status not in expected_operations:
+            errors.append(
+                "OPERATION_STATUS:" + str(operation_status)
+                + " expected=" + "|".join(expected_operations)
+            )
+        native_summary = _native_log_summary(logcat)
+        if case_id == "CAP-NATIVE-PROC-FD" and native_summary["c3_t02_error_cases"]:
+            errors.extend(
+                "NATIVE_CASE_ERROR:" + item["id"]
+                for item in native_summary["c3_t02_error_cases"]
+            )
+        limitation_observed = bool(expected_limitation_markers) and all(
+            marker in logcat for marker in expected_limitation_markers
+        )
+        status = (
+            expected_limitation_status
+            if limitation_observed
+            else "PASS" if not errors else "FAIL"
+        )
+    except Exception as error:  # preserve the result and continue with later capabilities
+        status = "FAIL"
+        errors.append(f"{error.__class__.__name__}:{error}")
+        native_summary = _native_log_summary(logcat)
+        try:
+            post_marker_logcat = context.device.logcat(timeout_sec=60.0)
+            logcat = _merge_case_logcat(logcat, post_marker_logcat)
+            native_summary = _native_log_summary(logcat)
+        except Exception as log_error:
+            errors.append(f"LOGCAT_CAPTURE_FAILED:{log_error}")
+    if post_marker_logcat:
+        case_dir.mkdir(parents=True, exist_ok=True)
+        post_marker_path = case_dir / "post-marker-logcat.txt"
+        post_marker_path.write_text(post_marker_logcat, encoding="utf-8")
+        artifacts.append(post_marker_path.relative_to(ROOT).as_posix())
+    if not artifacts:
+        try:
+            captured = _capture(context, case_dir / "failure", case_id)
+            artifacts = captured["artifacts"]
+            if not logcat:
+                logcat = captured["logcat"]
+        except Exception as capture_error:
+            errors.append(f"CAPTURE_FAILED:{capture_error}")
+    evidence = {
+        "case_id": case_id,
+        "command": command,
+        "package": package,
+        "status": status,
+        "required_markers": list(required),
+        "any_required_markers": list(any_required),
+        "forbidden_markers": list(forbidden),
+        "observed_markers": [marker for marker in (*required, *any_required) if marker in logcat],
+        "errors": errors,
+        "debug_status": result.get("status", ""),
+        "operation_status": (result.get("operation") or {}).get("status", ""),
+        "native_summary": native_summary,
+        "expected_limitation_markers": list(expected_limitation_markers),
+        "expected_limitation_observed": bool(expected_limitation_markers)
+        and all(marker in logcat for marker in expected_limitation_markers),
+        "artifacts": list(dict.fromkeys(artifacts)),
+        "duration_ms": max(0, int(round((time.monotonic() - started) * 1000))),
+    }
+    case_dir.mkdir(parents=True, exist_ok=True)
+    (case_dir / "capability.json").write_text(
+        json.dumps(evidence, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    return evidence
+
+
 def _framework_case(context: SmokeContext, run_dir: Path) -> dict[str, Any]:
     required = (
         "FRAMEWORK_PROBE_PROVIDER_BULK_PASS",
@@ -411,7 +565,7 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
         cas_commit=start_head,
         apk_paths=apk_paths.values(),
     )
-    _validate_api_device(metadata, expected_api)
+    _validate_api_device(metadata, expected_api, args.expected_page_size)
     (run_dir / "device-metadata.json").write_text(
         json.dumps(metadata, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
@@ -557,13 +711,110 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
     # without introducing an ABI/cross-bitness assertion into the API33/API34/API35 task.
     cases.append(
         _check_case(
-        context,
-        run_dir,
-        case_id="CAP-WEBVIEW-CLASSLOADER-NATIVE",
-        component="com.warden.controlledsandbox.fixture.MainActivity",
-        required=("NATIVE_LOAD JNI_LOADED",),
-        forbidden=("FATAL EXCEPTION", "ANR in", "JNI_UNAVAILABLE"),
-        wait_seconds=30.0,
+            context,
+            run_dir,
+            case_id="CAP-WEBVIEW-CLASSLOADER-NATIVE",
+            component="com.warden.controlledsandbox.fixture.MainActivity",
+            required=("NATIVE_LOAD JNI_LOADED",),
+            forbidden=("FATAL EXCEPTION", "ANR in", "JNI_UNAVAILABLE"),
+            wait_seconds=30.0,
+        )
+    )
+
+    # Native-specific coverage remains in the shared capability runner.  The first case
+    # records the actual Guest ClassLoader/JNI/native-hook path; the two C3 commands exercise
+    # proc/FD mediation and native page-size/media/dlopen paths; the adversarial service is an
+    # observation-only boundary audit and records raw-syscall limitations separately.
+    cases.append(
+        _debug_command_case(
+            context,
+            run_dir,
+            case_id="CAP-NATIVE-LOADER-JNI-HOOKS",
+            command="launch-component",
+            package=GUEST_PACKAGE,
+            extras={"component": "com.warden.controlledsandbox.fixture.MainActivity"},
+            required=(
+                "NATIVE_LOAD JNI_LOADED",
+                "NATIVE_PROBE ",
+                "PROBE nativeLoadDiagnostic=true",
+                "LOADER site=guest.dex",
+                "SO api=dlopen requested=libcontrolled_sandbox_fixture.so",
+            ),
+            forbidden=(
+                "FATAL EXCEPTION",
+                "ANR in",
+                "JNI_UNAVAILABLE",
+                "NATIVE_FILE_HOOK_INSTALL_FAILED",
+                "NATIVE_FILE_HOOK_REFRESH_FAILED",
+                "NATIVE_PROCESS_LIFETIME_HOOK_INSTALL_FAILED",
+                "NATIVE_PROCESS_LIFETIME_HOOK_REFRESH_FAILED",
+            ),
+            expected_operations=("LAUNCH_PASS",),
+            wait_seconds=45.0,
+        )
+    )
+    cases.append(
+        _debug_command_case(
+            context,
+            run_dir,
+            case_id="CAP-NATIVE-PROC-FD",
+            command="c3-t02-file-proc-network-fd",
+            package=GUEST_PACKAGE,
+            required=(
+                "RESULT_BEGIN",
+                "RESULT_END",
+                "C3-T02-FS-001",
+                "C3-T02-PROC-001",
+                "C3-T02-NET-001",
+                "C3-T02-FD-001",
+                "C3-T02-FD-002",
+                "C3-T02-FD-003",
+                "C3-T02-RAW-001",
+            ),
+            forbidden=("JNI_UNAVAILABLE", "FATAL EXCEPTION", "ANR in"),
+            expected_operations=("LAUNCH_PASS", "LAUNCH_ACCEPTED"),
+            wait_seconds=60.0,
+        )
+    )
+    cases.append(
+        _debug_command_case(
+            context,
+            run_dir,
+            case_id="CAP-NATIVE-MEDIA-16K",
+            command="c3-t03-native-media",
+            package=GUEST_PACKAGE,
+            required=(
+                f"C3_T03_NATIVE_MEDIA_RESULT_END status=PASS abi=x86_64 pageSize={args.expected_page_size}",
+            ),
+            forbidden=(
+                "C3_T03_NATIVE_MEDIA_FAIL",
+                "JNI_UNAVAILABLE",
+                "FATAL EXCEPTION",
+                "ANR in",
+            ),
+            expected_operations=("LAUNCH_PASS", "LAUNCH_ACCEPTED"),
+            wait_seconds=75.0,
+        )
+    )
+    cases.append(
+        _debug_command_case(
+            context,
+            run_dir,
+            case_id="CAP-NATIVE-ADVERSARIAL-BOUNDARY",
+            command="native-adversarial",
+            package=GUEST_PACKAGE,
+            required=(
+                "SERVICE_BEGIN context=IN_SANDBOX",
+                "CASE NATIVE-ADV-001 done",
+                "CASE NATIVE-ADV-010 done",
+            ),
+            forbidden=("FATAL EXCEPTION", "ANR in", "JNI_UNAVAILABLE"),
+            expected_limitation_markers=(
+                "Fatal signal 31 (SIGSYS), code 1 (SYS_SECCOMP)",
+                "SERVICE_BEGIN context=IN_SANDBOX",
+                "CASE NATIVE-ADV-010 done",
+            ),
+            wait_seconds=30.0,
         )
     )
 
@@ -573,11 +824,13 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
         "fail": sum(item["status"] == "FAIL" for item in cases),
         "skip": sum(item["status"] == "SKIP" for item in cases),
         "not_in_current_scope": sum(item["status"] == "NOT_IN_CURRENT_SCOPE" for item in cases),
+        "expected_limitation": sum(item["status"] == "EXPECTED_LIMITATION" for item in cases),
     }
     payload = {
         "run_id": run_id,
         "start_head": start_head,
         "final_head": start_head,
+        "expected_page_size": args.expected_page_size,
         "started_at": _now(),
         "device_metadata": metadata,
         "setup_installs": installs,
@@ -589,6 +842,7 @@ def run(args: argparse.Namespace) -> tuple[int, Path, dict[str, Any]]:
             "AppWidget dynamic host/provider fixture is not present and is explicit NOT_IN_CURRENT_SCOPE.",
             f"32-bit Companion/cross-bitness is deferred to C6-T02; fixture32 x86_64 is used for identity routing on API{expected_api}.",
             f"API{expected_api} NOT_EXPORTED dynamic receiver is exercised by a same-Guest send; adb-shell external delivery is not treated as equivalent.",
+            "Native adversarial raw-syscall BYPASS_CONFIRMED observations are retained as an expected boundary limitation, not converted into a product PASS claim.",
         ],
         "evidence_root": run_dir.relative_to(ROOT).as_posix(),
         "finished_at": _now(),
@@ -601,11 +855,17 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--serial", required=True)
     parser.add_argument("--instance-name", default="C6_T01B_API33_GoogleApis_x86_64")
-    parser.add_argument("--api32", action="store_true", help="Require API 32 x86_64/4096 device contract")
-    parser.add_argument("--api34", action="store_true", help="Require API 34 x86_64/4096 device contract")
-    parser.add_argument("--api35", action="store_true", help="Require API 35 x86_64/4096 device contract")
-    parser.add_argument("--api36", action="store_true", help="Require API 36 x86_64/4096 device contract")
-    parser.add_argument("--api37", action="store_true", help="Require API 37 x86_64/4096 device contract")
+    parser.add_argument("--api32", action="store_true", help="Require API 32 x86_64 device contract")
+    parser.add_argument("--api34", action="store_true", help="Require API 34 x86_64 device contract")
+    parser.add_argument("--api35", action="store_true", help="Require API 35 x86_64 device contract")
+    parser.add_argument("--api36", action="store_true", help="Require API 36 x86_64 device contract")
+    parser.add_argument("--api37", action="store_true", help="Require API 37 x86_64 device contract")
+    parser.add_argument(
+        "--expected-page-size",
+        type=int,
+        default=4096,
+        help="Require this runtime page size for the selected API lane (default: 4096)",
+    )
     parser.add_argument("--run-id", default="")
     parser.add_argument("--output-root", default=str(DEFAULT_OUTPUT_ROOT))
     return parser
@@ -625,6 +885,7 @@ def main() -> int:
         "pass": payload["summary"]["pass"],
         "fail": payload["summary"]["fail"],
         "skip": payload["summary"]["skip"],
+        "expected_limitation": payload["summary"]["expected_limitation"],
         "exit_code": code,
     }, ensure_ascii=False))
     return code

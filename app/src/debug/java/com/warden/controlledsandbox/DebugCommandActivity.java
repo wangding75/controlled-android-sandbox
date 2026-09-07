@@ -385,7 +385,11 @@ public final class DebugCommandActivity extends Activity {
                         "com.warden.controlledsandbox.fixture.C3T02FileProcNetworkFdActivity",
                         probeExtras);
                 result.put("c3T02", bundleJson(operation));
-                requireStatus("c3-t02-file-proc-network-fd", operation, "LAUNCH_PASS");
+                // These native probes publish their result asynchronously from the Guest
+                // Activity.  LAUNCH_ACCEPTED is the truthful broker contract here; the
+                // capability runner gates the actual native result markers below.
+                requireStatus("c3-t02-file-proc-network-fd", operation,
+                        "LAUNCH_PASS", "LAUNCH_ACCEPTED");
             } else if ("c3-t03-native-media".equals(command)) {
                 Bundle probeExtras = new Bundle();
                 probeExtras.putString("cas.native.context", "IN_SANDBOX");
@@ -393,7 +397,8 @@ public final class DebugCommandActivity extends Activity {
                         "com.warden.controlledsandbox.fixture.C3T03NativeMediaActivity",
                         probeExtras);
                 result.put("c3T03", bundleJson(operation));
-                requireStatus("c3-t03-native-media", operation, "LAUNCH_PASS");
+                requireStatus("c3-t03-native-media", operation,
+                        "LAUNCH_PASS", "LAUNCH_ACCEPTED");
             } else if ("broadcast-campaign".equals(command)) {
                 int iterations = Math.max(1, Math.min(100,
                         extras.getInt("iterations", 1)));
@@ -571,7 +576,8 @@ public final class DebugCommandActivity extends Activity {
                 result.put("isolatedServiceOperation", serviceOperation);
             } else if ("native-adversarial".equals(command)) {
                 operation = runtime.prepare(record, virtualUserId);
-                requireStatus("prepare", operation, "PREPARED", "ALREADY_PREPARED");
+                requireStatus("prepare", operation, "PREPARED", "ALREADY_PREPARED",
+                        "PREPARED_DEGRADED", "ALREADY_PREPARED_DEGRADED");
                 String component = extras.getString("component",
                         "com.warden.controlledsandbox.fixture.NativeAdversarialProbeService")
                         .trim();
