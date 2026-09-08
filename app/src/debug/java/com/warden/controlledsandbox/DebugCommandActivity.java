@@ -265,6 +265,24 @@ public final class DebugCommandActivity extends Activity {
                 return;
             }
             if (packageName.trim().isEmpty()) throw new IllegalArgumentException("package extra is required");
+            // Bootstrap probe for external verification only.  It deliberately acquires both
+            // NBB/VA-style service boundaries without importing, ensuring an instance, or
+            // changing a policy.  A cold Host APK update can publish Runtime Broker and Package
+            // Management Service on different scheduler turns; callers must establish this
+            // read-only boundary before issuing a single-attempt package mutation.
+            if ("runtime-package-ready".equals(command)) {
+                runtime = new RuntimeClient(this);
+                runtime.primeOperationOwner(requestId, operationId);
+                packages = new PackageServiceClient(this);
+                SandboxRecord existing = packages.findRecord(packageName);
+                JSONObject readiness = new JSONObject()
+                        .put(RuntimeKeys.STATUS, "RUNTIME_PACKAGE_READY")
+                        .put("recordPresent", existing != null);
+                result.put("operation", readiness);
+                result.put("status", "PASS");
+                Log.i(TAG, "PASS runtime-package-ready " + packageName);
+                return;
+            }
             // Keep the command's foreground owner edge to Runtime Broker alive before package
             // lookup.  A running large Guest must remain attached to the NBB/VA-style virtual
             // ProcessRecord owner while lookup/import resolves the next operation; creating the
@@ -375,9 +393,42 @@ public final class DebugCommandActivity extends Activity {
                 // Framework probes are non-visual Activities.  Keep the launch owner alive
                 // through the generic onCreate boundary, then let the probe markers establish
                 // its framework semantics; a first-frame gate is not applicable here.
+                String providerComponent = extras.getString("prewarmProviderComponent", "").trim();
+                if (!providerComponent.isEmpty()) {
+                    String providerProcess = extras.getString("prewarmProviderProcess", "").trim();
+                    String providerAuthority = extras.getString("prewarmProviderAuthority", "").trim();
+                    if (providerAuthority.isEmpty()) throw new IllegalArgumentException(
+                            "prewarmProviderAuthority is required with prewarmProviderComponent");
+                    Bundle provider = runtime.prepareProvider(record, virtualUserId,
+                            providerComponent, providerProcess, providerAuthority);
+                    requireStatus("launch-component-provider-prepare", provider,
+                            "PROVIDER_READY", "PROVIDER_ALREADY_READY",
+                            "PROVIDER_AUTHORITY_ATTACHED");
+                    result.put("providerPrewarm", bundleJson(provider));
+                }
                 operation = runtime.launchComponentAwaitingActivityCreated(record, virtualUserId,
                         component, componentIntentExtras(extras));
                 requireStatus("launch-component", operation, "LAUNCH_PASS");
+            } else if ("p1-04-bootstrap-suite".equals(command)) {
+                String component = extras.getString("component", "").trim();
+                if (component.isEmpty()) {
+                    throw new IllegalArgumentException("component extra is required");
+                }
+                int launches = Math.max(2, Math.min(6, extras.getInt("launches", 6)));
+                JSONArray attempts = new JSONArray();
+                for (int index = 1; index <= launches; index++) {
+                    Bundle launch = runtime.launchComponentAwaitingActivityCreated(record,
+                            virtualUserId, component, componentIntentExtras(extras));
+                    requireStatus("p1-04-bootstrap-" + index, launch, "LAUNCH_PASS");
+                    JSONObject entry = bundleJson(launch);
+                    entry.put("attempt", index).put("mode", index == 1 ? "cold" : "hot");
+                    attempts.put(entry);
+                }
+                result.put("bootstrapAttempts", attempts);
+                operation = new Bundle();
+                operation.putString(RuntimeKeys.STATUS, "P1_04_BOOTSTRAP_SUITE_PASS");
+                operation.putInt("coldAttempts", 1);
+                operation.putInt("hotAttempts", launches - 1);
             } else if ("c3-t02-file-proc-network-fd".equals(command)) {
                 Bundle probeExtras = new Bundle();
                 probeExtras.putString("cas.native.context", "IN_SANDBOX");
@@ -981,6 +1032,9 @@ public final class DebugCommandActivity extends Activity {
 
     private static Bundle componentIntentExtras(Bundle extras) {
         Bundle result = new Bundle();
+        if (extras.getBoolean("p105CasMode", false)) {
+            result.putBoolean("p105CasMode", true);
+        }
         if (extras.getBoolean("skipCrossPackageProbes", false)) {
             result.putBoolean("skipCrossPackageProbes", true);
         }
@@ -1014,6 +1068,12 @@ public final class DebugCommandActivity extends Activity {
         if (extras.containsKey("cameraRecoveryDelayMs")) {
             result.putLong("c2t04RecoveryDelayMs",
                     Math.max(0L, extras.getLong("cameraRecoveryDelayMs", 500L)));
+        }
+        // P1-08 keeps its expected policy values inside the Guest fixture so the Activity
+        // validates the delivered Intent as well as the external runner validating its marker.
+        for (String key : new String[] {"p108ExpectedCameraPermission",
+                "p108ExpectedCameraAppOp", "p108ExpectedInternetPermission"}) {
+            if (extras.containsKey(key)) result.putInt(key, extras.getInt(key));
         }
         return result;
     }
@@ -1523,6 +1583,9 @@ public final class DebugCommandActivity extends Activity {
         copyIfPresent(bundle, out, "internetPermission");
         copyIfPresent(bundle, out, "cameraAppOp");
         copyIfPresent(bundle, out, "recordAudioAppOp");
+        copyIfPresent(bundle, out, "frameworkReadiness");
+        copyIfPresent(bundle, out, "frameworkPmsAppOpsPermissionHooksReady");
+        copyIfPresent(bundle, out, "frameworkMandatoryHooksFailed");
         copyIfPresent(bundle, out, "permissionCount");
         copyIfPresent(bundle, out, "appOpCount");
         copyIfPresent(bundle, out, "cameraAppOpPolicy");

@@ -246,6 +246,36 @@ public final class GuestRuntimeEnvironment {
         }
     }
 
+    /**
+     * Records the last completed bootstrap boundary independently of the broad performance
+     * trace.  A failed stage deliberately has no synthetic recovery marker: callers receive the
+     * same first exception plus the exact factory/LoadedApk/Application/Provider boundary that
+     * was active when it escaped.
+     */
+    private static void bootstrapTrace(String stage, GuestPackageSpec spec, long started,
+                                       Throwable error) {
+        Bundle snapshot = new Bundle();
+        snapshot.putString(RuntimeKeys.REQUEST_ID, spec == null ? "" : spec.requestId);
+        snapshot.putString(RuntimeKeys.OPERATION_ID, spec == null ? "" : spec.operationId);
+        snapshot.putString(RuntimeKeys.PACKAGE_NAME, spec == null ? "" : spec.packageName);
+        snapshot.putString(RuntimeKeys.SESSION_ID, spec == null ? "" : spec.sessionId);
+        snapshot.putLong(RuntimeKeys.GENERATION, spec == null ? 0L : spec.generation);
+        snapshot.putString(RuntimeKeys.LAUNCH_STAGE, stage == null ? "" : stage);
+        snapshot.putLong(RuntimeKeys.LAUNCH_STAGE_AT_ELAPSED_MS,
+                Math.max(0L, android.os.SystemClock.elapsedRealtime() - started));
+        snapshot.putInt("pid", Process.myPid());
+        if (error == null) {
+            snapshot.putString(RuntimeKeys.STATUS, "BOOTSTRAP_STAGE");
+            RuntimeEventLog.event("GUEST_BOOTSTRAP_STAGE", snapshot);
+        } else {
+            snapshot.putString(RuntimeKeys.STATUS, "BOOTSTRAP_FAILED");
+            snapshot.putString(RuntimeKeys.ERROR_TYPE, error.getClass().getName());
+            snapshot.putString(RuntimeKeys.ERROR_MESSAGE, String.valueOf(error.getMessage()));
+            snapshot.putString("stack", stackSummary(error));
+            RuntimeEventLog.event("GUEST_BOOTSTRAP_FAILED", snapshot);
+        }
+    }
+
     private static Bundle awaitPreparation(CompletableFuture<Bundle> future) {
         try {
             return future.get(PREPARATION_WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
@@ -264,7 +294,9 @@ public final class GuestRuntimeEnvironment {
 
     private static Bundle prepareOnCurrentThread(Context host, GuestPackageSpec spec) {
         long started = android.os.SystemClock.elapsedRealtime();
+        String bootstrapStage = "ENTRY";
         prepareTrace("CURRENT_THREAD_BEGIN", spec, "", started, null);
+        bootstrapTrace(bootstrapStage, spec, started, null);
         RuntimePerformanceTrace perf = new RuntimePerformanceTrace(
                 spec.requestId, spec.operationId, spec.packageName);
         Bundle result = new Bundle();
@@ -600,6 +632,8 @@ public final class GuestRuntimeEnvironment {
             // and NBB both make this distinction implicitly by letting LoadedApk own the loader;
             // passing the facade here makes VMRuntime report "Unsupported class loader" and
             // breaks native-bridge startup in apps such as Quark/Tinker.
+            bootstrapStage = "FACTORY_CLASSLOADER";
+            bootstrapTrace(bootstrapStage, spec, started, null);
             ClassLoader frameworkLoader = loader.definingLoader();
             ClassLoader processLoader = GuestComponentFactory.instantiateClassLoader(
                     frameworkLoader, appComponentFactory, guestContext.getApplicationInfo());
@@ -622,8 +656,12 @@ public final class GuestRuntimeEnvironment {
             stagedSession = session;
             loaderApkDescriptor = null;
             loaderNativeArchiveDescriptor = null;
+            bootstrapStage = "LOADED_APK_INSTALL";
+            bootstrapTrace(bootstrapStage, spec, started, null);
             session.loadedApkBridge = GuestLoadedApkBridge.install(session);
             Application application;
+            bootstrapStage = "APPLICATION_INSTANTIATE";
+            bootstrapTrace(bootstrapStage, spec, started, null);
             try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.APPLICATION_ATTACH)) {
                 application = guestContext.mainThread.call(
                         () -> instantiateApplication(spec, processLoader,
@@ -636,10 +674,14 @@ public final class GuestRuntimeEnvironment {
             // Guest Application into that exact LoadedApk before the session becomes READY;
             // otherwise Android will construct a second Application and apps with process-global
             // SDK state (for example Quark's platform client API) fail during Activity launch.
+            bootstrapStage = "APPLICATION_BIND";
+            bootstrapTrace(bootstrapStage, spec, started, null);
             session.loadedApkBridge.bindApplication(application);
             session.bindApplication(application);
             GuestNativeBindingDiagnostic.recordClass("application", application.getClass());
             stagedProcessIdentity.attachApplication(application);
+            bootstrapStage = "APPLICATION_ATTACH_BASE_CONTEXT";
+            bootstrapTrace(bootstrapStage, spec, started, null);
             guestContext.mainThread.run(() -> invokeNearestAttachBaseContext(application, guestContext));
             if (nativeHooksInstalled && !NativePolicy.refreshHooks()) {
                 throw new IllegalStateException("NATIVE_FILE_HOOK_REFRESH_FAILED_AFTER_APPLICATION_CREATE:"
@@ -677,9 +719,13 @@ public final class GuestRuntimeEnvironment {
             session.activityThreadInstrumentation = GuestActivityThreadInstrumentation.install(session);
             stagedHooks = null;
             stagedFrameworkCallRouter = null;
+            bootstrapStage = "PROVIDER_PREPARE";
+            bootstrapTrace(bootstrapStage, spec, started, null);
             try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.PROVIDER_PREPARE)) {
                 session.components.prepareDeclaredProviders();
             }
+            bootstrapStage = "APPLICATION_ONCREATE";
+            bootstrapTrace(bootstrapStage, spec, started, null);
             try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.APPLICATION_ONCREATE)) {
                 session.mainThread.run(application::onCreate);
             }
@@ -698,6 +744,8 @@ public final class GuestRuntimeEnvironment {
                         "NATIVE_PROCESS_LIFETIME_HOOK_REFRESH_FAILED_AFTER_APPLICATION_ONCREATE:"
                                 + NativePolicy.hookStatus());
             }
+            bootstrapStage = "READY";
+            bootstrapTrace(bootstrapStage, spec, started, null);
             Bundle ready = session.status("READY", started);
             RuntimeEventLog.event("GUEST_PREPARED", ready);
             prepareTrace("CURRENT_THREAD_RETURN", spec,
@@ -732,12 +780,14 @@ public final class GuestRuntimeEnvironment {
             result.putString(RuntimeKeys.STATUS, "FAILED");
             result.putString(RuntimeKeys.ERROR_TYPE, error.getClass().getName());
             result.putString(RuntimeKeys.ERROR_MESSAGE, String.valueOf(error.getMessage()));
+            result.putString(RuntimeKeys.LAUNCH_STAGE, bootstrapStage);
             result.putString("stack", stackSummary(error));
             result.putInt("pid", Process.myPid());
             result.putLong("durationMs", android.os.SystemClock.elapsedRealtime() - started);
             android.util.Log.e("CS_RUNTIME", "GUEST_PREPARE_FAILED_STACK\n"
                     + result.getString("stack", ""));
             RuntimeEventLog.event("GUEST_PREPARE_FAILED", result);
+            bootstrapTrace(bootstrapStage, spec, started, error);
             prepareTrace("CURRENT_THREAD_FAIL", spec,
                     result.getString(RuntimeKeys.ERROR_TYPE, "GUEST_PREPARE_FAILED"), started,
                     error);
@@ -1489,8 +1539,17 @@ public final class GuestRuntimeEnvironment {
     }
     private static String stackSummary(Throwable error) {
         StringBuilder out = new StringBuilder();
-        out.append(error).append('\n');
-        for (int i = 0; i < Math.min(error.getStackTrace().length, 24); i++) out.append("  at ").append(error.getStackTrace()[i]).append('\n');
+        Throwable current = error;
+        int depth = 0;
+        while (current != null && depth++ < 8) {
+            if (depth > 1) out.append("Caused by: ");
+            out.append(current).append('\n');
+            StackTraceElement[] trace = current.getStackTrace();
+            for (int i = 0; i < Math.min(trace.length, 64); i++) {
+                out.append("  at ").append(trace[i]).append('\n');
+            }
+            current = current.getCause();
+        }
         return out.toString();
     }
 
@@ -1646,6 +1705,16 @@ public final class GuestRuntimeEnvironment {
             out.putInt(RuntimeKeys.VIRTUAL_UID, spec.virtualUid);
             out.putString(RuntimeKeys.PROCESS_NAME, spec.processName);
             out.putString("frameworkReadiness", frameworkHooks.report().readiness().name());
+            // Keep the three identity-boundary hooks observable at the prepared-session
+            // boundary. A generic DEGRADED status may only describe an optional platform
+            // service (for example WifiScanner); it must not let PMS/AppOps/permission
+            // injection be mistaken for a successful identity boundary.
+            boolean identityHooksReady = frameworkHooks.report().installed("packageManager")
+                    && frameworkHooks.report().installed("appOps")
+                    && frameworkHooks.report().installed("permission");
+            out.putBoolean("frameworkPmsAppOpsPermissionHooksReady", identityHooksReady);
+            out.putString("frameworkMandatoryHooksFailed", String.join(",",
+                    frameworkHooks.report().mandatoryFailures()));
             out.putInt("pid", Process.myPid());
             out.putBoolean("frameworkActivityTransportInstalled", activityThreadInstrumentation != null);
             out.putBoolean("frameworkServiceTransportInstalled", serviceFrameworkBridge != null);
@@ -1730,6 +1799,12 @@ public final class GuestRuntimeEnvironment {
             }
             out.putString(RuntimeKeys.STATUS, effectiveStatus);
             out.putString("frameworkReadiness", frameworkHooks.report().readiness().name());
+            boolean identityHooksReady = frameworkHooks.report().installed("packageManager")
+                    && frameworkHooks.report().installed("appOps")
+                    && frameworkHooks.report().installed("permission");
+            out.putBoolean("frameworkPmsAppOpsPermissionHooksReady", identityHooksReady);
+            out.putString("frameworkMandatoryHooksFailed", String.join(",",
+                    frameworkHooks.report().mandatoryFailures()));
             out.putInt("pid", Process.myPid());
             // PROCESS_NAME is the logical declared owner used by the Broker session key. Keep
             // the actual Android hosting process in a separate diagnostic-only field so the

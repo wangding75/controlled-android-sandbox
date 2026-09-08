@@ -1,6 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
         android:name="com.warden.controlledsandbox.fixture.lifecycle.LifecycleApplication"
+        android:appComponentFactory="com.warden.controlledsandbox.fixture.lifecycle.LifecycleComponentFactory"
         android:allowBackup="false"
         android:label="CAS Lifecycle Fixture"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
@@ -11,5 +12,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <provider
+            android:name="com.warden.controlledsandbox.fixture.lifecycle.LifecycleProvider"
+            android:authorities="com.warden.controlledsandbox.fixture.lifecycle.bootstrap"
+            android:exported="false" />
     </application>
 </manifest>

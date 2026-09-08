@@ -155,6 +155,14 @@
             android:foregroundServiceType="dataSync">
             <meta-data android:name="cas.fixture.service_meta" android:value="service-main" />
         </service>
+        <service android:name="com.warden.controlledsandbox.fixture.P105NullBindingService"
+            android:exported="false" />
+        <service android:name="com.warden.controlledsandbox.fixture.P105DyingService"
+            android:exported="false" android:process=":p105_dying" />
+        <activity android:name="com.warden.controlledsandbox.fixture.P105ServiceSemanticsProbeActivity"
+            android:exported="true" />
+        <activity android:name="com.warden.controlledsandbox.fixture.P107PmsSignatureProbeActivity"
+            android:exported="false" android:noHistory="true" />
         <service android:name="com.warden.controlledsandbox.fixture.RemoteFixtureService" android:exported="false" android:process=":remote" />
         <service android:name="com.warden.controlledsandbox.fixture.IsolatedFixtureService" android:exported="false" android:isolatedProcess="true" />
         <service android:name="com.warden.controlledsandbox.fixture.IsolatedFaultNativeService"

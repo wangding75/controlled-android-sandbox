@@ -195,7 +195,7 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
             case "getReceiverInfo":
                 return component(args, VirtualPackageMetadata.Type.RECEIVER);
             case "getServiceInfo":
-                return component(args, VirtualPackageMetadata.Type.SERVICE);
+                return serviceComponent(method, args);
             case "getProviderInfo":
                 return component(args, VirtualPackageMetadata.Type.PROVIDER);
             case "activitySupportsIntent":
@@ -234,10 +234,7 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
                         identity.permissionPolicy().effectiveGrants());
             }
             case "resolveService": {
-                Intent intent = firstIntent(args);
-                return universe.resolve(identity.packageName(), intent,
-                        VirtualPackageMetadata.Type.SERVICE, firstLong(args, 0L),
-                        identity.permissionPolicy().effectiveGrants());
+                return resolveService(method, args);
             }
             case "queryIntentActivities":
             case "queryIntentActivitiesAsUser":
@@ -251,7 +248,7 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
                 return query(returnType, args, VirtualPackageMetadata.Type.RECEIVER);
             case "queryIntentServices":
             case "queryIntentServicesAsUser":
-                return query(returnType, args, VirtualPackageMetadata.Type.SERVICE);
+                return query(method, returnType, args, VirtualPackageMetadata.Type.SERVICE);
             case "queryIntentContentProviders":
             case "queryIntentContentProvidersAsUser":
                 return query(returnType, args, VirtualPackageMetadata.Type.PROVIDER);
@@ -512,6 +509,12 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
             android.util.Log.i("CS_PM_STUB_COMPONENT_ABSENT", "method=" + methodName);
             return new VisibilityDecision(targetPackage, false, null);
         }
+        if (!guestTarget && isQualifiedServiceLookup(methodName, args)) {
+            // The service helpers below perform a second, stricter owner check on the raw PMS
+            // result. Letting that check run is necessary to distinguish a real system Service
+            // from a host user app; this is not a general package-identity pass-through.
+            return new VisibilityDecision(targetPackage, false, NoResult.VALUE);
+        }
         if (visibility != null && !guestTarget
                 && PackageVisibilityPolicy.reportsAbsentWithoutProjector(visibility)
                 && isPackageIdentityMethod(methodName)
@@ -540,6 +543,16 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
                     hiddenPackageResult(methodName, returnType));
         }
         return new VisibilityDecision(targetPackage, guestTarget, NoResult.VALUE);
+    }
+
+    private static boolean isQualifiedServiceLookup(String methodName, Object[] args) {
+        if (!"getServiceInfo".equals(methodName) && !"resolveService".equals(methodName)
+                && !"queryIntentServices".equals(methodName)
+                && !"queryIntentServicesAsUser".equals(methodName)) return false;
+        if ("getServiceInfo".equals(methodName)) return firstComponent(args) != null;
+        Intent intent = firstIntent(args);
+        return intent != null && (intent.getComponent() != null
+                || (intent.getPackage() != null && !intent.getPackage().trim().isEmpty()));
     }
 
     /**
@@ -941,11 +954,102 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
         return universe.componentInfo(identity.packageName(), name, type, firstLong(args, 0L));
     }
 
+    /**
+     * Keeps the PackageManager surface aligned with the runtime Service router. A virtual
+     * component always wins; only a specifically addressed, exported system-owner Service can
+     * be projected from the physical PMS after the virtual lookup is absent.
+     */
+    private Object serviceComponent(Method method, Object[] args) throws Throwable {
+        Object virtual = component(args, VirtualPackageMetadata.Type.SERVICE);
+        if (virtual != null) return virtual;
+        ComponentName component = firstComponent(args);
+        Object raw = invokeDelegate(method, args);
+        return raw instanceof ServiceInfo service
+                && isAllowedHostService(new Intent().setComponent(component), service)
+                ? service : null;
+    }
+
+    private Object resolveService(Method method, Object[] args) throws Throwable {
+        Intent intent = firstIntent(args);
+        ResolveInfo virtual = universe.resolve(identity.packageName(), intent,
+                VirtualPackageMetadata.Type.SERVICE, firstLong(args, 0L),
+                identity.permissionPolicy().effectiveGrants());
+        if (virtual != null || !mayQueryHostService(intent)) return virtual;
+        Object raw = invokeDelegate(method, args);
+        if (!(raw instanceof ResolveInfo result)
+                || !isAllowedHostService(intent, result.serviceInfo)) return null;
+        return result;
+    }
+
     private Object query(Class<?> returnType, Object[] args, VirtualPackageMetadata.Type type) {
         Intent intent = firstIntent(args);
         List<ResolveInfo> matches = universe.query(identity.packageName(), intent, type,
                 firstLong(args, 0L), identity.permissionPolicy().effectiveGrants());
         return metadata.adaptCollection(matches, returnType);
+    }
+
+    private Object query(Method method, Class<?> returnType, Object[] args,
+                         VirtualPackageMetadata.Type type) throws Throwable {
+        Intent intent = firstIntent(args);
+        List<ResolveInfo> virtual = universe.query(identity.packageName(), intent, type,
+                firstLong(args, 0L), identity.permissionPolicy().effectiveGrants());
+        if (type != VirtualPackageMetadata.Type.SERVICE || !mayQueryHostService(intent)) {
+            return metadata.adaptCollection(virtual, returnType);
+        }
+        ArrayList<ResolveInfo> combined = new ArrayList<>(virtual);
+        LinkedHashSet<String> names = new LinkedHashSet<>();
+        for (ResolveInfo value : combined) names.add(serviceName(value));
+        for (Object value : collectionValues(invokeDelegate(method, args))) {
+            if (!(value instanceof ResolveInfo service)
+                    || !isAllowedHostService(intent, service.serviceInfo)
+                    || !names.add(serviceName(service))) continue;
+            combined.add(service);
+        }
+        return metadata.adaptCollection(combined, returnType);
+    }
+
+    private Object invokeDelegate(Method method, Object[] args) throws Throwable {
+        try {
+            return method.invoke(delegate, args);
+        } catch (InvocationTargetException error) {
+            throw error.getCause() == null ? error : error.getCause();
+        }
+    }
+
+    private boolean mayQueryHostService(Intent intent) {
+        if (intent == null) return false;
+        ComponentName component = intent.getComponent();
+        String packageName = component == null ? intent.getPackage() : component.getPackageName();
+        // No generic host enumeration, and never fall through to a physical installation whose
+        // package name is already part of the virtual universe.
+        return packageName != null && !packageName.trim().isEmpty()
+                && !universe.isVisibleTo(identity.packageName(), packageName);
+    }
+
+    private boolean isAllowedHostService(Intent intent, ServiceInfo info) {
+        if (info == null || info.applicationInfo == null || !info.enabled || !info.exported
+                || !isSystemOwner(info.applicationInfo)) return false;
+        String packageName = info.packageName == null ? "" : info.packageName.trim();
+        String applicationPackage = info.applicationInfo.packageName == null ? ""
+                : info.applicationInfo.packageName.trim();
+        if (packageName.isEmpty() || (!applicationPackage.isEmpty()
+                && !packageName.equals(applicationPackage))) return false;
+        ComponentName component = intent == null ? null : intent.getComponent();
+        if (component != null) return packageName.equals(component.getPackageName())
+                && info.name != null && info.name.equals(component.getClassName());
+        return intent != null && intent.getPackage() != null
+                && packageName.equals(intent.getPackage());
+    }
+
+    private static boolean isSystemOwner(ApplicationInfo info) {
+        // FLAG_UPDATED_SYSTEM_APP is 0x80 and is absent from the compact source stubs.
+        return info != null && (info.flags & (ApplicationInfo.FLAG_SYSTEM | 0x80)) != 0;
+    }
+
+    private static String serviceName(ResolveInfo value) {
+        if (value == null || value.serviceInfo == null) return "";
+        return (value.serviceInfo.packageName == null ? "" : value.serviceInfo.packageName)
+                + "/" + (value.serviceInfo.name == null ? "" : value.serviceInfo.name);
     }
 
     /**

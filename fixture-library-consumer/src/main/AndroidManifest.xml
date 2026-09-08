@@ -1,0 +1,20 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <queries>
+        <package android:name="com.warden.controlledsandbox.fixture.libraryprovider" />
+        <package android:name="com.warden.controlledsandbox.fixture32" />
+        <provider android:authorities="com.warden.controlledsandbox.fixture.libraryprovider.reentrant" />
+        <provider android:authorities="com.warden.controlledsandbox.fixture32.missing" />
+    </queries>
+    <application android:label="CAS P1 Library Consumer" android:allowBackup="false">
+        <!-- Optional preserves direct native installation; CAS resolves it only from an imported
+             provider revision in the same virtual package universe. -->
+        <uses-library android:name="cas.p1.fixture.provider" android:required="false" />
+        <activity android:name=".ProjectionConsumerActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity android:name=".LibraryProjectionActivity" android:exported="true" />
+    </application>
+</manifest>

@@ -32,14 +32,20 @@ public final class PmsPermissionAttributionProbeActivity extends Activity {
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
-        try {
-            JSONObject result = runProbe();
-            Log.i(TAG, "C2_T02_PROBE_PASS " + result);
-        } catch (Throwable error) {
-            Log.e(TAG, "C2_T02_PROBE_FAIL " + error, error);
-        } finally {
-            new Handler(Looper.getMainLooper()).postDelayed(this::finish, 250L);
-        }
+        // A cold Guest :provider bootstrap can synchronously re-enter the broker.  Run the
+        // complete probe away from Activity's UI thread so this fixture does not consume the
+        // dispatcher’s documented main-thread reentrancy budget.  The PM/AppOps/Resolver calls
+        // themselves and their virtual identity/permission assertions remain unchanged.
+        new Thread(() -> {
+            try {
+                JSONObject result = runProbe();
+                Log.i(TAG, "C2_T02_PROBE_PASS " + result);
+            } catch (Throwable error) {
+                Log.e(TAG, "C2_T02_PROBE_FAIL " + error, error);
+            } finally {
+                new Handler(Looper.getMainLooper()).postDelayed(this::finish, 250L);
+            }
+        }, "p1-08-probe").start();
     }
 
     private JSONObject runProbe() throws Exception {
@@ -83,6 +89,20 @@ public final class PmsPermissionAttributionProbeActivity extends Activity {
         int hostPackageCamera = packages.checkPermission(CAMERA, HOST_PACKAGE);
         int contextInternet = checkSelfPermission(INTERNET);
         if (contextCamera != packageCamera) throw new AssertionError("PERMISSION_PROJECTION_MISMATCH");
+        int expectedCameraPermission = getIntent().getIntExtra(
+                "p108ExpectedCameraPermission", Integer.MIN_VALUE);
+        if (expectedCameraPermission != Integer.MIN_VALUE
+                && contextCamera != expectedCameraPermission) {
+            throw new AssertionError("P1_08_CAMERA_PERMISSION_EXPECTED="
+                    + expectedCameraPermission + " actual=" + contextCamera);
+        }
+        int expectedInternetPermission = getIntent().getIntExtra(
+                "p108ExpectedInternetPermission", Integer.MIN_VALUE);
+        if (expectedInternetPermission != Integer.MIN_VALUE
+                && contextInternet != expectedInternetPermission) {
+            throw new AssertionError("P1_08_INTERNET_PERMISSION_EXPECTED="
+                    + expectedInternetPermission + " actual=" + contextInternet);
+        }
         if (hostPackageCamera != PackageManager.PERMISSION_DENIED) {
             throw new AssertionError("PERMISSION_HOST_PACKAGE_VISIBLE");
         }
@@ -110,6 +130,14 @@ public final class PmsPermissionAttributionProbeActivity extends Activity {
                 new Class<?>[] {String.class, String.class}, CAMERA_OP, getPackageName());
         invoke(appOpsType, appOps, "checkPackage", new Class<?>[] {int.class, String.class},
                 physicalUid, getPackageName());
+        int expectedCameraAppOp = getIntent().getIntExtra(
+                "p108ExpectedCameraAppOp", Integer.MIN_VALUE);
+        if (expectedCameraAppOp != Integer.MIN_VALUE
+                && (check != expectedCameraAppOp || note != expectedCameraAppOp
+                || start != expectedCameraAppOp || proxy != expectedCameraAppOp)) {
+            throw new AssertionError("P1_08_CAMERA_APPOPS_EXPECTED=" + expectedCameraAppOp
+                    + " actual=" + check + "/" + note + "/" + start + "/" + proxy);
+        }
 
         boolean hostAppOpsHidden = false;
         try {
@@ -152,7 +180,10 @@ public final class PmsPermissionAttributionProbeActivity extends Activity {
                         .put("callingAttributionPackage",
                                 callback.getString("callingAttributionPackage"))
                         .put("callingAttributionUid",
-                                callback.getInt("callingAttributionUid", -1)));
+                                callback.getInt("callingAttributionUid", -1)))
+                .put("p108ExpectedCameraPermission", expectedCameraPermission)
+                .put("p108ExpectedCameraAppOp", expectedCameraAppOp)
+                .put("p108ExpectedInternetPermission", expectedInternetPermission);
     }
 
     private JSONObject attributionJson() throws Exception {

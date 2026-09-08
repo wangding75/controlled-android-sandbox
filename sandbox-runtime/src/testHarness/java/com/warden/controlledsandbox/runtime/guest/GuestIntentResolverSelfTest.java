@@ -118,6 +118,10 @@ public final class GuestIntentResolverSelfTest {
 
         FakeHostPackageManager hostPms = new FakeHostPackageManager();
         GuestIntentResolver hostResolver = new GuestIntentResolver(spec, packageManager, hostPms);
+        GuestIntentResolver.Target virtualBeforeHost = hostResolver.resolveOptionalService(service);
+        require(!virtualBeforeHost.hostOwned()
+                        && "guest.pkg.SyncService".equals(virtualBeforeHost.className()),
+                "virtual Service resolves before the raw host owner path");
         GuestIntentResolver.Target hostService = hostResolver.resolveOne(
                 new Intent("android.soter.ISoterService").setPackage("host.system.service"),
                 GuestIntentResolver.Kind.SERVICE);
@@ -126,6 +130,10 @@ public final class GuestIntentResolverSelfTest {
                         && "host.system.service".equals(hostService.packageName())
                         && "host.system.service.SoterService".equals(hostService.className()),
                 "package-constrained system Service resolves through the host owner route");
+        require(hostResolver.resolveOptionalService(new Intent("guest.action.MISSING")) == null,
+                "missing optional Service has an absence result rather than a routing exception");
+        require(hostResolver.resolveOptionalService(new Intent("android.soter.ISoterService")) == null,
+                "unqualified implicit Service cannot enumerate the host system owner route");
 
         Intent broadcast = new Intent("guest.action.NOTIFY").setPackage("guest.pkg");
         List<GuestIntentResolver.Target> receivers = resolver.resolveReceivers(broadcast);
@@ -246,6 +254,11 @@ public final class GuestIntentResolverSelfTest {
             info.applicationInfo.flags = android.content.pm.ApplicationInfo.FLAG_SYSTEM;
             result.serviceInfo = info;
             return result;
+        }
+
+        public List<ResolveInfo> queryIntentServices(Intent intent, String resolvedType,
+                                                      long flags, int userId) {
+            return List.of();
         }
     }
 

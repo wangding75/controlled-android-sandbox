@@ -148,15 +148,17 @@ public final class SharedLibraryResolver {
     private AvailableLibrary select(ManifestModel.SharedLibraryDependency dependency) {
         List<AvailableLibrary> versions = available.get(dependency.key());
         if (versions == null || versions.isEmpty()) return null;
+        AvailableLibrary versionCandidate = null;
         for (AvailableLibrary candidate : versions) {
             if (dependency.version() > 0 && candidate.version() != dependency.version()) continue;
+            if (versionCandidate == null) versionCandidate = candidate;
             if (!dependency.certificateDigest().isEmpty()
                     && !dependency.certificateDigest().equals(candidate.certificateDigest())) continue;
             return candidate;
         }
-        // Preserve a useful version/certificate mismatch diagnostic by returning the best
-        // version candidate when no exact candidate satisfies the dependency.
-        return versions.get(0);
+        // Preserve a useful rejection diagnostic: a matching version with an unmatched
+        // certificate must not be replaced by the newest incompatible revision.
+        return versionCandidate == null ? versions.get(0) : versionCandidate;
     }
 
     private static boolean sameIdentity(AvailableLibrary left, AvailableLibrary right) {

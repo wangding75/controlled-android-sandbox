@@ -58,28 +58,20 @@ final class GuestIntentResolver {
 
     Target resolveOne(Intent intent, Kind kind) {
         if (intent == null) throw new IllegalArgumentException("intent is required");
+        if (kind == Kind.SERVICE) {
+            Target service = resolveOptionalService(intent);
+            if (service != null) return service;
+            throw new IllegalArgumentException("NO_GUEST_SERVICE_MATCH");
+        }
         ResolveInfo resolved;
         switch (kind) {
             case ACTIVITY -> resolved = packageManager.resolveActivity(intent,
                     PackageManager.MATCH_DEFAULT_ONLY);
-            case SERVICE -> resolved = packageManager.resolveService(intent, 0);
             case RECEIVER -> {
                 List<ResolveInfo> matches = packageManager.queryBroadcastReceivers(intent, 0);
                 resolved = matches == null || matches.isEmpty() ? null : matches.get(0);
             }
             default -> throw new AssertionError(kind);
-        }
-        if (resolved == null && kind == Kind.SERVICE) {
-            ServiceInfo hostService = HostPackageManagerBridge.resolveService(
-                    hostPackageManagerService, intent, HostPackageManagerBridge.physicalUserId());
-            if (isAllowedHostService(hostService)) {
-                Target target = hostTarget(hostService);
-                android.util.Log.i("CS_GUEST_SERVICE_ROUTE", "owner=HOST_SYSTEM package="
-                        + target.packageName() + " component=" + target.className()
-                        + " process=" + target.processName() + " caller=" + spec.packageName
-                        + " action=" + value(intent.getAction()) + " user=" + spec.virtualUserId);
-                return target;
-            }
         }
         if (resolved == null) {
             logResolutionFailure(intent, kind);
@@ -94,14 +86,85 @@ final class GuestIntentResolver {
         return target;
     }
 
-    private boolean isAllowedHostService(ServiceInfo info) {
+    /**
+     * Resolves a Service for Context APIs whose Android contract has an absence return value.
+     * A null here means that no virtual or explicitly constrained eligible system owner exists;
+     * it does not represent a policy, transport, parse, or permission error.
+     */
+    Target resolveOptionalService(Intent intent) {
+        if (intent == null) throw new IllegalArgumentException("intent is required");
+        ResolveInfo resolved = packageManager.resolveService(intent, 0);
+        if (resolved != null) {
+            Target target = target(resolved, Kind.SERVICE);
+            android.util.Log.i("CS_GUEST_RESOLVE", "kind=SERVICE component="
+                    + target.className() + " process=" + target.processName()
+                    + " caller=" + spec.packageName + " processName=" + spec.processName
+                    + " user=" + spec.virtualUserId + " revision=" + spec.packageRevision);
+            return target;
+        }
+        rejectExplicitVirtualServiceAccess(intent);
+        boolean hostAddressed = hasHostServiceAddress(intent);
+        HostPackageManagerBridge.Lookup<ServiceInfo> hostLookup = !hostAddressed
+                || hostPackageManagerService == null ? null
+                : HostPackageManagerBridge.resolveService(hostPackageManagerService, intent,
+                        HostPackageManagerBridge.physicalUserId());
+        if (hostLookup != null && !hostLookup.isResult() && !hostLookup.isEmpty()) {
+            throw new IllegalStateException("HOST_PMS_SERVICE_LOOKUP_FAILED:"
+                    + hostLookup.diagnostic());
+        }
+        ServiceInfo hostService = hostLookup == null ? null : hostLookup.value();
+        if (isAllowedHostService(intent, hostService)) {
+            Target target = hostTarget(hostService);
+            android.util.Log.i("CS_GUEST_SERVICE_ROUTE", "owner=HOST_SYSTEM package="
+                    + target.packageName() + " component=" + target.className()
+                    + " process=" + target.processName() + " caller=" + spec.packageName
+                    + " action=" + value(intent.getAction()) + " user=" + spec.virtualUserId);
+            return target;
+        }
+        if (hostService != null && hostAddressed) {
+            // The raw PMS did find a Service, but it is not an eligible system owner. This is a
+            // policy denial, not a normal optional-Service absence and must not turn into a bind
+            // to the physical user app.
+            throw new SecurityException("HOST_SERVICE_OWNER_DENIED");
+        }
+        logResolutionFailure(intent, Kind.SERVICE);
+        return null;
+    }
+
+    private void rejectExplicitVirtualServiceAccess(Intent intent) {
+        ComponentName component = intent == null ? null : intent.getComponent();
+        if (component == null) return;
+        ServiceInfo info = explicitServiceInfo(component);
+        if (info == null || !isVirtualPackage(value(info.packageName)) || !info.enabled
+                || spec.packageName.equals(info.packageName)) return;
+        if (!info.exported) throw new SecurityException("VIRTUAL_SERVICE_NOT_EXPORTED");
+        if (!value(info.permission).isEmpty()) {
+            throw new SecurityException("VIRTUAL_SERVICE_PERMISSION_DENIED");
+        }
+    }
+
+    private boolean hasHostServiceAddress(Intent intent) {
+        return intent != null && (intent.getComponent() != null
+                || !value(intent.getPackage()).isEmpty());
+    }
+
+    private boolean isAllowedHostService(Intent intent, ServiceInfo info) {
         if (info == null || info.applicationInfo == null || !info.enabled || !info.exported) {
             return false;
         }
+        // An unqualified implicit Intent must never enumerate or bind arbitrary host system
+        // services. Only an explicit component or a package-constrained lookup can opt into
+        // the narrow system-owner route.
+        ComponentName requested = intent == null ? null : intent.getComponent();
+        String requestedPackage = intent == null ? "" : value(intent.getPackage());
         String packageName = value(info.packageName);
         String applicationPackage = value(info.applicationInfo.packageName);
         if (packageName.isEmpty() || (!applicationPackage.isEmpty()
                 && !packageName.equals(applicationPackage))) return false;
+        if (requested != null && (!packageName.equals(requested.getPackageName())
+                || !value(info.name).equals(requested.getClassName()))) return false;
+        if (requested == null && (requestedPackage.isEmpty()
+                || !packageName.equals(requestedPackage))) return false;
         // A package already in the virtual universe is Guest-owned even if the raw host PMS
         // still has a physical installation with the same package name.
         if (isVirtualPackage(packageName)) return false;
@@ -156,12 +219,16 @@ final class GuestIntentResolver {
             line.append(" candidateQueryError=").append(oneLine(error.toString()));
         }
         line.append(" candidates=").append(candidateList(candidates, kind));
-        if (kind == Kind.SERVICE && hostPackageManagerService != null) {
-            ServiceInfo host = HostPackageManagerBridge.resolveService(hostPackageManagerService,
-                    intent, HostPackageManagerBridge.physicalUserId());
+        if (kind == Kind.SERVICE && hostPackageManagerService != null
+                && hasHostServiceAddress(intent)) {
+            HostPackageManagerBridge.Lookup<ServiceInfo> hostLookup =
+                    HostPackageManagerBridge.resolveService(hostPackageManagerService, intent,
+                            HostPackageManagerBridge.physicalUserId());
+            ServiceInfo host = hostLookup.value();
             line.append(" hostCandidate=").append(serviceCandidate(host))
-                    .append(" hostOwner=").append(isAllowedHostService(host)
-                            ? "HOST_SYSTEM" : "NOT_ROUTABLE");
+                    .append(" hostOwner=").append(isAllowedHostService(intent, host)
+                            ? "HOST_SYSTEM" : "NOT_ROUTABLE")
+                    .append(" hostLookup=").append(hostLookup.diagnostic());
         }
         String rejection = candidates == null || candidates.isEmpty()
                 ? "NO_FILTER_OR_VISIBLE_CANDIDATE" : "CANDIDATE_REJECTED_BY_RESOLVE";
@@ -178,19 +245,25 @@ final class GuestIntentResolver {
 
     private String explicitComponentInfo(ComponentName component, Kind kind) {
         if (kind != Kind.SERVICE || component == null) return "NA";
+        ServiceInfo info = explicitServiceInfo(component);
+        return info == null ? "null" : serviceCandidate(info);
+    }
+
+    private ServiceInfo explicitServiceInfo(ComponentName component) {
         try {
             java.lang.reflect.Method method = packageManager.getClass().getMethod(
                     "getServiceInfo", ComponentName.class, int.class);
             Object value = method.invoke(packageManager, component, 0);
-            if (!(value instanceof ServiceInfo info)) return "null";
-            return serviceCandidate(info);
+            return value instanceof ServiceInfo info ? info : null;
         } catch (java.lang.reflect.InvocationTargetException error) {
             Throwable cause = error.getCause() == null ? error : error.getCause();
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(cause);
-            return "error=" + oneLine(cause.toString());
+            if (cause instanceof PackageManager.NameNotFoundException) return null;
+            if (cause instanceof RuntimeException runtime) throw runtime;
+            throw new IllegalStateException("SERVICE_INFO_QUERY_FAILED", cause);
         } catch (Throwable error) {
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-            return "error=" + oneLine(error.toString());
+            return null;
         }
     }
 

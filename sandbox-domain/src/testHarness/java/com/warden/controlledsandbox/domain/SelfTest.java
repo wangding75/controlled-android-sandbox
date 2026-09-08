@@ -354,6 +354,15 @@ public final class SelfTest {
         require(!failure.successful() && failure.missingRequired().size() == 1
                         && failure.errors().get(0).contains("version mismatch"),
                 "required shared library version mismatch fails closed");
+
+        SharedLibraryResolver.Resolution certificateFailure = resolver.resolve(java.util.List.of(
+                new ManifestModel.SharedLibraryDependency(
+                        ManifestModel.SharedLibraryDependency.Kind.SDK,
+                        "com.example.sdk", true, 3, "c".repeat(64))));
+        require(!certificateFailure.successful()
+                        && certificateFailure.missingRequired().size() == 1
+                        && certificateFailure.errors().get(0).contains("certificate mismatch"),
+                "required shared library certificate mismatch fails closed");
     }
 
     private static void testSlotPool() {

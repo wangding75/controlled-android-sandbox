@@ -1,0 +1,15 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace = 'com.warden.controlledsandbox.fixture.libraryconsumer'
+    compileSdk = rootProject.ext.controlledCompileSdk
+    buildToolsVersion rootProject.ext.controlledBuildTools
+
+    defaultConfig {
+        applicationId 'com.warden.controlledsandbox.fixture.libraryconsumer'
+        minSdk = rootProject.ext.controlledMinSdk
+        targetSdk = rootProject.ext.controlledTargetSdk
+        versionCode 1
+        versionName '1.0'
+    }
+}

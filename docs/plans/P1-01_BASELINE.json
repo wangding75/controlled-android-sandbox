@@ -1,0 +1,123 @@
+{
+  "task_id": "P1-01",
+  "status": "DONE",
+  "completed_at": "2026-09-08T10:45:36+08:00",
+  "cas": {
+    "repository": "D:/github/controlled-android-sandbox",
+    "branch": "feature/t57-r03-va-pro-capability-campaign",
+    "head": "40f629d03bbb0927f171a0e318c242398d8a141d",
+    "head_subject": "REALAPP-COMPAT-02: diagnose shared library provider and component routing blockers",
+    "tracked_dirty_diff": "clean",
+    "untracked_paths_at_freeze": ["out/"],
+    "head_parent": "51c53726572ec24215880d92bbfaa401f03c139a",
+    "realapp_compat_02_change": {
+      "file_count": 15,
+      "insertions": 930,
+      "deletions": 22,
+      "files": [
+        "app/src/main/java/com/warden/controlledsandbox/VirtualPackageStateBuilder.java",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualSharedLibrarySnapshot.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/packagemanager/PackageManagerInvocationHandler.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestApplicationInfoFactory.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestContentProviderFrameworkInterceptor.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestContext.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestContextComponentRouter.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestIntentResolver.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestPendingIntentDispatcher.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestSharedLibraryPathResolver.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/HostPackageManagerBridge.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/GuestBrokerContentProviderSelfTest.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/GuestIntentResolverSelfTest.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/GuestSharedLibraryPathResolverSelfTest.java"
+      ]
+    }
+  },
+  "references": {
+    "newblackbox": {
+      "head": "89b59836c66f173756a4ae258cf379a957649820",
+      "file": "D:/github/t57-reference-sources/NewBlackbox/Bcore/build.gradle",
+      "line": 23,
+      "observed_behavior": "defaultConfig ndk abiFilters is arm64-v8a and armeabi-v7a. This is a build-ABI fact only."
+    },
+    "virtualapp_open_source": {
+      "head": "802a82c2b9c15a1990e75eee1e9fe07168854772",
+      "build_file": "D:/github/t57-reference-sources/VirtualApp/VirtualApp/lib/build.gradle",
+      "build_line": 4,
+      "readme": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "observed_behavior": "The open-source lib declares compileSdkVersion 26 and armeabi-v7a/x86. Its README states that GitHub code stopped updating in December 2017; its commercial changelog lists updates through 2026-08-04 / item 713.",
+      "adoption_decision": "Do not treat either the 2017 open-source implementation or commercial changelog entries as proof of a modern VA PRO implementation. Use only as bounded historical/reference evidence."
+    }
+  },
+  "current_debug_apks": {
+    "host": {
+      "path": "app/build/outputs/apk/debug/app-debug.apk",
+      "sha256": "14470e500457583e2a1627e1e8ce0523803486eee0ca6ed7b4f0db9d8e4162a0"
+    },
+    "fixture_basic": {
+      "path": "fixture-basic/build/outputs/apk/debug/fixture-basic-debug.apk",
+      "sha256": "a43fd685009edf92f107d3bad38ccf7dc93f52215f836e3d60bbe1aedd1449ee"
+    },
+    "fixture_compat32": {
+      "path": "fixture-compat32/build/outputs/apk/debug/fixture-compat32-debug.apk",
+      "sha256": "f4acafbde048c71b318fe5740972501b2831d36eb9703290e8b09f58637d57c2"
+    }
+  },
+  "build": {
+    "command": ".\\gradlew.bat assembleDebug --console=plain",
+    "result": "BUILD SUCCESSFUL",
+    "parameters": {
+      "java": 17,
+      "host_ndk_abis": ["arm64-v8a", "x86_64"],
+      "jni_packaging": "non-legacy / page-aligned"
+    }
+  },
+  "current_avd": {
+    "serial": "emulator-5554",
+    "manufacturer": "Google",
+    "model": "sdk_gphone64_x86_64",
+    "api_level": 36,
+    "android_version": "16",
+    "abi": "x86_64",
+    "page_size": 4096,
+    "fingerprint": "google/sdk_gphone64_x86_64/emu64xa:16/BE2A.250530.026.F3/13894323:userdebug/dev-keys",
+    "boot_id": "d71ff14a-804-4918-84ba-35dd9ba2b584"
+  },
+  "current_short_baseline": {
+    "run_id": "p1-01-api36-s01-s04-continuous-20260908",
+    "evidence_root": "out/verification/p1-01-api36-s01-s04-continuous-20260908",
+    "retry_policy": "no diagnostic retry; each case attempt=1",
+    "summary": {"overall": "PASS", "pass": 4, "fail": 0},
+    "cases": [
+      "S01-host-build-install-launch: PASS",
+      "S02-guest-import-add: PASS",
+      "S03-cold-launch-first-frame: PASS",
+      "S04-warm-launch-reuse: PASS with activity_reuse=true"
+    ]
+  },
+  "historical_evidence": {
+    "realapp_compat_02_smoke": {
+      "path": "out/verification/realapp-compat-02-s01s10-20260907/run.json",
+      "source_head": "51c53726572ec24215880d92bbfaa401f03c139a",
+      "result": "S01-S10 PASS on historical Xiaomi 25019PNF3C / API36 / arm64-v8a / 4KB",
+      "host_apk_sha256": "7c04ae8459919ab7e989f5a6a16c74429b89a0d9afa21bde6432a4735d1271e0",
+      "fixture_apk_sha256": "a43fd685009edf92f107d3bad38ccf7dc93f52215f836e3d60bbe1aedd1449ee",
+      "classification": "HISTORICAL: source head is the parent of current HEAD, not a current-HEAD claim"
+    },
+    "realapp_compat_02_commercial": {
+      "chrome": "FAIL: nested java.lang.NullPointerException; no launch/first-frame claim",
+      "quark": "PASS only for launch/first frame; session=a265b7da-e253-4bcc-a877-082c979007b9, generation=1; business smoke remains untested",
+      "artifacts": "out/verification/realapp-compat-02-realapps-final-20260907"
+    },
+    "realapp_compat_01_capabilities": {
+      "path": "out/verification/realapp-compat-01-capability-final-20260907/capability-matrix.json",
+      "source_head": "bd315b2758bfdf3d4df0d346aefd6d3bb3700c4b",
+      "summary": "8 PASS / 2 FAIL / 1 NOT_IN_CURRENT_SCOPE / 1 EXPECTED_LIMITATION",
+      "retained_failures": [
+        "CAP-SCHEDULING-NOTIFICATION-ALARM-JOB-FGS: missing C2_T05 loop/alarm/job/FGS markers",
+        "CAP-NATIVE-ADVERSARIAL-BOUNDARY: missing CASE NATIVE-ADV-010 done"
+      ],
+      "classification": "HISTORICAL: not a current-HEAD capability claim"
+    }
+  }
+}

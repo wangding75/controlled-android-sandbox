@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <permission android:name="com.warden.controlledsandbox.fixture32.permission.P105_SERVICE"
+        android:protectionLevel="signature" />
     <application
         android:name="com.warden.controlledsandbox.fixture.FixtureApplication"
         android:allowBackup="false"
@@ -40,6 +42,9 @@
             <meta-data android:name="cas.fixture.service_meta" android:value="service-peer" />
         </service>
         <service android:name="com.warden.controlledsandbox.fixture.RemoteFixtureService" android:exported="false" android:process=":remote" />
+        <service android:name="com.warden.controlledsandbox.fixture.P105PeerPermissionService"
+            android:exported="true"
+            android:permission="com.warden.controlledsandbox.fixture32.permission.P105_SERVICE" />
         <service android:name="com.warden.controlledsandbox.fixture.IsolatedFixtureService" android:exported="false" android:isolatedProcess="true" />
         <receiver android:name="com.warden.controlledsandbox.fixture.FixtureReceiver" android:exported="true">
             <meta-data android:name="cas.fixture.receiver_meta" android:value="receiver-peer" />

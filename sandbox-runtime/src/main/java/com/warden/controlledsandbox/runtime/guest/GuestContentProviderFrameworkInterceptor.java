@@ -91,6 +91,10 @@ final class GuestContentProviderFrameworkInterceptor implements FrameworkCallInt
 
     @Override public Interception intercept(
             String serviceName, Method method, Object[] arguments) throws Throwable {
+        if (method != null && "getContentProvider".equals(method.getName())) {
+            android.util.Log.i("CS_PROVIDER_ROUTE", "entry service=" + serviceName
+                    + " signature=" + method.toGenericString());
+        }
         if (closed) {
             throw new SecurityException("CONTENT_PROVIDER_TRANSPORT_CLOSED");
         }
@@ -99,6 +103,8 @@ final class GuestContentProviderFrameworkInterceptor implements FrameworkCallInt
             return Interception.passThrough();
         }
         String authority = authority(method, arguments);
+        android.util.Log.i("CS_PROVIDER_ROUTE", "authority=" + authority + " known="
+                + descriptors.containsKey(authority) + " expectedPackage=" + spec.packageName);
         if (authority.isEmpty()) {
             throw new SecurityException("CONTENT_PROVIDER_AUTHORITY_UNRESOLVED");
         }
@@ -108,9 +114,16 @@ final class GuestContentProviderFrameworkInterceptor implements FrameworkCallInt
         if ("settings".equals(authority)) return Interception.passThrough();
         ProviderDescriptor descriptor = descriptors.get(authority);
         if (descriptor == null) {
-            ProviderInfo hostProvider = HostPackageManagerBridge.resolveContentProvider(
-                    hostPackageManagerService, authority, providerFlags(arguments),
-                    HostPackageManagerBridge.physicalUserId());
+            HostPackageManagerBridge.Lookup<ProviderInfo> hostLookup =
+                    hostPackageManagerService == null ? null
+                            : HostPackageManagerBridge.resolveContentProvider(
+                                    hostPackageManagerService, authority, providerFlags(arguments),
+                                    HostPackageManagerBridge.physicalUserId());
+            if (hostLookup != null && !hostLookup.isResult() && !hostLookup.isEmpty()) {
+                throw new IllegalStateException("HOST_PMS_PROVIDER_LOOKUP_FAILED:"
+                        + hostLookup.diagnostic());
+            }
+            ProviderInfo hostProvider = hostLookup == null ? null : hostLookup.value();
             if (isAllowedHostProvider(hostProvider)) {
                 android.util.Log.i("CS_PROVIDER_ROUTE", "owner=HOST_SYSTEM authority="
                         + authority + " package=" + hostProvider.packageName + " component="
@@ -120,6 +133,15 @@ final class GuestContentProviderFrameworkInterceptor implements FrameworkCallInt
                 // pass through so AMS returns the host-owned transport rather than attempting to
                 // instantiate a system provider inside the Guest Broker.
                 return Interception.passThrough();
+            }
+            if (hostProvider == null) {
+                // ContentResolver's ordinary probe contract is a null holder for an authority
+                // that physical PMS cannot resolve. Handle that result here so the framework
+                // proxy cannot fall through and expose an arbitrary Host Provider. A resolved
+                // but ineligible Host Provider still fails closed below.
+                android.util.Log.i("CS_PROVIDER_ROUTE", "owner=ABSENT authority=" + authority
+                        + " expectedPackage=" + spec.packageName);
+                return Interception.handled(null);
             }
             throw new SecurityException("CONTENT_PROVIDER_AUTHORITY_NOT_VIRTUALIZED:" + authority);
         }

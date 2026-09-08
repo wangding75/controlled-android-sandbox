@@ -192,28 +192,19 @@ public final class GuestBrokerContentProviderSelfTest {
                 new GuestContentProviderFrameworkInterceptor(context, spec);
         Method providerMethod = FakeActivityManager.class.getMethod(
                 "getContentProvider", String.class, String.class);
-        boolean unknownAuthorityDenied = false;
-        try {
-            interceptor.intercept("activity-manager", providerMethod,
-                    new Object[]{"guest.pkg", "host.authority"});
-        } catch (SecurityException expected) {
-            unknownAuthorityDenied = expected.getMessage().contains(
-                    "CONTENT_PROVIDER_AUTHORITY_NOT_VIRTUALIZED");
-        }
-        require(unknownAuthorityDenied,
-                "unknown Provider authority cannot fall through to Host ContentResolver");
+        com.warden.controlledsandbox.framework.core.FrameworkCallInterceptor.Interception absent =
+                interceptor.intercept("activity-manager", providerMethod,
+                        new Object[]{"guest.pkg", "host.authority"});
+        require(absent.handled() && absent.result() == null,
+                "missing Provider authority must return an intercepted null, not Host fallback");
         Method modernProviderMethod = ModernActivityManager.class.getMethod(
                 "getContentProvider", Object.class, String.class, String.class,
                 String.class, int.class, boolean.class);
-        boolean modernUnknownDenied = false;
-        try {
-            interceptor.intercept("activity-manager", modernProviderMethod,
-                    new Object[]{new Object(), "guest.pkg", "feature-id", "host.modern", 0, true});
-        } catch (SecurityException expected) {
-            modernUnknownDenied = expected.getMessage().endsWith(":host.modern");
-        }
-        require(modernUnknownDenied,
-                "modern getContentProvider signature resolves authority immediately before user id");
+        com.warden.controlledsandbox.framework.core.FrameworkCallInterceptor.Interception modernAbsent =
+                interceptor.intercept("activity-manager", modernProviderMethod,
+                        new Object[]{new Object(), "guest.pkg", "feature-id", "host.modern", 0, true});
+        require(modernAbsent.handled() && modernAbsent.result() == null,
+                "modern getContentProvider signature must return null for missing authority");
         interceptor.close();
 
         providerRoutingFixture();
@@ -225,19 +216,21 @@ public final class GuestBrokerContentProviderSelfTest {
     /** Generic Provider owner fixture: an external system package may route, an ordinary Host APK may not. */
     private static void providerRoutingFixture() {
         FakeHostPackageManager hostPms = new FakeHostPackageManager();
-        android.content.pm.ProviderInfo systemProvider =
+        HostPackageManagerBridge.Lookup<android.content.pm.ProviderInfo> systemLookup =
                 HostPackageManagerBridge.resolveContentProvider(hostPms,
                         "system.authority", 0L, 0);
-        require(systemProvider != null
+        android.content.pm.ProviderInfo systemProvider = systemLookup.value();
+        require(systemLookup.isResult() && systemProvider != null
                         && "host.system.provider".equals(systemProvider.packageName)
                         && "host.system.provider".equals(systemProvider.applicationInfo.packageName)
                         && systemProvider.enabled && systemProvider.exported
                         && HostPackageManagerBridge.isSystemOwner(systemProvider.applicationInfo),
                 "external system Provider projects metadata through the Host owner route");
-        android.content.pm.ProviderInfo ordinaryProvider =
+        HostPackageManagerBridge.Lookup<android.content.pm.ProviderInfo> ordinaryLookup =
                 HostPackageManagerBridge.resolveContentProvider(hostPms,
                         "ordinary.authority", 0L, 0);
-        require(ordinaryProvider != null
+        android.content.pm.ProviderInfo ordinaryProvider = ordinaryLookup.value();
+        require(ordinaryLookup.isResult() && ordinaryProvider != null
                         && !HostPackageManagerBridge.isSystemOwner(ordinaryProvider.applicationInfo),
                 "ordinary Host Provider remains outside the Host system owner route");
     }

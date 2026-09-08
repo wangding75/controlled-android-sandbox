@@ -1,0 +1,19 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:label="CAS P1 Library Provider" android:allowBackup="false">
+        <!-- Parsed by CAS as the provider half of P1-03's virtual Java-library graph.
+             It is deliberately not presented as an Android PMS static-library provider. -->
+        <library android:name="cas.p1.fixture.provider" />
+        <activity android:name=".ProviderProbeActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <service android:name=".RemoteFixtureService" android:exported="true" android:process=":remote" />
+        <provider
+            android:name=".ReentrantFixtureProvider"
+            android:authorities="com.warden.controlledsandbox.fixture.libraryprovider.reentrant"
+            android:exported="true"
+            android:process=":provider" />
+    </application>
+</manifest>

@@ -1,5 +1,8 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application
+        android:name="com.warden.controlledsandbox.fixture.lifecycle.FailingLifecycleApplication"
+        tools:replace="android:name">
         <activity android:name="com.warden.controlledsandbox.fixture.lifecycle.LifecycleV2Activity"
             android:exported="false" />
     </application>

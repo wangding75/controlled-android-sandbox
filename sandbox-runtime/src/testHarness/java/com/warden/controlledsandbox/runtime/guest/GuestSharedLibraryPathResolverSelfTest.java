@@ -46,12 +46,32 @@ public final class GuestSharedLibraryPathResolverSelfTest {
                         && projectedFiles.contains(provider.getCanonicalPath())
                         && projectedFiles.contains(split.getCanonicalPath()),
                 "host-owned provider source projection reaches ApplicationInfo.sharedLibraryFiles");
+        VirtualPackageStateSnapshot duplicate = state("guest.duplicate", "guest-duplicate.apk",
+                new VirtualSharedLibrarySnapshot(VirtualSharedLibrarySnapshot.KIND_STATIC,
+                        "host.library", true, 7L, "", true, "host.provider",
+                        List.of(provider.getAbsolutePath(), provider.getAbsolutePath()), null));
+        require(GuestSharedLibraryPathResolver.resolvedSharedLibraryFiles(duplicate, List.of()).size() == 1,
+                "duplicate host provider source files are projected once");
+        VirtualPackageStateSnapshot stale = state("guest.stale", "guest-stale.apk",
+                new VirtualSharedLibrarySnapshot(VirtualSharedLibrarySnapshot.KIND_STATIC,
+                        "host.library", true, 7L, "", true, "host.provider",
+                        List.of(new File(root, "old-provider.apk").getAbsolutePath()), null));
+        boolean staleRejected = false;
+        try {
+            GuestSharedLibraryPathResolver.resolvedSharedLibraryFiles(stale, List.of());
+        } catch (IllegalStateException expected) {
+            staleRejected = expected.getMessage().startsWith("SHARED_LIBRARY_PROVIDER_APK_UNAVAILABLE:");
+        }
+        require(staleRejected, "stale provider path fails closed instead of falling back to Host storage");
         boolean missing = false;
         try {
             GuestSharedLibraryPathResolver.appendResolvedLibraryPaths(guest.getAbsolutePath(),
                     state, List.of());
-        } catch (IllegalStateException expected) { missing = true; }
-        require(missing, "missing virtual provider projection fails closed");
+        } catch (IllegalStateException expected) {
+            missing = expected.getMessage().startsWith(
+                    "SHARED_LIBRARY_PROVIDER_PROJECTION_MISSING:");
+        }
+        require(missing, "missing virtual provider projection has an actionable fail-closed error");
         System.out.println("PASS virtual shared-library class-loader path self-test");
     }
 

@@ -28,6 +28,8 @@ include ':fixture-lifecycle'
 include ':fixture-split-base'
 include ':fixtureSplitFeature'
 project(':fixtureSplitFeature').projectDir = file('fixture-split-feature')
+include ':fixture-library-provider'
+include ':fixture-library-consumer'
 include ':sandbox-native'
 
 include ':sandbox-companion32'

@@ -117,7 +117,11 @@ final class GuestContextComponentRouter {
     }
 
     ComponentName startService(Intent intent, boolean foreground) {
-        GuestIntentResolver.Target target = resolver.resolveOne(intent, GuestIntentResolver.Kind.SERVICE);
+        GuestIntentResolver.Target target = resolver.resolveOptionalService(intent);
+        if (target == null) {
+            logServiceAbsence("startService", intent);
+            return null;
+        }
         if (target.hostOwned()) {
             return foreground
                     ? context.hostServiceContext().startForegroundService(intent)
@@ -134,7 +138,11 @@ final class GuestContextComponentRouter {
     }
 
     boolean stopService(Intent intent) {
-        GuestIntentResolver.Target target = resolver.resolveOne(intent, GuestIntentResolver.Kind.SERVICE);
+        GuestIntentResolver.Target target = resolver.resolveOptionalService(intent);
+        if (target == null) {
+            logServiceAbsence("stopService", intent);
+            return false;
+        }
         if (target.hostOwned()) return context.hostServiceContext().stopService(intent);
         Bundle request = bridge.baseRequest();
         request.putAll(resolver.request(intent, target));
@@ -152,7 +160,11 @@ final class GuestContextComponentRouter {
         if (connections.containsKey(connection) || hostConnections.containsKey(connection)) {
             throw new IllegalArgumentException("ServiceConnection already bound");
         }
-        GuestIntentResolver.Target target = resolver.resolveOne(intent, GuestIntentResolver.Kind.SERVICE);
+        GuestIntentResolver.Target target = resolver.resolveOptionalService(intent);
+        if (target == null) {
+            logServiceAbsence("bindService", intent);
+            return false;
+        }
         if (target.hostOwned()) {
             Executor callbackExecutor = executor == null ? context.getMainExecutor() : executor;
             ComponentName component = new ComponentName(target.packageName(), target.className());
@@ -528,6 +540,19 @@ final class GuestContextComponentRouter {
 
     private String processName(GuestIntentResolver.Target target) {
         return target.processName().isEmpty() ? target.packageName() : target.processName();
+    }
+
+    private void logServiceAbsence(String api, Intent intent) {
+        android.util.Log.i("CS_GUEST_SERVICE_ABSENT", "api=" + api
+                + " caller=" + spec.packageName
+                + " session=" + spec.sessionId
+                + " generation=" + spec.generation
+                + " action=" + (intent == null || intent.getAction() == null
+                        ? "" : intent.getAction())
+                + " component=" + (intent == null || intent.getComponent() == null
+                        ? "" : intent.getComponent().flattenToShortString())
+                + " package=" + (intent == null || intent.getPackage() == null
+                        ? "" : intent.getPackage()));
     }
 
     private record ConnectionRecord(String connectionId, GuestIntentResolver.Target target,

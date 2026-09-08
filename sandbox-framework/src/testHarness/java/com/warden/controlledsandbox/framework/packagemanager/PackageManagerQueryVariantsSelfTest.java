@@ -9,6 +9,7 @@ import android.content.pm.PermissionInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ProviderInfo;
 import android.content.pm.ResolveInfo;
+import android.content.pm.ServiceInfo;
 
 import com.warden.controlledsandbox.framework.capability.CapabilityAuditSink;
 import com.warden.controlledsandbox.framework.capability.CapabilityLeaseRegistry;
@@ -32,6 +33,7 @@ public final class PackageManagerQueryVariantsSelfTest {
         VirtualPackageMetadata guest = new VirtualPackageMetadata("guest.pkg", "guest.pkg.Main",
                 guestInfo, List.of(
                 activity("guest.pkg.Main", "guest.pkg", Set.of("android.intent.action.VIEW")),
+                service("guest.pkg.SyncService", "guest.pkg:sync", Set.of("guest.SYNC")),
                 provider("guest.pkg.DataProvider", "guest.pkg:provider", "guest.data", 4),
                 provider("guest.pkg.BootstrapProvider", "guest.pkg:provider", "guest.bootstrap", 12)));
         VirtualPackageMetadata peer = new VirtualPackageMetadata("peer.pkg", "peer.pkg.Share",
@@ -70,6 +72,31 @@ public final class PackageManagerQueryVariantsSelfTest {
         List<ResolveInfo> activities = proxy.queryIntentActivitiesAsUser(
                 new Intent("android.intent.action.VIEW"), null, 0L, 0);
         require(activities.size() == 2, "AsUser activity query returns visible virtual packages");
+
+        ResolveInfo virtualService = proxy.resolveService(
+                new Intent("guest.SYNC").setPackage("guest.pkg"), null, 0L, 0);
+        require(virtualService != null && virtualService.serviceInfo != null
+                        && "guest.pkg.SyncService".equals(virtualService.serviceInfo.name),
+                "resolveService keeps a same-name virtual Service ahead of raw host PMS");
+        Intent systemServiceIntent = new Intent("system.BIND").setPackage("system.pkg");
+        ResolveInfo systemService = proxy.resolveService(systemServiceIntent, null, 0L, 0);
+        require(systemService != null && systemService.serviceInfo != null
+                        && "system.pkg.SystemService".equals(systemService.serviceInfo.name),
+                "resolveService projects only the qualified system-owner Service");
+        List<ResolveInfo> systemServices = proxy.queryIntentServices(systemServiceIntent, null, 0L, 0);
+        require(systemServices.size() == 1 && systemServices.get(0).serviceInfo != null
+                        && "system.pkg".equals(systemServices.get(0).serviceInfo.packageName),
+                "queryIntentServices shares the qualified system-owner rule");
+        ServiceInfo systemInfo = proxy.getServiceInfo(new ComponentName("system.pkg",
+                "system.pkg.SystemService"), 0L);
+        require(systemInfo != null && "system.pkg.SystemService".equals(systemInfo.name),
+                "getServiceInfo shares the qualified system-owner rule");
+        require(proxy.resolveService(new Intent("system.BIND"), null, 0L, 0) == null
+                        && proxy.queryIntentServices(new Intent("system.BIND"), null, 0L, 0).isEmpty(),
+                "unqualified implicit Service query cannot enumerate host system Services");
+        require(proxy.resolveService(new Intent("user.BIND").setPackage("user.pkg"),
+                        null, 0L, 0) == null,
+                "ordinary host user Service stays absent even when raw PMS resolves it");
 
         Intent peerExplicit = new Intent().setComponent(
                 new ComponentName("peer.pkg", "peer.pkg.Share"));
@@ -222,6 +249,12 @@ public final class PackageManagerQueryVariantsSelfTest {
                 false, initOrder, false, "never");
     }
 
+    private static VirtualPackageMetadata.Component service(String name, String process,
+                                                              Set<String> actions) {
+        return new VirtualPackageMetadata.Component(VirtualPackageMetadata.Type.SERVICE, name,
+                process, true, true, false, actions, "");
+    }
+
     private static void require(boolean condition, String label) {
         if (!condition) throw new AssertionError(label);
     }
@@ -247,6 +280,10 @@ public final class PackageManagerQueryVariantsSelfTest {
         ApplicationInfo getApplicationInfo(String packageName, int flags);
         PackageInfo getPackageInfo(String packageName, int flags);
         int getApplicationEnabledSetting(String packageName, int userId);
+        ResolveInfo resolveService(Intent intent, String resolvedType, long flags, int userId);
+        List<ResolveInfo> queryIntentServices(Intent intent, String resolvedType,
+                                              long flags, int userId);
+        ServiceInfo getServiceInfo(ComponentName component, long flags);
     }
 
     public static final class FakePackageApiDelegate implements FakePackageApi {
@@ -322,6 +359,43 @@ public final class PackageManagerQueryVariantsSelfTest {
         }
         @Override public int getApplicationEnabledSetting(String packageName, int userId) {
             throw new AssertionError("delegate");
+        }
+        @Override public ResolveInfo resolveService(Intent intent, String resolvedType,
+                                                     long flags, int userId) {
+            if (intent != null && "system.pkg".equals(intent.getPackage())
+                    && "system.BIND".equals(intent.getAction())) return service("system.pkg",
+                    "system.pkg.SystemService", true);
+            if (intent != null && "user.pkg".equals(intent.getPackage())
+                    && "user.BIND".equals(intent.getAction())) return service("user.pkg",
+                    "user.pkg.UserService", false);
+            return null;
+        }
+        @Override public List<ResolveInfo> queryIntentServices(Intent intent, String resolvedType,
+                                                                 long flags, int userId) {
+            ResolveInfo value = resolveService(intent, resolvedType, flags, userId);
+            return value == null ? List.of() : List.of(value);
+        }
+        @Override public ServiceInfo getServiceInfo(ComponentName component, long flags) {
+            if (component != null && "system.pkg".equals(component.getPackageName())
+                    && "system.pkg.SystemService".equals(component.getClassName())) {
+                return service("system.pkg", "system.pkg.SystemService", true).serviceInfo;
+            }
+            return null;
+        }
+        private static ResolveInfo service(String packageName, String name, boolean system) {
+            ApplicationInfo application = new ApplicationInfo();
+            application.packageName = packageName;
+            application.flags = system ? ApplicationInfo.FLAG_SYSTEM : 0;
+            ServiceInfo service = new ServiceInfo();
+            service.packageName = packageName;
+            service.name = name;
+            service.processName = packageName + ":service";
+            service.enabled = true;
+            service.exported = true;
+            service.applicationInfo = application;
+            ResolveInfo result = new ResolveInfo();
+            result.serviceInfo = service;
+            return result;
         }
     }
 }

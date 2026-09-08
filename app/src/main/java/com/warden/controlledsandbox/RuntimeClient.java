@@ -158,6 +158,7 @@ final class RuntimeClient implements AutoCloseable {
         return launchComponent(record, virtualUserId, component, intentExtras,
                 false, true);
     }
+
     private Bundle launchComponent(SandboxRecord record, int virtualUserId, String component,
                                    Bundle intentExtras, boolean awaitReadiness,
                                    boolean awaitActivityCreated) throws Exception {
@@ -309,8 +310,12 @@ final class RuntimeClient implements AutoCloseable {
     Bundle prepareProvider(SandboxRecord record, int virtualUserId) throws Exception { return component(record, virtualUserId, ComponentOperations.PREPARE_PROVIDER, record.providerClass, record.providerProcess, "", record.providerAuthority); }
     Bundle prepareProvider(SandboxRecord record, int virtualUserId, String component,
                            String authority) throws Exception {
+        return prepareProvider(record, virtualUserId, component, "", authority);
+    }
+    Bundle prepareProvider(SandboxRecord record, int virtualUserId, String component,
+                           String processName, String authority) throws Exception {
         return component(record, virtualUserId, ComponentOperations.PREPARE_PROVIDER,
-                component, "", "", authority);
+                component, processName, "", authority);
     }
     Bundle queryProvider(SandboxRecord record, int virtualUserId, String component,
                          String authority) throws Exception {

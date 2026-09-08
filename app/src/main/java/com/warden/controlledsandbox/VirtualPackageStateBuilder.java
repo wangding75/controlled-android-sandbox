@@ -443,7 +443,7 @@ final class VirtualPackageStateBuilder {
                         provider = library.getDeclaringPackage().getPackageName();
                     }
                     String certificate = "";
-                    List<String> digests = library.getCertDigests();
+                    List<String> digests = sharedLibraryCertDigests(library);
                     if (digests != null) {
                         for (String digest : digests) {
                             String normalized = digest == null ? ""
@@ -466,6 +466,27 @@ final class VirtualPackageStateBuilder {
             // declarations.  Optional libraries still retain their explicit unresolved state.
             android.util.Log.w("CS_SHARED_LIBRARY", "host shared-library catalog unavailable",
                     unavailable);
+        }
+    }
+
+    /**
+     * getCertDigests is not present on every API level that exposes SharedLibraryInfo. The host
+     * PMS catalog remains authoritative, so an unavailable optional accessor must mean "no
+     * digest projection", not a LinkageError that kills package import.
+     */
+    @SuppressWarnings("unchecked")
+    private static List<String> sharedLibraryCertDigests(SharedLibraryInfo library) {
+        if (library == null) return List.of();
+        try {
+            java.lang.reflect.Method getter = SharedLibraryInfo.class.getMethod("getCertDigests");
+            Object result = getter.invoke(library);
+            return result instanceof List<?> values ? (List<String>) values : List.of();
+        } catch (NoSuchMethodException | IllegalAccessException unavailable) {
+            return List.of();
+        } catch (java.lang.reflect.InvocationTargetException unavailable) {
+            Throwable cause = unavailable.getCause();
+            if (cause instanceof RuntimeException runtime) throw runtime;
+            return List.of();
         }
     }
 

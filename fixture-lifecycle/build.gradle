@@ -27,6 +27,11 @@ android {
             versionCode 2
             versionName '2.0-lifecycle'
         }
+        v3 {
+            dimension 'lineage'
+            versionCode 3
+            versionName '3.0-lifecycle-recovery'
+        }
     }
 
     buildTypes { release { minifyEnabled false } }

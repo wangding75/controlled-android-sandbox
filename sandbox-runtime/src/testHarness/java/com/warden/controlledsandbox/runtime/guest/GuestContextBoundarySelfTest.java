@@ -75,21 +75,22 @@ public final class GuestContextBoundarySelfTest {
             require(spec.packageName.equals(boundary.getPackageName()),
                     "Guest base Context preserves package identity");
             require(context.getApplicationContext() == context, "application Context before bootstrap");
-            expectVirtualRoutingFailure(() -> context.bindService(new android.content.Intent(),
+            require(!context.bindService(new android.content.Intent(),
                             new android.content.ServiceConnection() {
                                 @Override public void onServiceConnected(
                                         android.content.ComponentName name, android.os.IBinder binder) { }
                                 @Override public void onServiceDisconnected(
                                         android.content.ComponentName name) { }
-                            }, Context.BIND_AUTO_CREATE), "NO_GUEST_SERVICE_MATCH", "bindService");
-            expectVirtualRoutingFailure(() -> context.bindService(new android.content.Intent(),
+                            }, Context.BIND_AUTO_CREATE),
+                    "missing Service bind returns false rather than a routing exception");
+            require(!context.bindService(new android.content.Intent(),
                             Context.BIND_AUTO_CREATE, Runnable::run,
                             new android.content.ServiceConnection() {
                                 @Override public void onServiceConnected(
                                         android.content.ComponentName name, android.os.IBinder binder) { }
                                 @Override public void onServiceDisconnected(
                                         android.content.ComponentName name) { }
-                            }), "NO_GUEST_SERVICE_MATCH", "bindService executor overload");
+                            }), "missing Service executor bind returns false rather than a routing exception");
             require(context.getContentResolver() != null,
                     "ContentResolver is exposed through the framework interception boundary");
             Object firstInflater = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
