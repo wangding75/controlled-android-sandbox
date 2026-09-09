@@ -122,6 +122,20 @@
             android:exported="false" />
         <activity android:name="com.warden.controlledsandbox.fixture.FrameworkActivityResultChildActivity"
             android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.P109RotationProbeActivity"
+            android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.P109VisualProbeActivity"
+            android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.P110PayloadProbeActivity"
+            android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.P114WebViewProbeActivity"
+            android:exported="true" />
+        <activity android:name="com.warden.controlledsandbox.fixture.P111PrepareFailureActivity"
+            android:exported="false" android:process=":p111_prepare_failure" />
+        <activity android:name="com.warden.controlledsandbox.fixture.P111Slot62Activity"
+            android:exported="false" android:process=":p111_slot_62" />
+        <activity android:name="com.warden.controlledsandbox.fixture.P111Slot63Activity"
+            android:exported="false" android:process=":p111_slot_63" />
         <activity android:name="com.warden.controlledsandbox.fixture.FaultJavaCrashActivity"
             android:exported="true" android:process=":fault_java" />
         <activity android:name="com.warden.controlledsandbox.fixture.FaultMainThreadCrashActivity"
@@ -134,6 +148,10 @@
             android:exported="true" android:process=":fault_abort" />
         <service android:name="com.warden.controlledsandbox.fixture.FaultCrashService"
             android:exported="true" android:process=":fault_svc" />
+        <service android:name="com.warden.controlledsandbox.fixture.P111JavaCrashService"
+            android:exported="false" android:process=":p111_java_crash" />
+        <service android:name="com.warden.controlledsandbox.fixture.P111NativeAbortService"
+            android:exported="false" android:process=":fault_abort_svc" />
         <service android:name="com.warden.controlledsandbox.fixture.FaultAnrService"
             android:exported="true" android:process=":fault_anr_svc" />
         <provider

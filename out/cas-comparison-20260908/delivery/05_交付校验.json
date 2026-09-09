@@ -1,0 +1,45 @@
+{
+  "artifact_validation": "PASS",
+  "task_count": 30,
+  "phases": {
+    "1": 16,
+    "2": 14
+  },
+  "conditional_tasks": 3,
+  "source_anchors_verified": 79,
+  "changelog_entries_verified": 46,
+  "dependencies": "unique, resolved and acyclic; all prerequisites earlier in list",
+  "long_tasks_last": [
+    "P2-90",
+    "P2-91"
+  ],
+  "product_tests_executed": false,
+  "product_code_modified": false,
+  "files": [
+    {
+      "name": "00_执行计划.html",
+      "bytes": 196014,
+      "sha256": "bf9b1da379bd6c734ab218f52fb3161527bbf56d52b90c6a08e95e3699f912ac"
+    },
+    {
+      "name": "01_源码差异分析.md",
+      "bytes": 36595,
+      "sha256": "80cc9a2930130251d76fb02afea97bbdaca6c95d797cf2b2c9a8717d6746e3a6"
+    },
+    {
+      "name": "02_两阶段执行任务书.md",
+      "bytes": 100992,
+      "sha256": "d0ca3d02dd743c679b34fb48b7d05bd9d627cced024e906de5863c572fa3c776"
+    },
+    {
+      "name": "03_任务与证据索引.json",
+      "bytes": 91553,
+      "sha256": "400cede69c1f67f24b8406aeaf8af384c5274caaa4ee055c7b1d3f9004ec772f"
+    },
+    {
+      "name": "04_源码证据索引.md",
+      "bytes": 37131,
+      "sha256": "f264fb99ac1ed7ca473b1a0e3a150e19618afb6f25bff81045fe51d79df830cc"
+    }
+  ]
+}

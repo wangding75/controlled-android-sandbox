@@ -14,5 +14,9 @@
             android:exported="false"
             android:isolatedProcess="true"
             android:process=":native_enf_iso" />
+        <service
+            android:name=".P111LateConnectionService"
+            android:exported="false"
+            android:process=":p111_late_connection" />
     </application>
 </manifest>

@@ -3,6 +3,7 @@ package com.warden.controlledsandbox.framework.core;
 import android.content.pm.ApplicationInfo;
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 import com.warden.controlledsandbox.framework.identity.VirtualPackageMetadata;
+import com.warden.controlledsandbox.framework.identity.VirtualPermissionPolicy;
 import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceAuthority;
 import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceState;
 import java.lang.reflect.Proxy;
@@ -21,6 +22,7 @@ public final class VirtualSystemServiceSelfTest {
         testAlarmLifecycle();
         testPendingIntentAlarmDelegatesToHost();
         testNotificationNamespace();
+        testNotificationPermissionDenialDoesNotUseHostGrant();
         testNotificationChannelObjects();
         testNotificationFailureRollback();
         testNotificationOwnedCancelAll();
@@ -121,6 +123,25 @@ public final class VirtualSystemServiceSelfTest {
         int hostId = delegate.lastId;
         notifications.cancelNotificationWithTag("guest.notify", "guest.notify", "updates", 42, 7);
         require(delegate.lastId == hostId, "notification cancellation reuses host namespace ID");
+    }
+
+    private static void testNotificationPermissionDenialDoesNotUseHostGrant() {
+        String permission = "android.permission.POST_NOTIFICATIONS";
+        ApplicationInfo info = new ApplicationInfo();
+        info.packageName = "guest.notify.denied"; info.uid = 12012;
+        VirtualPermissionPolicy policy = new VirtualPermissionPolicy(Set.of(permission),
+                java.util.Map.of(permission, VirtualPermissionPolicy.DENIED), Set.of());
+        GuestIdentity identity = new GuestIdentity(info.packageName, info.uid, info, Set.of(permission),
+                "host.pkg", 10001, new VirtualPackageMetadata(info.packageName, "", info, List.of()),
+                info.packageName, 0, 12L, policy,
+                new com.warden.controlledsandbox.framework.identity.SandboxAppOpsPolicy(java.util.Map.of()));
+        FakeNotificationDelegate delegate = new FakeNotificationDelegate();
+        NotificationApi notifications = proxy(NotificationApi.class, delegate, identity, "notification");
+        notifications.enqueueNotificationWithTag(info.packageName, info.packageName, "denied", 9,
+                new FakeNotification(), 0);
+        require(delegate.enqueueCalls == 0, "denied Guest notification must not use Host grant");
+        require(identity.virtualServices().notifications().size() == 0,
+                "denied Guest notification must not enter active namespace state");
     }
 
 
@@ -240,7 +261,8 @@ public final class VirtualSystemServiceSelfTest {
 
     private static GuestIdentity identity(String packageName, int userId, long generation) {
         ApplicationInfo info = new ApplicationInfo(); info.packageName = packageName; info.uid = 12000 + userId;
-        return new GuestIdentity(packageName, info.uid, info, Set.of(), "host.pkg", 10001,
+        Set<String> grantedPermissions = Set.of("android.permission.POST_NOTIFICATIONS");
+        return new GuestIdentity(packageName, info.uid, info, grantedPermissions, "host.pkg", 10001,
                 new VirtualPackageMetadata(packageName, "", info, List.of()), packageName,
                 userId, generation);
     }
@@ -320,10 +342,10 @@ public final class VirtualSystemServiceSelfTest {
         void cancelAllNotifications(String pkg, int userId);
     }
     static class FakeNotificationDelegate implements NotificationApi {
-        int lastId; String lastTag; int cancelCalls; int cancelAllCalls;
+        int lastId; String lastTag; int enqueueCalls; int cancelCalls; int cancelAllCalls;
         public void enqueueNotificationWithTag(String pkg, String opPkg, String tag, int id,
                                                FakeNotification notification, int userId) {
-            lastTag = tag; lastId = id;
+            enqueueCalls++; lastTag = tag; lastId = id;
         }
         public void cancelNotificationWithTag(String pkg, String opPkg, String tag, int id, int userId) {
             cancelCalls++; lastTag = tag; lastId = id;

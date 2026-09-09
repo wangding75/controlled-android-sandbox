@@ -11,8 +11,11 @@ android {
         applicationId 'com.warden.controlledsandbox.fixture.split'
         minSdk = rootProject.ext.controlledMinSdk
         targetSdk = rootProject.ext.controlledTargetSdk
-        versionCode 1
-        versionName '1.0-split'
+        // P1-13 rebuilds the same base + feature split set at two revisions.  The
+        // default keeps the ordinary fixture stable; the verification runner passes
+        // -Pp113VersionCode for the update/rollback witnesses.
+        versionCode = (findProperty('p113VersionCode') ?: 1).toInteger()
+        versionName = "${findProperty('p113VersionName') ?: '1.0-split'}"
     }
 
     dynamicFeatures = [':fixtureSplitFeature']

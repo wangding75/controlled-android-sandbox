@@ -1,0 +1,5 @@
+<resources>
+    <!-- Bundled as a configuration split so P1-13 can verify qualified resources separately
+         from the feature-code split. -->
+    <string name="feature_name">CAS Split Feature API 34+</string>
+</resources>

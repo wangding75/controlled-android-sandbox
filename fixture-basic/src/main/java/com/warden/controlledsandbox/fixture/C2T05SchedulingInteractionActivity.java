@@ -422,6 +422,10 @@ public final class C2T05SchedulingInteractionActivity extends Activity {
 
     private void runForegroundService(int loop) throws Exception {
         deleteFile("c2-t05-fgs.log");
+        // `stopService()` only reports that AMS accepted the request.  The authoritative
+        // lifecycle result is FixtureService.onDestroy(), which writes this separate receipt.
+        // Clear it before each loop so a previous generation/loop cannot satisfy this check.
+        deleteFile("c2-t05-fgs-stopped.log");
         Intent request = new Intent(this, FixtureService.class)
                 .setAction("com.warden.controlledsandbox.fixture.C2_T05_FGS")
                 .putExtra("c2t05Session", session).putExtra("c2t05Loop", loop);
@@ -435,6 +439,10 @@ public final class C2T05SchedulingInteractionActivity extends Activity {
         }
         if (!stopService(new Intent(this, FixtureService.class))) {
             throw new IllegalStateException("FGS_STOP_RETURN_FALSE");
+        }
+        if (!waitForFileLine(new File(getFilesDir(), "c2-t05-fgs-stopped.log"),
+                session + " " + loop, CALLBACK_TIMEOUT_SECONDS * 1000L)) {
+            throw new IllegalStateException("FGS_STOP_CALLBACK_TIMEOUT:" + loop);
         }
         Log.i(TAG, "C2_T05_FGS_STOP_PASS loop=" + loop + " session=" + session);
     }

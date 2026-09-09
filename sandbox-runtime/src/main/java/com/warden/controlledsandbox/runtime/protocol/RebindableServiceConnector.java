@@ -119,6 +119,19 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
                 timeoutMs, initialRetryMs, maxRetryMs, invalidationListener);
     }
 
+    /**
+     * Creates a connector with an explicit bind policy and timing budget.
+     *
+     * <p>This is for callers that must expose one bounded acquisition attempt as a distinct
+     * operation. It does not add any retry or change the behavior of the default constructors.</p>
+     */
+    public RebindableServiceConnector(Context context, Intent intent,
+            BinderAdapter<T> adapter, ServiceCloser<T> closer, String serviceName,
+            int bindingFlags, long timeoutMs, long initialRetryMs, long maxRetryMs) {
+        this(context, intent, adapter, closer, serviceName, bindingFlags,
+                timeoutMs, initialRetryMs, maxRetryMs, () -> { });
+    }
+
     private RebindableServiceConnector(Context context, Intent intent,
             BinderAdapter<T> adapter, ServiceCloser<T> closer, String serviceName,
             int bindingFlags, long timeoutMs, long initialRetryMs, long maxRetryMs,

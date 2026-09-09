@@ -68,7 +68,7 @@ if not errors:
             errors.append(f'package lifecycle transaction control missing: {fragment}')
 
     for operation, lifecycle_call in [
-            ('deleteInstance(String packageName, int virtualUserId)',
+            ('public PackageServiceResult deleteInstanceWithOperation(',
              'lifecycle.deleteInstance(normalizedPackage, virtualUserId)'),
             ('clearInstanceData(String packageName, int virtualUserId)',
              'lifecycle.clearInstanceData(normalizedPackage, virtualUserId)')]:
@@ -192,7 +192,8 @@ if not errors:
         if forbidden in text['debug_activity']:
             errors.append(f'DebugCommandActivity bypasses lifecycle authority: {forbidden}')
     if not any(required in text['debug_activity'] for required in (
-            'packages.importApkFile(', 'packages.importInstalledApplication(')):
+            'packages.importApkFile(', 'packages.importInstalledApplication(',
+            'packages.importInstalledApplicationAndEnsure(')):
         errors.append('DebugCommandActivity lifecycle wiring missing: package import entry point')
     for required in ['packages.ensureInstance(', 'packages.findRecord(']:
         if required not in text['debug_activity']:

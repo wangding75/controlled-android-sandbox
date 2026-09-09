@@ -8,6 +8,11 @@ import android.util.Log;
 public final class FeatureActivity extends Activity {
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
-        Log.i("CS_SPLIT_FIXTURE", "FEATURE_CREATE classLoaded=true");
+        Log.i(
+                "CS_SPLIT_FIXTURE",
+                "FEATURE_CREATE classLoaded=true featureConfigMarker="
+                        + getString(R.string.p113_config_marker)
+                        + " baseConfigMarker="
+                        + getString(com.warden.controlledsandbox.fixture.split.R.string.p113_base_config_marker));
     }
 }

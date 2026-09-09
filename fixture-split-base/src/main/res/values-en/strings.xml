@@ -1,0 +1,4 @@
+<resources>
+    <!-- A selected language configuration must be installed as a separate config split. -->
+    <string name="p113_base_config_marker">base-en-config</string>
+</resources>

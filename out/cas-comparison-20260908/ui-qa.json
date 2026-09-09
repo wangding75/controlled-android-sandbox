@@ -1,0 +1,23 @@
+{
+  "counts": {
+    "all": 30,
+    "phase1": 16,
+    "phase2": 14,
+    "tail": 2,
+    "tailOpen": 2,
+    "openAfterCollapse": 0,
+    "chromeSearch": 7,
+    "noMatch": 0
+  },
+  "tail": [
+    "P2-90",
+    "P2-91"
+  ],
+  "errors": [],
+  "brokenLinks": [],
+  "phoneWidth": {
+    "width": 390,
+    "scroll": 390
+  },
+  "passed": true
+}

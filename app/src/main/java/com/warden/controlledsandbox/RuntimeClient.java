@@ -18,6 +18,7 @@ import com.warden.controlledsandbox.domain.protocol.RuntimeProtocol;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.broker.RuntimeBrokerService;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeOperationTransport;
 import com.warden.controlledsandbox.runtime.protocol.RebindableServiceConnector;
 import com.warden.controlledsandbox.runtime.diagnostics.RuntimePerformanceTrace;
@@ -179,7 +180,11 @@ final class RuntimeClient implements AutoCloseable {
                 copiedExtras.remove(RuntimeKeys.HOST_TASK_REUSE);
             }
             if (!copiedExtras.isEmpty()) {
-                request.putBundle(RuntimeKeys.INTENT_EXTRAS, copiedExtras);
+                // Match the Guest Activity path: a complete Intent gets one wire payload (or a
+                // bounded FD), not a second raw extras Bundle inside executeV2's Binder envelope.
+                Intent intent = new Intent();
+                intent.putExtras(copiedExtras);
+                RuntimeIntentWireCodec.encodeActivity(request, intent);
             }
         }
         return companionRoute(record)

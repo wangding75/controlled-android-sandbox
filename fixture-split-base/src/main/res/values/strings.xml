@@ -1,0 +1,4 @@
+<resources>
+    <!-- P1-13: the default value stays in the base master split. -->
+    <string name="p113_base_config_marker">base-default</string>
+</resources>

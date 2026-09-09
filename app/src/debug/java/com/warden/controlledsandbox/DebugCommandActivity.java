@@ -6,7 +6,9 @@ import android.content.pm.ApplicationInfo;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.util.Log;
+import dalvik.system.PathClassLoader;
 import com.warden.controlledsandbox.contract.InstallSessionInfoSnapshot;
 import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
 import com.warden.controlledsandbox.contract.NativeCompanionResult;
@@ -21,6 +23,7 @@ import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPeripheralServicesProfileSnapshot;
 import com.warden.controlledsandbox.compatibility.dingtalk.DingTalkCompatibilityManager;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.runtime.protocol.RebindableServiceConnector;
 import com.warden.controlledsandbox.sdk.CasSandboxEngine;
 import com.warden.controlledsandbox.sdk.SandboxCatalog;
 import com.warden.controlledsandbox.sdk.SandboxEngineObserver;
@@ -409,6 +412,59 @@ public final class DebugCommandActivity extends Activity {
                 operation = runtime.launchComponentAwaitingActivityCreated(record, virtualUserId,
                         component, componentIntentExtras(extras));
                 requireStatus("launch-component", operation, "LAUNCH_PASS");
+            } else if ("p1-09-visual-launch".equals(command)) {
+                String component = extras.getString("component", "").trim();
+                if (component.isEmpty()) {
+                    throw new IllegalArgumentException("component extra is required");
+                }
+                // P1-09 needs the ordinary visual readiness contract, unlike the semantic
+                // probes above which intentionally complete from onCreate.  This does not
+                // alter the product deadline or retry policy: RuntimeActivityLaunchCoordinator
+                // supplies the existing request/session/generation-bound terminal receipt.
+                operation = runtime.launchComponent(record, virtualUserId, component,
+                        componentIntentExtras(extras), true);
+                requireStatus("p1-09-visual-launch", operation, "LAUNCH_PASS");
+            } else if ("p1-10-payload-launch".equals(command)) {
+                int payloadBytes = extras.getInt("payloadBytes", 0);
+                if (payloadBytes < 1 || payloadBytes > 1_100_000) {
+                    throw new IllegalArgumentException("payloadBytes must be 1..1100000");
+                }
+                // Generate in the Host rather than placing a large array in the ADB command.
+                // This is the actual Guest -> Broker route under test; the fixture checks the
+                // deterministic content after the one-time FD/token route is consumed.
+                byte[] payload = p110Payload(payloadBytes);
+                CRC32 checksum = new CRC32();
+                checksum.update(payload);
+                Bundle payloadExtras = new Bundle();
+                payloadExtras.putByteArray("p110.payload", payload);
+                payloadExtras.putInt("p110.payloadBytes", payloadBytes);
+                payloadExtras.putLong("p110.checksum", checksum.getValue());
+                operation = runtime.launchComponentAwaitingActivityCreated(record, virtualUserId,
+                        "com.warden.controlledsandbox.fixture.P110PayloadProbeActivity",
+                        payloadExtras);
+                requireStatus("p1-10-payload-launch", operation, "LAUNCH_PASS");
+                operation.putInt("payloadBytes", payloadBytes);
+                operation.putLong("payloadChecksum", checksum.getValue());
+            } else if ("p1-13-dcl-probe".equals(command)) {
+                boolean readOnly = extras.getBoolean("readOnly", false);
+                operation = p113DynamicCodeProbe(packageName, readOnly);
+                result.put("p113ReadOnly", readOnly);
+            } else if ("p1-14-webview-probe".equals(command)) {
+                // This is an offline fixture probe.  The values are placed in the component
+                // intent explicitly rather than forwarding arbitrary debug extras into Guest
+                // code; it exercises the normal Activity/first-frame route only.
+                Bundle webViewExtras = new Bundle();
+                webViewExtras.putString("p114.token", extras.getString("token", ""));
+                webViewExtras.putString("p114.requestId", requestId);
+                webViewExtras.putBoolean("p114.writeToken", extras.getBoolean("writeToken", true));
+                webViewExtras.putBoolean("p114.crashRenderer",
+                        extras.getBoolean("crashRenderer", false));
+                operation = runtime.launchComponent(record, virtualUserId,
+                        "com.warden.controlledsandbox.fixture.P114WebViewProbeActivity",
+                        webViewExtras, true);
+                requireStatus("p1-14-webview-probe", operation, "LAUNCH_PASS");
+                result.put("p114RendererCrashRequested",
+                        webViewExtras.getBoolean("p114.crashRenderer"));
             } else if ("p1-04-bootstrap-suite".equals(command)) {
                 String component = extras.getString("component", "").trim();
                 if (component.isEmpty()) {
@@ -673,7 +729,7 @@ public final class DebugCommandActivity extends Activity {
                 int slotTarget = extras.getInt("slotTarget", -1);
                 operation = runtime.prepare(record, virtualUserId, processName, slotPad, slotTarget);
                 requireStatus("slot-campaign-prepare", operation, "PREPARED", "ALREADY_PREPARED",
-                        "ALREADY_PREPARED_DEGRADED");
+                        "PREPARED_DEGRADED", "ALREADY_PREPARED_DEGRADED");
                 String serviceComponent = extras.getString("component",
                         "com.warden.controlledsandbox.fixture.NativeAdversarialProbeService").trim();
                 if (extras.getBoolean("startService", true)) {
@@ -688,14 +744,37 @@ public final class DebugCommandActivity extends Activity {
                 result.put("processName", processName);
             } else if ("fault-probe".equals(command)) {
                 String mode = extras.getString("mode", "").trim().toLowerCase(java.util.Locale.ROOT);
-                operation = runtime.prepare(record, virtualUserId);
+                // Ordinary Guests own a bound Broker lease.  For this recovery probe, start the
+                // same Broker service explicitly (the isolated-component coordinator uses this
+                // START_STICKY ownership form too) so the Broker's death recipient and prewarm
+                // executor survive the one-shot debug client's eventual unbind.
+                android.content.ComponentName p111BrokerOwner = startService(new Intent(this,
+                        com.warden.controlledsandbox.runtime.broker.RuntimeBrokerService.class));
+                if (p111BrokerOwner == null) {
+                    throw new IllegalStateException("P1_11_BROKER_START_REJECTED");
+                }
+                result.put("p111BrokerOwner", p111BrokerOwner.flattenToShortString());
+                String faultProcess = switch (mode) {
+                    case "java", "uncaught" -> "com.warden.controlledsandbox.fixture:p111_java_crash";
+                    case "main" -> "com.warden.controlledsandbox.fixture:fault_main";
+                    case "service" -> "com.warden.controlledsandbox.fixture:fault_svc";
+                    case "anr-activity" -> "com.warden.controlledsandbox.fixture:fault_anr";
+                    case "anr-service" -> "com.warden.controlledsandbox.fixture:fault_anr_svc";
+                    case "anr-provider" -> "com.warden.controlledsandbox.fixture:fault_anr_provider";
+                    case "native-segv", "segv" -> "com.warden.controlledsandbox.fixture:fault_native";
+                    case "native-abort", "abort" -> "com.warden.controlledsandbox.fixture:fault_abort_svc";
+                    case "isolated-native-segv", "isolated-native-abort" -> extras.getString(
+                            "processName", "com.warden.controlledsandbox.fixture:fault_iso_native").trim();
+                    default -> throw new IllegalArgumentException("Unsupported fault mode: " + mode);
+                };
+                operation = runtime.prepare(record, virtualUserId, faultProcess, 0);
                 requireStatus("fault-prepare", operation, "PREPARED", "ALREADY_PREPARED",
-                        "ALREADY_PREPARED_DEGRADED");
+                        "PREPARED_DEGRADED", "ALREADY_PREPARED_DEGRADED");
                 result.put("generationBefore", operation.getLong(RuntimeKeys.GENERATION, -1L));
                 result.put("slotBefore", operation.getInt(RuntimeKeys.PROCESS_SLOT, -1));
                 if ("java".equals(mode) || "uncaught".equals(mode)) {
-                    operation = runtime.launchComponent(record, virtualUserId,
-                            "com.warden.controlledsandbox.fixture.FaultJavaCrashActivity");
+                    operation = runtime.startService(record, virtualUserId,
+                            "com.warden.controlledsandbox.fixture.P111JavaCrashService", faultProcess);
                 } else if ("main".equals(mode)) {
                     operation = runtime.launchComponent(record, virtualUserId,
                             "com.warden.controlledsandbox.fixture.FaultMainThreadCrashActivity");
@@ -719,22 +798,54 @@ public final class DebugCommandActivity extends Activity {
                     operation = runtime.launchComponent(record, virtualUserId,
                             "com.warden.controlledsandbox.fixture.FaultNativeCrashActivity");
                 } else if ("native-abort".equals(mode) || "abort".equals(mode)) {
-                    operation = runtime.launchComponent(record, virtualUserId,
-                            "com.warden.controlledsandbox.fixture.FaultNativeAbortActivity");
+                    operation = runtime.startService(record, virtualUserId,
+                            "com.warden.controlledsandbox.fixture.P111NativeAbortService", faultProcess);
                 } else if ("isolated-native-segv".equals(mode) || "isolated-native-abort".equals(mode)) {
                     operation = runtime.startService(record, virtualUserId,
                             "com.warden.controlledsandbox.fixture.IsolatedFaultNativeService",
                             extras.getString("processName",
                                     "com.warden.controlledsandbox.fixture:fault_iso_native").trim());
-                } else {
-                    throw new IllegalArgumentException("Unsupported fault mode: " + mode);
+                }
+                if ("java".equals(mode) || "uncaught".equals(mode)
+                        || "native-abort".equals(mode) || "abort".equals(mode)) {
+                    // RuntimeBrokerService is a bound service in the debug harness. Keep this
+                    // client alive through the 1_500 ms prewarm schedule and one observed
+                    // Guest prepare (~1_500 ms on the API-35 AVD), so a returned command does
+                    // not tear down the Binder transport mid-recovery.
+                    android.os.SystemClock.sleep(4_500L);
                 }
                 result.put("faultMode", mode);
+                result.put("faultProcess", faultProcess);
                 result.put("faultOperation", bundleJson(operation));
+            } else if ("p1-11-prepare-failure".equals(command)) {
+                // The process is declared in the fixture manifest.  Its Application throws during
+                // the real Guest prepare transaction, exercising ALLOCATED/PREPARING rollback
+                // rather than fabricating a failure in the debug caller.
+                String processName = "com.warden.controlledsandbox.fixture:p111_prepare_failure";
+                operation = runtime.prepare(record, virtualUserId, processName, 0);
+                if (!"FAILED".equals(operation.getString(RuntimeKeys.STATUS, ""))) {
+                    throw new IllegalStateException("P111_PREPARE_FAILURE_NOT_REPORTED:"
+                            + operation.getString(RuntimeKeys.STATUS, ""));
+                }
+                result.put("failureExpected", true);
+                result.put("processName", processName);
+            } else if ("p1-11-late-connection".equals(command)) {
+                operation = p111LateConnectionProbe();
+                result.put("lateConnection", bundleJson(operation));
+            } else if ("p1-11-explicit-recover".equals(command)) {
+                String processName = extras.getString("processName", "").trim();
+                if (processName.isEmpty()) {
+                    throw new IllegalArgumentException("processName is required for explicit recovery");
+                }
+                operation = runtime.prepare(record, virtualUserId, processName, 0);
+                requireStatus("p1-11-explicit-recover", operation, "PREPARED",
+                        "ALREADY_PREPARED", "PREPARED_DEGRADED", "ALREADY_PREPARED_DEGRADED");
+                result.put("processName", processName);
+                result.put("recoveryExplicit", true);
             } else if ("pi-system-holder".equals(command)) {
                 operation = runtime.prepare(record, virtualUserId);
                 requireStatus("pi-system-holder-prepare", operation, "PREPARED", "ALREADY_PREPARED",
-                        "ALREADY_PREPARED_DEGRADED");
+                        "PREPARED_DEGRADED", "ALREADY_PREPARED_DEGRADED");
                 operation = runtime.launchComponent(record, virtualUserId,
                         extras.getString("component",
                                 "com.warden.controlledsandbox.fixture.SystemHolderPendingIntentActivity")
@@ -807,6 +918,52 @@ public final class DebugCommandActivity extends Activity {
             if (!"hold-prepare".equals(command)) writeResult(result);
             runOnUiThread(() -> { finish(); worker.shutdown(); });
         }
+    }
+
+    private Bundle p111LateConnectionProbe() throws Exception {
+        Intent delayed = new Intent(this, P111LateConnectionService.class)
+                .putExtra("p111.late", true);
+        RebindableServiceConnector<IBinder> first = new RebindableServiceConnector<>(this,
+                delayed, binder -> binder, ignored -> { }, "P1-11 delayed service",
+                Context.BIND_AUTO_CREATE, 75L, 0L, 0L);
+        try {
+            try {
+                first.requireSingleAttempt();
+                throw new IllegalStateException("P111_LATE_BIND_DID_NOT_TIMEOUT");
+            } catch (IllegalStateException expected) {
+                RebindableServiceConnector.Snapshot timeout = first.snapshot();
+                if (!"BIND_TIMEOUT".equals(timeout.lastFailure()) || timeout.connected()
+                        || timeout.binding()) {
+                    throw new IllegalStateException("P111_LATE_BIND_WRONG_TERMINAL:"
+                            + timeout.lastFailure());
+                }
+            }
+            // The delayed callback now arrives for the retired Attempt.  It must be closed and
+            // unbound instead of publishing a stale Binder into the connector.
+            Thread.sleep(450L);
+            RebindableServiceConnector.Snapshot afterLate = first.snapshot();
+            if (afterLate.connected() || afterLate.binding()) {
+                throw new IllegalStateException("P111_LATE_BIND_RESURRECTED");
+            }
+        } finally {
+            first.close();
+        }
+        Intent immediate = new Intent(this, P111LateConnectionService.class)
+                .putExtra("p111.late", false);
+        try (RebindableServiceConnector<IBinder> second = new RebindableServiceConnector<>(this,
+                immediate, binder -> binder, ignored -> { }, "P1-11 immediate service",
+                Context.BIND_AUTO_CREATE, 1_000L, 0L, 0L)) {
+            if (second.requireSingleAttempt() == null) {
+                throw new IllegalStateException("P111_LATE_BIND_RECOVERY_NULL");
+            }
+        }
+        Bundle out = new Bundle();
+        out.putString(RuntimeKeys.STATUS, "P1_11_LATE_CONNECTION_PASS");
+        out.putString("firstFailure", "BIND_TIMEOUT");
+        out.putBoolean("lateCallbackPublished", false);
+        out.putBoolean("explicitRecoveryConnected", true);
+        Log.i(TAG, "P1_11_LATE_CONNECTION_PASS");
+        return out;
     }
 
     private static int awaitServiceStartId(RuntimeClient runtime, SandboxRecord record,
@@ -1028,6 +1185,83 @@ public final class DebugCommandActivity extends Activity {
                 enabled ? java.util.List.of("0") : java.util.List.of(), java.util.List.of(),
                 source == null ? VirtualCameraSourceSnapshot.none() : source,
                 enabled && configured);
+    }
+
+    private static byte[] p110Payload(int length) {
+        byte[] payload = new byte[length];
+        for (int index = 0; index < length; index++) {
+            payload[index] = (byte) ((index * 31 + 17) & 0xff);
+        }
+        return payload;
+    }
+
+    /**
+     * Debug-only witness for Android 14's DCL read-only contract.  The probe copies a locally
+     * installed fixture APK into the Host's private code cache, marks the positive copy
+     * read-only before writing bytes, and then asks the platform PathClassLoader to resolve a
+     * fixture-only class.  The negative copy remains writable and its platform exception is
+     * reported rather than converted into a successful load.  It is not a Guest runtime loader.
+     */
+    private Bundle p113DynamicCodeProbe(String packageName, boolean readOnly) throws Exception {
+        if (packageName == null || packageName.trim().isEmpty()) {
+            throw new IllegalArgumentException("packageName is required");
+        }
+        ApplicationInfo sourceInfo = getPackageManager().getApplicationInfo(packageName.trim(), 0);
+        File source = new File(sourceInfo.sourceDir);
+        if (!source.isFile()) throw new IllegalStateException("P113_SOURCE_APK_MISSING");
+        File target = new File(getCodeCacheDir(), "p113-"
+                + (readOnly ? "readonly" : "writable") + ".apk");
+        if (target.exists() && !target.delete()) {
+            throw new IllegalStateException("P113_DCL_STALE_FILE_DELETE_FAILED");
+        }
+        boolean markedReadOnly = false;
+        try (FileInputStream input = new FileInputStream(source);
+             FileOutputStream output = new FileOutputStream(target)) {
+            if (readOnly) {
+                markedReadOnly = target.setReadOnly();
+                if (!markedReadOnly) throw new IllegalStateException("P113_DCL_SET_READ_ONLY_FAILED");
+            }
+            byte[] buffer = new byte[8192];
+            int count;
+            while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+            output.getFD().sync();
+        }
+        Bundle out = new Bundle();
+        out.putBoolean("readOnlyRequested", readOnly);
+        out.putBoolean("readOnlyMarkedBeforeWrite", markedReadOnly);
+        out.putString("copiedSource", source.getName());
+        out.putLong("copiedBytes", target.length());
+        try {
+            PathClassLoader loader = new PathClassLoader(target.getAbsolutePath(), getClassLoader());
+            Class<?> loaded = loader.loadClass(
+                    "com.warden.controlledsandbox.fixture.FixtureApplication");
+            if (!readOnly) {
+                // Deliberately leave this outside the rejection branch: a writable load is a
+                // failed negative case, never evidence that the platform rejected it.
+                throw new AssertionError("P113_WRITABLE_DCL_UNEXPECTEDLY_LOADED:"
+                        + loaded.getName());
+            }
+            out.putString(RuntimeKeys.STATUS, "P1_13_DCL_READONLY_PASS");
+            out.putString("loadedClass", loaded.getName());
+            Log.i(TAG, "P1_13_DCL_READONLY_PASS bytes=" + target.length());
+        } catch (Throwable error) {
+            if (readOnly) {
+                if (error instanceof Exception) throw (Exception) error;
+                if (error instanceof Error) throw (Error) error;
+                throw new IllegalStateException("P113_DCL_READONLY_FAILURE", error);
+            }
+            if (error instanceof AssertionError) throw error;
+            out.putString(RuntimeKeys.STATUS, "P1_13_DCL_WRITABLE_REJECTED");
+            out.putString("rejectionType", error.getClass().getName());
+            out.putString("rejectionMessage", String.valueOf(error.getMessage()));
+            Log.i(TAG, "P1_13_DCL_WRITABLE_REJECTED type=" + error.getClass().getName());
+        } finally {
+            if (target.exists()) {
+                target.setWritable(true);
+                if (!target.delete()) Log.w(TAG, "P113_DCL_CLEANUP_FAILED " + target);
+            }
+        }
+        return out;
     }
 
     private static Bundle componentIntentExtras(Bundle extras) {

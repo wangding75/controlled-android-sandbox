@@ -215,6 +215,15 @@ public final class VirtualSystemServiceInterceptor {
             String channelId = notificationChannelId(arguments);
             boolean created = findNotification(guestId, guestTag) == null;
             NotificationMetadata metadata = notificationMetadata(arguments, guestId, guestTag);
+            // Normal notifications must not escape through the Host identity when the current
+            // Guest generation has denied POST_NOTIFICATIONS.  The host application's grant is
+            // not a substitute for the Guest decision.  Android still permits a foreground
+            // service to publish its mandatory service notification while drawer visibility is
+            // denied, so preserve only that distinct framework-owned path.
+            if (!metadata.foregroundService && !identity.permissionPolicy().isGranted(
+                    "android.permission.POST_NOTIFICATIONS")) {
+                return Call.handled(defaultValue(method.getReturnType()));
+            }
             VirtualSystemServiceAuthority.NotificationRecord candidate = new VirtualSystemServiceAuthority.NotificationRecord(
                     guestId, 0, guestTag, "", channelId, "RESERVED", identity.packageRevision(),
                     metadata.contentIntentTokenId, metadata.deleteIntentTokenId, metadata.actionIntentTokenIds,

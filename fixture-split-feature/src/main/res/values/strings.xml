@@ -1,3 +1,4 @@
 <resources>
     <string name="feature_name">CAS Split Feature</string>
+    <string name="p113_config_marker">feature-default</string>
 </resources>
