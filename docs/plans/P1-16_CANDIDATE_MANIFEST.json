@@ -1,0 +1,55 @@
+{
+  "candidate_id": "p1-gate-20260909",
+  "source_head": "a95225ba213b78a3b78bc537aa7675ee2bc1f362",
+  "working_tree_code_changes": [
+    "fixture-split-feature/build.gradle",
+    "tools/verification/capabilities/smoke.py"
+  ],
+  "runtime_policy_changed": false,
+  "build_variant": "debug",
+  "artifacts": [
+    {
+      "role": "host",
+      "path": "app/build/outputs/apk/debug/app-debug.apk",
+      "sha256": "a136cea2897a0f0f2c61064fdf7da8db543efd2da01d17f68ced93afde2e787e"
+    },
+    {
+      "role": "arm64-capable-fixture",
+      "path": "fixture-basic/build/outputs/apk/debug/fixture-basic-debug.apk",
+      "sha256": "35230e85bdc9a6c254cbfc3b2a226eb3c33da399b845b6ee1c0171e9bcc2969f"
+    },
+    {
+      "role": "conditional-companion32",
+      "path": "fixture-compat32/build/outputs/apk/debug/fixture-compat32-debug.apk",
+      "sha256": "47f01bfd30ce99dead80c87f3b505b74f131c00184be490c179c5831eb8b7db8",
+      "install_policy": "only when the target device requires a 32-bit companion"
+    },
+    {
+      "role": "split-base",
+      "path": "fixture-split-base/build/outputs/apk/debug/fixture-split-base-debug.apk",
+      "sha256": "2f2989ba4cda4960185904c388766b800f5060afd6b01b75d4f785797244309d"
+    },
+    {
+      "role": "split-feature",
+      "path": "fixture-split-feature/build/outputs/apk/debug/fixtureSplitFeature-debug.apk",
+      "sha256": "841aa8acf6d20ba78cf1e923fa7088bc486396bd64b8daf9dceedd5f7e835b80",
+      "version_coordinate": "versionCode=1; versionName=1.0-split"
+    }
+  ],
+  "gate_evidence": {
+    "api35": "out/verification/p1-16-api35-final-gate-20260909",
+    "api36": "out/verification/p1-16-api36-final-gate-20260909",
+    "api35_split_regression": "out/verification/p1-16-api35-split-version-coherent-20260909",
+    "api36_split_regression": "out/verification/p1-13-api36-version-coherent-20260909",
+    "static_compile": "build/static-android-compile",
+    "native_boundary": "out/verification/p1-15-api36-native-20260909"
+  },
+  "not_claimed": [
+    "ARM64 physical/OEM behavior",
+    "Xiaomi HyperOS commercial-app compatibility",
+    "VA PRO equivalence",
+    "hostile native-process isolation",
+    "large regression or eight-hour stability"
+  ],
+  "next_task": "P2-01"
+}

@@ -731,7 +731,11 @@ def _invoke_debug(
     debug_component_ready = _wait_for_component(
         device, DEBUG_COMPONENT, timeout_sec=15.0
     )
-    host_teardown = _fence_host_before_start(device, force_stop=force_stop_host)
+    host_teardown = _fence_host_before_start(
+        device,
+        force_stop=force_stop_host,
+        guest_package=package,
+    )
     device.run_as_remove(HOST_PACKAGE, "files/debug-command-result.json")
     device.clear_logcat()
     request_id = _request_id(command)
@@ -869,10 +873,13 @@ def _wait_for_package_update_idle(
 
 
 def _fence_host_before_start(
-    device: AdbDevice, *, force_stop: bool, timeout_sec: float = 15.0
+    device: AdbDevice, *, force_stop: bool, guest_package: str = "",
+    timeout_sec: float = 15.0
 ) -> dict[str, Any]:
-    """Fence Host process and ATMS/WM teardown before dispatching a new command."""
+    """Fence a cold Host command and its named Guest fixture before dispatching it."""
     stop_result: AdbCommandResult | None = None
+    guest_stop_result: AdbCommandResult | None = None
+    guest_stopped = False
     if force_stop:
         stop_result = device.force_stop(HOST_PACKAGE)
         require(
@@ -888,12 +895,35 @@ def _fence_host_before_start(
             f"package={HOST_PACKAGE}",
             classification=FailureClass.HARNESS_DEFECT,
         )
+        normalized_guest = (guest_package or "").strip()
+        if normalized_guest and normalized_guest != HOST_PACKAGE:
+            # A Host force-stop retires the Broker/ledger but an independently installed fixture
+            # can retain its physical Activity.  A cold S03 must not inherit that stale task;
+            # S04 deliberately skips this fence and proves reuse from the new S03 session.
+            guest_stop_result = device.force_stop(normalized_guest)
+            require(
+                guest_stop_result.ok,
+                "GUEST_FIXTURE_FORCE_STOP_FAILED",
+                _command_dict(guest_stop_result),
+                classification=FailureClass.ENVIRONMENT,
+            )
+            guest_stopped = device.wait_for_package_stopped(normalized_guest, timeout_sec)
+            require(
+                guest_stopped,
+                "GUEST_FIXTURE_PROCESS_STOP_TIMEOUT",
+                f"package={normalized_guest}",
+                classification=FailureClass.HARNESS_DEFECT,
+            )
     teardown = _wait_for_host_activity_teardown(
         device, timeout_sec, include_guest_activities=force_stop
     )
     return {
         "force_stop": _command_dict(stop_result) if stop_result is not None else None,
         "process_stopped": force_stop,
+        "guest_force_stop": (
+            _command_dict(guest_stop_result) if guest_stop_result is not None else None
+        ),
+        "guest_process_stopped": guest_stopped,
         "activity_teardown": teardown,
     }
 

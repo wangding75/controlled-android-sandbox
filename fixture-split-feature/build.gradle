@@ -10,6 +10,10 @@ android {
     defaultConfig {
         minSdk = rootProject.ext.controlledMinSdk
         targetSdk = rootProject.ext.controlledTargetSdk
+        // Keep every APK in a base+feature session on the revision selected by the
+        // P1-13 runner.  An old feature manifest must never be paired with a rebuilt base.
+        versionCode = (findProperty('p113VersionCode') ?: 1).toInteger()
+        versionName = "${findProperty('p113VersionName') ?: '1.0-split'}"
     }
 
     buildTypes { release { minifyEnabled false } }

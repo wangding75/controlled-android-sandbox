@@ -37,3 +37,9 @@ This is a Java-only split set. The observed `nativeLibCount=0` and `nativeBytesE
 * `git diff --check`: PASS.
 
 Large regression and the eight-hour stability run were not started and remain final-stage work.
+
+## 2026-09-09 packaging-regression closure
+
+The P1-15 capability invocation preserved a real installation failure: the base fixture declared version code 1 while the dynamic-feature APK still declared version code 2, so Android rejected the set as inconsistent. Before changing it, `P1-13_SPLIT_REGRESSION_DECISION.md` rechecked NBB `PackageManagerCompat` and VA `PackageParserEx`/`NativeEngine` paths and retained CAS's requirement for one complete, internally coherent split revision set. `fixture-split-feature/build.gradle` now consumes the same `p113VersionCode` and `p113VersionName` properties/defaults as the base; CAS runtime code and split-session validation were not loosened.
+
+After rebuilding, `apkanalyzer` reported version 1 for both base and feature, direct `adb install-multiple` accepted the set, and the exclusive rerun `out/verification/p1-13-api36-version-coherent-20260909/run.json` passed on its first attempt with no automatic retry. It covers base + configuration split + feature, three lifecycle rounds, and virtual users 0 and 1.
