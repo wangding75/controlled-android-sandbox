@@ -31,10 +31,12 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
@@ -203,7 +205,20 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
             routedRequest.putString(RuntimeKeys.CONNECTION_ID, UUID.randomUUID().toString());
         }
         routedRequest.putBinder(RuntimeKeys.SERVICE_CONNECTION_BINDER, new Binder());
-        Route route = route(routedRequest, guestClass);
+        synchronized (hostConnections) {
+            // A caller may retry the same ServiceConnection after a failed bind. The marker is
+            // only for the one cleanup edge associated with the previous attempt.
+            failedConnections.remove(guestConnection);
+        }
+        Route route;
+        try {
+            route = route(routedRequest, guestClass);
+        } catch (Throwable error) {
+            rememberFailedBinding(guestConnection);
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            throw error instanceof RuntimeException
+                    ? (RuntimeException) error : new IllegalStateException(error);
+        }
         HostConnection hostConnection = new HostConnection(route, guestConnection,
                 executor == null ? session.context.getMainExecutor() : executor);
         if (closed) {
@@ -218,6 +233,7 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
         } catch (Throwable error) {
             hostConnection.close();
             synchronized (hostConnections) { hostConnections.remove(guestConnection, hostConnection); }
+            rememberFailedBinding(guestConnection);
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             throw error instanceof RuntimeException
                     ? (RuntimeException) error : new IllegalStateException(error);
@@ -239,6 +255,7 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
             hostConnection.close();
             hostConnection.published = false;
             synchronized (hostConnections) { hostConnections.remove(guestConnection, hostConnection); }
+            rememberFailedBinding(guestConnection);
         }
         return accepted;
     }
@@ -265,10 +282,17 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
             return;
         }
         HostConnection found = null;
+        boolean failed = false;
         synchronized (hostConnections) {
             found = hostConnections.remove(guestConnection);
+            failed = failedConnections.remove(guestConnection);
         }
         if (found == null) {
+            if (failed) {
+                android.util.Log.i("CS_SERVICE_FRAMEWORK",
+                        "unbind ignored after failed bind");
+                return;
+            }
             // close() may win the race after the first closed check and clear the map while a
             // framework callback is still unwinding.  Keep strict Android behavior while live,
             // but converge teardown races on an idempotent terminal edge.
@@ -285,7 +309,38 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
         session.context.hostServiceContext().unbindService(found);
     }
 
+    /** Forwards AOSP's advisory process-group hint through the physical relay binding. */
+    boolean updateServiceGroup(ServiceConnection guestConnection, int group, int importance) {
+        if (guestConnection == null) throw new IllegalArgumentException("connection is null");
+        HostConnection found;
+        boolean failed;
+        synchronized (hostConnections) {
+            found = hostConnections.get(guestConnection);
+            failed = failedConnections.contains(guestConnection);
+        }
+        if (found == null) {
+            if (closed || failed) return false;
+            return false;
+        }
+        if (found.closed || !found.published) {
+            android.util.Log.i("CS_SERVICE_FRAMEWORK",
+                    "updateServiceGroup ignored before host binding publication");
+            return true;
+        }
+        session.context.hostServiceContext().updateServiceGroup(found, group, importance);
+        return true;
+    }
+
     private final Map<ServiceConnection, HostConnection> hostConnections = new IdentityHashMap<>();
+    private final Set<ServiceConnection> failedConnections =
+            Collections.newSetFromMap(new IdentityHashMap<>());
+
+    private void rememberFailedBinding(ServiceConnection guestConnection) {
+        if (guestConnection == null) return;
+        synchronized (hostConnections) {
+            failedConnections.add(guestConnection);
+        }
+    }
 
     private Route route(Bundle request, String guestClass) {
         if (closed) throw new IllegalStateException("GUEST_SERVICE_FRAMEWORK_BRIDGE_CLOSED");
@@ -327,6 +382,7 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
         copyString(route.request, intent, RuntimeKeys.INTENT_COMPONENT_PACKAGE);
         copyString(route.request, intent, RuntimeKeys.INTENT_COMPONENT_CLASS);
         copyString(route.request, intent, RuntimeKeys.CONNECTION_ID);
+        copyBoolean(route.request, intent, RuntimeKeys.ISOLATED_SERVICE_BIND_FALLBACK);
         copyBoolean(route.request, intent, RuntimeKeys.SERVICE_RECOVERY);
         copyBoolean(route.request, intent, RuntimeKeys.SERVICE_REDELIVERED);
         copyBoolean(route.request, intent, RuntimeKeys.FRAMEWORK_SERVICE_FOREGROUND);
@@ -381,6 +437,7 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
         synchronized (hostConnections) {
             boundConnections = new ArrayList<>(hostConnections.values());
             hostConnections.clear();
+            failedConnections.clear();
         }
         for (HostConnection connection : boundConnections) {
             connection.close();

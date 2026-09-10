@@ -47,6 +47,44 @@ final class GuestSharedLibraryPathResolver {
     }
 
     /**
+     * Mirrors the native-element portion of platform {@code LoadedApk.makePaths}: a resolved
+     * shared-library APK contributes {@code apk!/lib/<primaryCpuAbi>} to the defining loader.
+     * CAS constructs that loader directly, so projecting {@code sharedLibraryFiles} alone is
+     * insufficient.  Sources still come exclusively from the package authority's already
+     * resolved shared-library projection; this is not a Host library-directory fallback.
+     */
+    static String appendResolvedNativeLibraryPaths(String baseNativePath,
+                                                   VirtualPackageStateSnapshot state,
+                                                   List<VirtualPackageProjectionSnapshot> universe,
+                                                   String nativeAbi) {
+        String base = baseNativePath == null ? "" : baseNativePath.trim();
+        String abi = nativeAbi == null ? "" : nativeAbi.trim();
+        if (state == null || abi.isEmpty()) return base;
+        android.content.pm.ApplicationInfo applicationInfo = state.applicationInfo();
+        if (applicationInfo == null || applicationInfo.targetSdkVersion < 26) return base;
+        Set<String> seen = new HashSet<>();
+        if (!base.isEmpty()) {
+            for (String path : base.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
+                if (!path.trim().isEmpty()) seen.add(path.trim());
+            }
+        }
+        StringBuilder result = new StringBuilder(base);
+        int added = 0;
+        for (String archive : resolvedSharedLibraryFiles(state, universe)) {
+            String element = nativeArchiveElement(archive, abi);
+            if (element.isEmpty() || !seen.add(element)) continue;
+            if (result.length() > 0) result.append(File.pathSeparator);
+            result.append(element);
+            added++;
+        }
+        if (added > 0) {
+            android.util.Log.i("CS_SHARED_LIBRARY_ROUTE", "nativeElements=" + added
+                    + " abi=" + abi);
+        }
+        return result.toString();
+    }
+
+    /**
      * Projects the same immutable provider APK set into ApplicationInfo.sharedLibraryFiles.
      * Chromium and other platform-aware loaders consult that field independently of the
      * ClassLoader dex path, so leaving it null creates a split/shared-library mismatch even when
@@ -170,6 +208,18 @@ final class GuestSharedLibraryPathResolver {
         } catch (java.io.IOException error) {
             throw new IllegalStateException("SHARED_LIBRARY_PROVIDER_APK_UNAVAILABLE:" + provider,
                     error);
+        }
+    }
+
+    private static String nativeArchiveElement(String rawPath, String abi) {
+        String value = rawPath == null ? "" : rawPath.trim();
+        if (value.isEmpty() || abi == null || abi.trim().isEmpty()) return "";
+        try {
+            File archive = new File(value).getCanonicalFile();
+            if (!archive.isFile() || !archive.getName().endsWith(".apk")) return "";
+            return archive.getPath() + "!/lib/" + abi.trim();
+        } catch (java.io.IOException ignored) {
+            return "";
         }
     }
 

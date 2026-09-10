@@ -423,10 +423,22 @@ public final class GuestRuntimeEnvironment {
             GuestNativeBindingDiagnostic.recordLoader("guest.base", loader);
             GuestNativeBindingDiagnostic.recordLoader("guest.dex", loader.definingLoader());
             GuestResourceLoader.LoadedResources loadedResources;
+            List<String> resolvedSharedLibraryFiles = spec.isolatedProcess
+                    ? List.of()
+                    : GuestSharedLibraryPathResolver.resolvedSharedLibraryFiles(
+                            spec.packageState, spec.packageUniverse);
+            boolean providerAssetsPreloaded = !spec.isolatedProcess
+                    && android.os.Build.VERSION.SDK_INT >= 36
+                    && containsApkPath(resolvedSharedLibraryFiles);
             try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.RESOURCES)) {
                 loadedResources = spec.isolatedProcess
                         ? GuestResourceLoader.load(host, spec.apkDescriptor, spec.splitDescriptors)
-                        : GuestResourceLoader.load(host, spec.apkPath, spec.splitPathArray());
+                        : providerAssetsPreloaded
+                                ? GuestResourceLoader.loadWithProviderAssetsFirst(host,
+                                        spec.apkPath, spec.splitPathArray(),
+                                        resolvedSharedLibraryFiles)
+                                : GuestResourceLoader.load(host, spec.apkPath,
+                                        spec.splitPathArray());
             }
             PackageManager processPackageManager = host.getPackageManager();
             // VirtualPackageStateBuilder already parsed the manifest at import time and carries
@@ -531,7 +543,8 @@ public final class GuestRuntimeEnvironment {
             WebViewProfileManager.Profile webViewProfile = WebViewProfileManager.install(
                     spec, virtualServices.compatibilityProfile().webView());
             guestContext.configureWebViewProvider(
-                    virtualServices.compatibilityProfile().webView().providerPackage());
+                    virtualServices.compatibilityProfile().webView().providerPackage(),
+                    providerAssetsPreloaded);
             GuestFrameworkCallRouter frameworkCallRouter = new GuestFrameworkCallRouter(
                     guestContext, spec, virtualServices.pendingIntents(),
                     new GuestPendingIntentDispatcher(guestContext, spec),
@@ -850,6 +863,8 @@ public final class GuestRuntimeEnvironment {
                 spec, guestDataRoot, packagedNativeLibraryDir);
         String nativeLibrarySearchPath = GuestNativeRuntimeProjection.searchPath(
                 spec, guestDataRoot, packagedNativeLibraryDir);
+        nativeLibrarySearchPath = GuestSharedLibraryPathResolver.appendResolvedNativeLibraryPaths(
+                nativeLibrarySearchPath, spec.packageState, spec.packageUniverse, spec.nativeAbi);
         String guestDexPath = spec.dexPath();
         String coreDexMode = "apk";
         int virtualPid = 20000 + (spec.virtualUserId * 100) + spec.processSlot;
@@ -882,7 +897,8 @@ public final class GuestRuntimeEnvironment {
         // Do not install a second signal-chain handler in a foreign-ABI process.  The
         // platform bridge and Quark's CrashSDK already own that chain; CAS's recorder is
         // retained for native-ABI guests where the calling convention is ours.
-        boolean nativeCrashRecorderInstalled = nativePolicyConfigured && !isTranslatedGuestAbi(spec.nativeAbi)
+        boolean nativeCrashRecorderInstalled = nativePolicyConfigured
+                && !isTranslatedGuestAbi(spec.nativeAbi)
                 && nativeCrashFile != null
                 && NativePolicy.installCrashRecorder(nativeCrashFile.getAbsolutePath());
         return new NativeBootstrap(nativeAbi, packagedNativeLibraryDir, guestDataRoot,
@@ -1404,6 +1420,14 @@ public final class GuestRuntimeEnvironment {
     }
 
     private static String safe(String value) { return value.replaceAll("[^A-Za-z0-9._-]", "_"); }
+
+    private static boolean containsApkPath(List<String> paths) {
+        if (paths == null) return false;
+        for (String path : paths) {
+            if (path != null && path.trim().endsWith(".apk")) return true;
+        }
+        return false;
+    }
 
     /**
      * Isolated processes cannot traverse another package's APK path.  Load the current APK and

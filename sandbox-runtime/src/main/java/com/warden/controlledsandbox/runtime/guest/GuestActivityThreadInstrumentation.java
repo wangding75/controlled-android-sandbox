@@ -38,6 +38,8 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
     private final GuestRuntimeEnvironment.Session session;
     private final Map<Activity, Launch> launches =
             Collections.synchronizedMap(new IdentityHashMap<>());
+    private final Map<Activity, java.util.List<AutoCloseable>> activityAutofillHooks =
+            Collections.synchronizedMap(new IdentityHashMap<>());
     private final Map<Activity, Boolean> staleRouteActivities =
             Collections.synchronizedMap(new IdentityHashMap<>());
     private final ExecutorService events = Executors.newSingleThreadExecutor(r -> {
@@ -394,6 +396,7 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
         try (FrameworkClassLoaderScope ignored = enterFrameworkClassLoader()) {
             ActivityFieldBridge.installGuest(activity, session, route.component,
                     route.intent, route.taskId);
+            installActivityAutofillHook(activity);
             Bundle frameworkEvidence = ActivityFieldBridge.promoteFrameworkRecord(activity, session,
                     route.component, route.intent);
             // A reference AppInstrumentation.checkActivity() → ContextCompat.fix() before onCreate.
@@ -408,6 +411,9 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
                     + Math.max(0L, delegateStarted - callbackStarted)
                     + " pid=" + android.os.Process.myPid());
             delegate.callActivityOnCreate(activity, effectiveState);
+            // Chrome creates its content/DecorView during onCreate. Rebind any manager that was
+            // materialized by that framework-owned Context while retaining the first hook above.
+            installActivityAutofillHook(activity);
             android.util.Log.i("CS_FRAMEWORK_ACTIVITY", "CALLBACK_CREATE_DELEGATE_RETURN component="
                     + route.component + " request=" + route.requestId
                     + " operation=" + route.operationId + " delegateElapsedMs="
@@ -452,6 +458,7 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
         try (FrameworkClassLoaderScope ignored = enterFrameworkClassLoader()) {
             ActivityFieldBridge.installGuest(activity, session, route.component,
                     route.intent, route.taskId);
+            installActivityAutofillHook(activity);
             ActivityFieldBridge.promoteFrameworkRecord(activity, session,
                     route.component, route.intent);
             ActivityFieldBridge.fixFrameworkWindowIdentity(activity);
@@ -468,6 +475,7 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
                     + Math.max(0L, delegateStarted - callbackStarted)
                     + " persistable=true pid=" + android.os.Process.myPid());
             delegate.callActivityOnCreate(activity, effectiveState, effectivePersistentState);
+            installActivityAutofillHook(activity);
             android.util.Log.i("CS_FRAMEWORK_ACTIVITY", "CALLBACK_CREATE_DELEGATE_RETURN component="
                     + route.component + " request=" + route.requestId
                     + " operation=" + route.operationId + " delegateElapsedMs="
@@ -586,8 +594,42 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
                 emit(activity, route, "DESTROYED", new Bundle());
             }
         } finally {
+            closeActivityAutofillHooks(activity);
             launches.remove(activity);
         }
+        }
+    }
+
+    private void installActivityAutofillHook(Activity activity) throws Exception {
+        AutoCloseable hook = com.warden.controlledsandbox.framework.service
+                .AutofillManagerServiceHook.installForActivity(
+                        activity, session.frameworkHooks.identity());
+        int count;
+        synchronized (activityAutofillHooks) {
+            count = activityAutofillHooks.computeIfAbsent(activity,
+                    ignored -> new java.util.ArrayList<>()).size();
+            activityAutofillHooks.get(activity).add(hook);
+            count++;
+        }
+        android.util.Log.i("CS_AUTOFILL_PROXY", "ACTIVITY_BINDING_READY activity="
+                + activity.getClass().getName() + " count=" + count);
+    }
+
+    private void closeActivityAutofillHooks(Activity activity) {
+        java.util.List<AutoCloseable> hooks;
+        synchronized (activityAutofillHooks) {
+            hooks = activityAutofillHooks.remove(activity);
+        }
+        if (hooks == null) return;
+        for (int index = hooks.size() - 1; index >= 0; index--) {
+            try {
+                hooks.get(index).close();
+            } catch (Throwable error) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy
+                        .rethrowIfFatal(error);
+                android.util.Log.w("CS_AUTOFILL_PROXY",
+                        "ACTIVITY_BINDING_ROLLBACK_FAILED", error);
+            }
         }
     }
 
@@ -1061,6 +1103,11 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             android.util.Log.e("CS_FRAMEWORK_ACTIVITY", "restore instrumentation failed", error);
         }
+        Activity[] autofillActivities;
+        synchronized (activityAutofillHooks) {
+            autofillActivities = activityAutofillHooks.keySet().toArray(new Activity[0]);
+        }
+        for (Activity activity : autofillActivities) closeActivityAutofillHooks(activity);
         launches.clear();
         staleRouteActivities.clear();
     }

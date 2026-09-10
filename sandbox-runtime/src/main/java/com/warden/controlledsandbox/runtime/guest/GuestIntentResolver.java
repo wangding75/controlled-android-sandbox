@@ -95,7 +95,30 @@ final class GuestIntentResolver {
         if (intent == null) throw new IllegalArgumentException("intent is required");
         ResolveInfo resolved = packageManager.resolveService(intent, 0);
         if (resolved != null) {
-            Target target = target(resolved, Kind.SERVICE);
+            ServiceInfo info = resolved.serviceInfo;
+            if (info == null) throw new IllegalStateException("RESOLVED_SERVICE_INFO_MISSING");
+            Target target;
+            if (isVirtualPackage(value(info.packageName))) {
+                // VA/NBB resolve against the virtual PMS first. A virtual result remains
+                // Guest-owned even when the same package is physically installed on Host.
+                target = target(resolved, Kind.SERVICE);
+            } else if (isAllowedHostService(intent, info)) {
+                // The PackageManager adapter may return the explicitly addressed, exported
+                // system-owner result after the virtual lookup misses. Preserve that owner
+                // decision at the Context boundary; routing it through the Guest Broker would
+                // incorrectly require a virtual package record for a Host component.
+                target = hostTarget(info);
+                android.util.Log.i("CS_GUEST_SERVICE_ROUTE", "owner=HOST_SYSTEM package="
+                        + target.packageName() + " component=" + target.className()
+                        + " process=" + target.processName() + " caller=" + spec.packageName
+                        + " action=" + value(intent.getAction()) + " user=" + spec.virtualUserId);
+            } else {
+                if (hasHostServiceAddress(intent)) {
+                    throw new SecurityException("HOST_SERVICE_OWNER_DENIED");
+                }
+                logResolutionFailure(intent, Kind.SERVICE);
+                return null;
+            }
             android.util.Log.i("CS_GUEST_RESOLVE", "kind=SERVICE component="
                     + target.className() + " process=" + target.processName()
                     + " caller=" + spec.packageName + " processName=" + spec.processName

@@ -41,6 +41,9 @@ public final class CapabilityServiceProxySelfTest {
         try { audio.startRecording("guest.pkg"); }
         catch (SecurityException expected) { denied = expected.getMessage().contains("microphone"); }
         require(denied && audioDelegate.calls == 0, "microphone denied before host delegate");
+        audio.setAllowedCapturePolicy(1);
+        require(audioDelegate.capturePolicyCalls == 1,
+                "playback capture policy is not treated as microphone acquisition");
         require(fixture.events.stream().anyMatch(e -> "DENIED".equals(e.decision())),
                 "denied calls audited");
     }
@@ -178,10 +181,18 @@ public final class CapabilityServiceProxySelfTest {
     static final class FakeLocationRequest { }
     static final class FakeExecutor { }
 
-    interface AudioApi { int startRecording(String packageName); }
+    interface AudioApi {
+        int startRecording(String packageName);
+        int setAllowedCapturePolicy(int capturePolicy);
+    }
     static final class FakeAudioService implements AudioApi {
         int calls;
+        int capturePolicyCalls;
         @Override public int startRecording(String packageName) { calls++; return 7; }
+        @Override public int setAllowedCapturePolicy(int capturePolicy) {
+            capturePolicyCalls++;
+            return 0;
+        }
     }
 
     private record Fixture(GuestIdentity identity, VirtualPermissionPolicy permissions,

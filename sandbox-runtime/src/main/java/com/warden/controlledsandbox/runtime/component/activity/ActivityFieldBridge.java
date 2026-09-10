@@ -1181,6 +1181,12 @@ public final class ActivityFieldBridge {
                 break;
             }
         }
+        if (themeResId == 0) {
+            ApplicationInfo application = session.context().getApplicationInfo();
+            if (application != null) themeResId = application.theme;
+        }
+        android.util.Log.i("CS_FRAMEWORK_ACTIVITY", "GUEST_THEME component="
+                + componentClass + " themeResId=0x" + Integer.toHexString(themeResId));
         if (themeResId != 0) guest.setTheme(themeResId);
     }
 

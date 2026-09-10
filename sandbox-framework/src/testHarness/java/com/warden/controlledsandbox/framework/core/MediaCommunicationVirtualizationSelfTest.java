@@ -63,6 +63,9 @@ public final class MediaCommunicationVirtualizationSelfTest {
         audio.abandonAudioFocus(secondFocus, "guest.pkg");
         audio.abandonAudioFocus(replacementFocus, "guest.pkg");
         audio.setStreamVolume(3, 8, 0, "guest.pkg");
+        audio.playSoundEffect(0);
+        require(!audio.isSupportFakeHfp(1, "guest.pkg"),
+                "guest does not claim host Fake-HFP capability");
         boolean unknownAudioDenied = false;
         try { audio.getDevices(); }
         catch (UnsupportedOperationException expected) { unknownAudioDenied = true; }
@@ -162,9 +165,11 @@ public final class MediaCommunicationVirtualizationSelfTest {
         int getMode();
         int getStreamVolume(int stream);
         boolean isSpeakerphoneOn();
+        boolean isSupportFakeHfp(int appVersionCode, String packageName);
         int requestAudioFocus(Object client, String packageName);
         int abandonAudioFocus(Object client, String packageName);
         void setStreamVolume(int stream, int volume, int flags, String packageName);
+        void playSoundEffect(int effectType);
         Object[] getDevices();
     }
     interface SmsApi {
@@ -201,9 +206,11 @@ public final class MediaCommunicationVirtualizationSelfTest {
         public int getMode() { calls++; return 0; }
         public int getStreamVolume(int stream) { calls++; return 0; }
         public boolean isSpeakerphoneOn() { calls++; return false; }
+        public boolean isSupportFakeHfp(int appVersionCode, String packageName) { calls++; return true; }
         public int requestAudioFocus(Object client, String packageName) { calls++; return 0; }
         public int abandonAudioFocus(Object client, String packageName) { calls++; return 0; }
         public void setStreamVolume(int stream, int volume, int flags, String packageName) { calls++; }
+        public void playSoundEffect(int effectType) { calls++; }
         public Object[] getDevices() { calls++; return new Object[]{new Object()}; }
     }
     static final class SmsDelegate implements SmsApi {

@@ -6,14 +6,17 @@ import java.util.Collections;
 /**
  * Contract for the process-local virtual input service.
  *
- * <p>The Guest receives an empty virtual input-device catalog.  It may register the platform
- * catalog listener so framework clients can complete their normal initialization, but no input
- * query or mutating operation is allowed to reach the Host input service.</p>
+ * <p>The Guest receives no physical input-device catalog.  Android's framework still requires
+ * the generic virtual keyboard entry ({@code -1}) to resolve {@code KeyCharacterMap}; that
+ * single synthetic entry is therefore retained while no hardware query or mutating operation
+ * is allowed to reach the Host input service.</p>
  */
 public final class InputManagerServiceContract {
     public static final String ANDROID_SERVICE = "input";
     public static final String DESCRIPTOR = "android.hardware.input.IInputManager";
     public static final String LOGICAL_SERVICE = "inputManager";
+    /** AOSP's synthetic keyboard id used by KeyCharacterMap.load(int). */
+    public static final int VIRTUAL_KEYBOARD_ID = -1;
 
     private InputManagerServiceContract() { }
 
@@ -28,7 +31,7 @@ public final class InputManagerServiceContract {
             throw new SecurityException("VIRTUAL_INPUT_OPERATION_UNAVAILABLE:" + methodName);
         }
         if ("getInputDeviceIds".equals(methodName) && returnType == int[].class) {
-            return new int[0];
+            return new int[] {VIRTUAL_KEYBOARD_ID};
         }
         if ("getInputDevice".equals(methodName)) return null;
         if (returnType == boolean.class) return false;

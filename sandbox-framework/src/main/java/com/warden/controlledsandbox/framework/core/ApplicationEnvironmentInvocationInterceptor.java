@@ -96,12 +96,17 @@ final class ApplicationEnvironmentInvocationInterceptor {
                     ? FrameworkApplicationEnvironmentObjectFactory.userInfo(method.getReturnType(), profile)
                     : nullValue(method.getReturnType()));
         }
-        if (containsAny(name, "getusers", "getprofiles", "getenabledprofiles", "getuserprofiles")) {
+        if (containsAny(name, "getusers", "getprofiles", "getprofileids",
+                "getenabledprofiles", "getuserprofiles")) {
             return Decision.handled(FrameworkApplicationEnvironmentObjectFactory.collectionResult(
                     method.getReturnType(), List.of(profile), (type, value) ->
-                            type.getSimpleName().toLowerCase(Locale.ROOT).contains("handle")
-                                    ? FrameworkApplicationEnvironmentObjectFactory.userHandle(type, profile.userId())
-                                    : FrameworkApplicationEnvironmentObjectFactory.userInfo(type, profile)));
+                            type == int.class || type == Integer.class
+                                    || type == long.class || type == Long.class
+                                    || type.getSimpleName().toLowerCase(Locale.ROOT).contains("handle")
+                                    ? FrameworkApplicationEnvironmentObjectFactory.userHandle(type,
+                                            profile.userId())
+                                    : FrameworkApplicationEnvironmentObjectFactory.userInfo(type,
+                                            profile)));
         }
         if (containsAny(name, "isuserrunning")) return Decision.handled(profile.running());
         if (containsAny(name, "isuserunlocked", "isunlocked")) return Decision.handled(profile.unlocked());
@@ -257,7 +262,13 @@ final class ApplicationEnvironmentInvocationInterceptor {
         if (containsAny(name, "getremainingcallcount")) return Decision.handled(profile.remainingCallCount());
         if (containsAny(name, "getratelimitresettime")) return Decision.handled(profile.rateLimitResetTimeMs());
         if (containsAny(name, "isratelimitingactive")) return Decision.handled(profile.remainingCallCount() == 0);
-        if (containsAny(name, "requestpinshortcut", "ispinrequestsupported")) {
+        // AOSP ShortcutManager.isRequestPinShortcutSupported() calls the Binder method
+        // isRequestPinItemSupported(userId, REQUEST_TYPE_SHORTCUT).  Keep the public
+        // capability query in the same policy branch as the request operation; otherwise
+        // Chromium's WebAppsUtils probe reaches the strict unsupported-operation guard and
+        // terminates the Guest process before the first page can be used.
+        if (containsAny(name, "requestpinshortcut", "ispinrequestsupported",
+                "isrequestpinitemsupported")) {
             return Decision.handled(booleanResult(method.getReturnType(), profile.allowPinRequests()));
         }
         if (containsAny(name, "hasshortcuthostpermission")) return Decision.handled(true);

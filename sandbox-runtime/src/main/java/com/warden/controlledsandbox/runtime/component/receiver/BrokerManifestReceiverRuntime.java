@@ -28,7 +28,29 @@ public final class BrokerManifestReceiverRuntime {
 
     public synchronized void indexPackage(Bundle input) throws Exception {
         if (input == null) throw new IllegalArgumentException("request is required");
-        File apk = new File(required(input, RuntimeKeys.APK_PATH));
+        ManifestModel manifest = parseManifest(new File(required(input, RuntimeKeys.APK_PATH)));
+        ArrayList<String> splitPaths = input.getStringArrayList(RuntimeKeys.SPLIT_PATHS);
+        if (splitPaths != null) {
+            for (String splitPath : splitPaths) {
+                if (splitPath == null || splitPath.trim().isEmpty()) {
+                    throw new IllegalArgumentException("Split APK path is required");
+                }
+                ManifestModel split = parseManifest(new File(splitPath));
+                if (!manifest.packageName().equals(split.packageName())) {
+                    throw new SecurityException("MANIFEST_SPLIT_PACKAGE_MISMATCH");
+                }
+                mergeReceiverSurface(manifest, split);
+            }
+        }
+        indexManifest(manifest, input);
+    }
+
+    /**
+     * AOSP parses the base manifest and each split into one Package before exposing
+     * the component lists to PackageManager. Keep the same package boundary here,
+     * while only merging the receiver/permission surface needed by this broker.
+     */
+    private static ManifestModel parseManifest(File apk) throws Exception {
         ManifestModel manifest;
         try (ZipFile archive = new ZipFile(apk)) {
             ZipEntry entry = archive.getEntry("AndroidManifest.xml");
@@ -37,7 +59,12 @@ public final class BrokerManifestReceiverRuntime {
                 manifest = new BinaryXmlManifestParser().parse(stream);
             }
         }
-        indexManifest(manifest, input);
+        return manifest;
+    }
+
+    private static void mergeReceiverSurface(ManifestModel target, ManifestModel split) {
+        for (String permission : split.permissions()) target.addPermission(permission);
+        for (ManifestModel.Component receiver : split.receivers()) target.addReceiver(receiver);
     }
 
     synchronized void indexManifest(ManifestModel manifest, Bundle input) {

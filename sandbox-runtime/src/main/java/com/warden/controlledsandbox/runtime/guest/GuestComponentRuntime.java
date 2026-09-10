@@ -220,7 +220,11 @@ public final class GuestComponentRuntime {
     private Bundle invokeOperation(Bundle request, String operation) throws Exception {
         String componentClass = request.getString(RuntimeKeys.COMPONENT_CLASS, "");
         IsolatedComponentPolicy.requireSupported(session.packageMetadata, componentClass,
-                request.getBoolean(RuntimeKeys.ISOLATED_PROCESS, false));
+                request.getBoolean(RuntimeKeys.ISOLATED_PROCESS, false)
+                        || (request.getBoolean(RuntimeKeys.ISOLATED_SERVICE_BIND_FALLBACK, false)
+                        && (ComponentOperations.BIND_SERVICE.equals(operation)
+                        || ComponentOperations.UNBIND_SERVICE.equals(operation)
+                        || ComponentOperations.ROUTE_FRAMEWORK_SERVICE.equals(operation))));
         if (ComponentOperations.isServiceOperation(operation)) {
             return invokeServiceOperation(componentClass, request, operation);
         }

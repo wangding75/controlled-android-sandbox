@@ -12,8 +12,10 @@ public final class InputManagerServiceContractSelfTest {
                 "registerInputDevicesChangedListener"), "listener registration is no-op");
         require(!InputManagerServiceContract.isNoOpListenerRegistration("enableInputDevice"),
                 "mutator is not listener registration");
-        require(((int[]) InputManagerServiceContract.controlledResult(
-                "getInputDeviceIds", int[].class)).length == 0, "device ids are virtual empty");
+        int[] ids = (int[]) InputManagerServiceContract.controlledResult(
+                "getInputDeviceIds", int[].class);
+        require(ids.length == 1 && ids[0] == InputManagerServiceContract.VIRTUAL_KEYBOARD_ID,
+                "only the generic virtual keyboard id is exposed");
         require(InputManagerServiceContract.controlledResult(
                 "getInputDevice", Object.class) == null, "device object is unavailable");
         require(Boolean.FALSE.equals(InputManagerServiceContract.controlledResult(

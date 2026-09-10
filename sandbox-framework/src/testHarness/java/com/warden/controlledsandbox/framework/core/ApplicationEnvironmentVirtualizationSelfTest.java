@@ -67,6 +67,8 @@ public final class ApplicationEnvironmentVirtualizationSelfTest {
         shortcuts.reportShortcutUsed("guest.pkg", "compose", 3);
         require(authority.shortcuts.get(0).usageCount() == 1, "shortcut usage count");
         require(shortcuts.getMaxShortcutCountPerActivity("guest.pkg", 3) == 15, "shortcut quota");
+        require(shortcuts.isRequestPinItemSupported(3, 1),
+                "shortcut pin capability query");
 
         AppWidgetApi widgets = proxy(AppWidgetApi.class, identity, "appWidget");
         int id = widgets.allocateAppWidgetId("guest.pkg", 9);
@@ -180,6 +182,7 @@ public final class ApplicationEnvironmentVirtualizationSelfTest {
         List<Object> getDynamicShortcuts(String packageName, int userId);
         void reportShortcutUsed(String packageName, String shortcutId, int userId);
         int getMaxShortcutCountPerActivity(String packageName, int userId);
+        boolean isRequestPinItemSupported(int userId, int requestType);
     }
     interface AppWidgetApi {
         int allocateAppWidgetId(String packageName, int hostId);

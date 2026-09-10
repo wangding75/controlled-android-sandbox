@@ -131,6 +131,12 @@ final class RuntimeGuestRequestValidator {
 
     Set<String> validateDeclaredProcess(String packageName, int virtualUserId,
                                         String requestedProcess) throws Exception {
+        return validateDeclaredProcess(packageName, virtualUserId, requestedProcess, false);
+    }
+
+    Set<String> validateDeclaredProcess(String packageName, int virtualUserId,
+                                        String requestedProcess,
+                                        boolean allowIsolatedBindFallback) throws Exception {
         if (owner.packageAuthority == null) {
             throw new IllegalStateException("RUNTIME_PACKAGE_AUTHORITY_NOT_INITIALIZED");
         }
@@ -146,7 +152,7 @@ final class RuntimeGuestRequestValidator {
                 application == null ? "" : application.processName);
         declared.add(applicationProcess.isEmpty() ? packageName : applicationProcess);
         for (VirtualComponentSnapshot component : state.components()) {
-            if (component == null || component.isolated()) continue;
+            if (component == null || (component.isolated() && !allowIsolatedBindFallback)) continue;
             String componentProcess = RuntimeBrokerService.normalizeProcessName(
                     packageName, component.processName());
             declared.add(componentProcess.isEmpty() ? packageName : componentProcess);

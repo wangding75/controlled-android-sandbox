@@ -12,6 +12,7 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -175,25 +176,47 @@ import java.util.concurrent.atomic.AtomicInteger;
             if (sessionId >= 0) autofillSessions.remove(sessionId);
             return Decision.handled(successValue(method.getReturnType()));
         }
-        if (blocked(profile.mode()) || !profile.enabled()) {
-            if (isCleanup(name)) return Decision.handled(successValue(method.getReturnType()));
-            if (containsAny(name, "isenabled", "isserviceenabled", "hasservicedenabled")) return handledBoolean(method, false);
-            if (containsAny(name, "startsession")) return Decision.handled(numeric(method.getReturnType(), -1));
-            return Decision.handled(emptyValue(method.getReturnType()));
-        }
-        if (containsAny(name, "isenabled", "isserviceenabled", "hasservicedenabled")) return handledBoolean(method, true);
-        if (containsAny(name, "issaveui", "issaveenabled")) return handledBoolean(method, profile.saveEnabled());
-        if (containsAny(name, "isaugmentedautofillserviceenabled", "isaugmentedautofill")) return handledBoolean(method, profile.augmentedAutofillEnabled());
-        if (containsAny(name, "getautofillservicecomponentname", "getservicecomponent")) {
-            return Decision.handled(componentValue(method.getReturnType(), profile.serviceComponent()));
+        // API 36 makes addClient/startSession oneway calls and moves their synchronous
+        // result to the trailing IResultReceiver.  AutofillManager waits on that receiver
+        // on the UI thread; returning a local value without completing it causes a 5s focus
+        // ANR even though the Binder invocation itself is handled.
+        if (containsAny(name, "addclient")) {
+            int flags = !blocked(profile.mode()) && profile.enabled() ? 1 : 0;
+            sendAutofillResult(lastCallback(arguments), flags, method.getName());
+            return Decision.handled(autofillReturn(method.getReturnType(), flags));
         }
         if (containsAny(name, "startsession")) {
+            if (blocked(profile.mode()) || !profile.enabled()) {
+                sendAutofillResult(lastCallback(arguments), -1, method.getName());
+                return Decision.handled(autofillReturn(method.getReturnType(), -1));
+            }
             if (autofillSessions.size() >= profile.maximumSessions()) {
                 throw new IllegalStateException("VIRTUAL_AUTOFILL_SESSION_LIMIT_EXCEEDED");
             }
             int sessionId = nextAutofillSession.getAndIncrement();
             autofillSessions.put(sessionId, System.currentTimeMillis() + profile.sessionTimeoutMs());
-            return Decision.handled(numeric(method.getReturnType(), sessionId));
+            sendAutofillResult(lastCallback(arguments), sessionId, method.getName());
+            return Decision.handled(autofillReturn(method.getReturnType(), sessionId));
+        }
+        if (containsAny(name, "isenabled", "isserviceenabled", "isservicesupported", "hasservicedenabled")) {
+            boolean enabled = !blocked(profile.mode()) && profile.enabled();
+            // API 36 uses a trailing IResultReceiver and a void return for these queries;
+            // older releases returned a boolean directly.  Preserve both contracts so the
+            // platform SyncResultReceiver is always completed when present.
+            if (method.getReturnType() == void.class || method.getReturnType() == Void.class) {
+                sendAutofillResult(lastCallback(arguments), enabled ? 1 : 0, method.getName());
+                return Decision.handled(null);
+            }
+            return handledBoolean(method, enabled);
+        }
+        if (blocked(profile.mode()) || !profile.enabled()) {
+            if (isCleanup(name)) return Decision.handled(successValue(method.getReturnType()));
+            return Decision.handled(emptyValue(method.getReturnType()));
+        }
+        if (containsAny(name, "issaveui", "issaveenabled")) return handledBoolean(method, profile.saveEnabled());
+        if (containsAny(name, "isaugmentedautofillserviceenabled", "isaugmentedautofill")) return handledBoolean(method, profile.augmentedAutofillEnabled());
+        if (containsAny(name, "getautofillservicecomponentname", "getservicecomponent")) {
+            return Decision.handled(componentValue(method.getReturnType(), profile.serviceComponent()));
         }
         if (containsAny(name, "updatesession", "sethassession", "setstate", "restoreSession")) {
             return Decision.handled(successValue(method.getReturnType()));
@@ -204,6 +227,95 @@ import java.util.concurrent.atomic.AtomicInteger;
         }
         if (mutation(name)) throw new SecurityException("VIRTUAL_AUTOFILL_MUTATION_DENIED:" + method.getName());
         return failUnsupported("autofill", method);
+    }
+
+    private static Object autofillReturn(Class<?> returnType, int result) {
+        return returnType == void.class || returnType == Void.class
+                ? null : numeric(returnType, result);
+    }
+
+    /** Completes the platform SyncResultReceiver without depending on its hidden interface type. */
+    private static void sendAutofillResult(Object receiver, int result, String methodName) {
+        if (receiver == null) {
+            android.util.Log.w("CS_AUTOFILL_POLICY", "missing result receiver method=" + methodName);
+            return;
+        }
+        try {
+            if (sendAutofillResultThroughBinder(receiver, result)) {
+                android.util.Log.i("CS_AUTOFILL_POLICY", "result_sent method=" + methodName
+                        + " result=" + result + " path=binder");
+                return;
+            }
+            // SyncResultReceiver is an API-internal IResultReceiver.Stub.  On AOSP its
+            // send(int, Bundle) override is public, but some vendor builds expose it only
+            // through a non-public Stub/superclass declaration.  getMethods() therefore is
+            // insufficient: walk declared methods and interfaces just as the generated Binder
+            // Stub does, while retaining the exact AIDL parameter contract.
+            Method send = findAutofillResultMethod(receiver.getClass(), new HashSet<>());
+            if (send != null) {
+                send.setAccessible(true);
+                send.invoke(receiver, result, null);
+                android.util.Log.i("CS_AUTOFILL_POLICY", "result_sent method=" + methodName
+                        + " result=" + result);
+                return;
+            }
+            android.util.Log.w("CS_AUTOFILL_POLICY", "result receiver send unavailable method="
+                    + methodName + " type=" + receiver.getClass().getName());
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(error);
+            android.util.Log.w("CS_AUTOFILL_POLICY", "result send failed method=" + methodName
+                    + " type=" + receiver.getClass().getName(), error);
+        }
+    }
+
+    /**
+     * Uses the generated AIDL transaction contract when a vendor runtime hides the Java Stub
+     * methods from reflection. IResultReceiver is an oneway Binder interface whose first method
+     * uses transaction code FIRST_CALL_TRANSACTION; this is the exact wire path emitted by AIDL
+     * for send(int, in Bundle), without depending on a hidden Java Stub method.
+     */
+    private static boolean sendAutofillResultThroughBinder(Object receiver, int result) {
+        if (!(receiver instanceof android.os.IInterface interfaceValue)) return false;
+        android.os.Parcel data = null;
+        try {
+            android.os.IBinder binder = interfaceValue.asBinder();
+            if (binder == null) return false;
+            data = android.os.Parcel.obtain();
+            data.writeInterfaceToken("com.android.internal.os.IResultReceiver");
+            data.writeInt(result);
+            data.writeTypedObject(null, 0);
+            return binder.transact(android.os.IBinder.FIRST_CALL_TRANSACTION, data, null,
+                    android.os.IBinder.FLAG_ONEWAY);
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(error);
+            android.util.Log.w("CS_AUTOFILL_POLICY", "binder result path failed receiver="
+                    + receiver.getClass().getName() + " error=" + error, error);
+            return false;
+        } finally {
+            if (data != null) data.recycle();
+        }
+    }
+
+    private static Method findAutofillResultMethod(Class<?> type, Set<Class<?>> visited) {
+        if (type == null || !visited.add(type)) return null;
+        try {
+            for (Method candidate : type.getDeclaredMethods()) {
+                Class<?>[] parameters = candidate.getParameterTypes();
+                if ("send".equals(candidate.getName()) && parameters.length == 2
+                        && (parameters[0] == int.class || parameters[0] == Integer.class)
+                        && "android.os.Bundle".equals(parameters[1].getName())) {
+                    return candidate;
+                }
+            }
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.framework.capability.FatalErrorPolicy
+                    .rethrowIfFatal(error);
+        }
+        for (Class<?> interfaceType : type.getInterfaces()) {
+            Method result = findAutofillResultMethod(interfaceType, visited);
+            if (result != null) return result;
+        }
+        return findAutofillResultMethod(type.getSuperclass(), visited);
     }
     private Decision biometric(Method method, Object[] arguments, VirtualBiometricProfileSnapshot profile) {
         String name = normalize(method.getName());

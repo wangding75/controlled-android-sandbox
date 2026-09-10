@@ -130,6 +130,16 @@ public final class GuestIntentResolverSelfTest {
                         && "host.system.service".equals(hostService.packageName())
                         && "host.system.service.SoterService".equals(hostService.className()),
                 "package-constrained system Service resolves through the host owner route");
+        FakePackageManager projectedHostPackageManager = new FakePackageManager();
+        projectedHostPackageManager.projectHostService = true;
+        GuestIntentResolver projectedHostResolver = new GuestIntentResolver(
+                spec, projectedHostPackageManager, hostPms);
+        GuestIntentResolver.Target projectedHost = projectedHostResolver.resolveOne(
+                new Intent("android.soter.ISoterService").setPackage("host.system.service"),
+                GuestIntentResolver.Kind.SERVICE);
+        require(projectedHost.hostOwned()
+                        && "host.system.service.SoterService".equals(projectedHost.className()),
+                "host-owner ResolveInfo from virtual PackageManager remains host-routed");
         require(hostResolver.resolveOptionalService(new Intent("guest.action.MISSING")) == null,
                 "missing optional Service has an absence result rather than a routing exception");
         require(hostResolver.resolveOptionalService(new Intent("android.soter.ISoterService")) == null,
@@ -179,6 +189,7 @@ public final class GuestIntentResolverSelfTest {
 
     private static final class FakePackageManager extends PackageManager {
         int lastActivityFlags;
+        boolean projectHostService;
 
         @Override public ResolveInfo resolveActivity(Intent intent, int flags) {
             lastActivityFlags = flags;
@@ -202,6 +213,21 @@ public final class GuestIntentResolverSelfTest {
         }
 
         @Override public ResolveInfo resolveService(Intent intent, int flags) {
+            if (projectHostService && "android.soter.ISoterService".equals(intent.getAction())
+                    && "host.system.service".equals(intent.getPackage())) {
+                ResolveInfo result = new ResolveInfo();
+                ServiceInfo info = new ServiceInfo();
+                info.packageName = "host.system.service";
+                info.name = "host.system.service.SoterService";
+                info.processName = info.packageName;
+                info.enabled = true;
+                info.exported = true;
+                info.applicationInfo = new android.content.pm.ApplicationInfo();
+                info.applicationInfo.packageName = info.packageName;
+                info.applicationInfo.flags = android.content.pm.ApplicationInfo.FLAG_SYSTEM;
+                result.serviceInfo = info;
+                return result;
+            }
             if (!"guest.action.SYNC".equals(intent.getAction())) return null;
             ResolveInfo result = new ResolveInfo();
             ServiceInfo info = new ServiceInfo();

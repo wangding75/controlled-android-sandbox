@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
@@ -22,6 +23,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.LayoutInflater;
+import dalvik.system.PathClassLoader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -66,6 +68,8 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     private final GuestStorageNameCodec storageNames;
     private final SharedState sharedState;
     private final Context unwrapBoundary;
+    /** Stable split Context identities keep platform and Chromium loader caches coherent. */
+    private final Map<String, GuestSplitContext> splitContexts = new HashMap<>();
     private final Resources.Theme frameworkTheme;
     private final Map<String, GuestPackageContext> packageContexts = new HashMap<>();
     /** ContextImpl caches this context-bound service; cloning it for every lookup is observable. */
@@ -208,13 +212,19 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         sharedState.systemServices.seal(installedHooks);
     }
     void configureWebViewProvider(String providerPackage) {
+        configureWebViewProvider(providerPackage, false);
+    }
+
+    void configureWebViewProvider(String providerPackage, boolean providerAssetsPreloaded) {
         webViewProviderServices.configure(providerPackage);
         // Android 16 moved WebView provider resources behind the registered-resource-paths
         // change. The platform-created provider Context receives those paths, but Chromium's
         // ContextUtils intentionally keeps the embedding Application's AssetManager. Append the
         // verified provider APK set to that Guest-owned AssetManager so assets such as
         // Trichrome's icudtl.dat remain available without exposing a Host Context or data root.
-        if (Build.VERSION.SDK_INT >= 36) appendApi36WebViewAssets(providerPackage);
+        if (Build.VERSION.SDK_INT >= 36 && !providerAssetsPreloaded) {
+            appendApi36WebViewAssets(providerPackage);
+        }
     }
     void closeWebViewProviderServices() {
         webViewProviderServices.close();
@@ -315,6 +325,8 @@ public final class GuestContext extends GuestHostOperationDenyContext {
                 .equals(serviceClass.getName())) return Context.TELEPHONY_SERVICE;
         if (serviceClass != null && "android.telephony.SubscriptionManager"
                 .equals(serviceClass.getName())) return Context.TELEPHONY_SUBSCRIPTION_SERVICE;
+        if (serviceClass != null && "android.app.LocaleManager"
+                .equals(serviceClass.getName())) return "locale";
         if (serviceClass != null && "android.os.BatteryManager"
                 .equals(serviceClass.getName())) return "batterymanager";
         if (serviceClass != null && "android.telecom.TelecomManager"
@@ -473,7 +485,19 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         if (webViewProviderServices.bindIsolated(service, flags, instanceName, executor, connection)) {
             return true;
         }
-        return super.bindIsolatedService(service, flags, instanceName, executor, connection);
+        // NBB's bindIsolatedService hook deliberately clears only the isolated instance name and
+        // sends the call through its ordinary virtual BindServiceCommon path. VA has no separate
+        // isolated-service router either. Preserve that execution method for Guest-owned
+        // services; delegating to the deny boundary would make Chrome's own
+        // SandboxedProcessService crash before its first frame.
+        return componentRouter.bindIsolatedService(service, connection, flags, executor);
+    }
+    @Override public void updateServiceGroup(ServiceConnection connection, int group,
+            int importance) {
+        // AOSP uses this as an advisory process-group hint for an existing binding. NBB/VA
+        // replace the Guest connection with their virtual/host relay before delegating to AMS;
+        // keep the same bounded route instead of exposing the Host Context through ContextWrapper.
+        componentRouter.updateServiceGroup(connection, group, importance);
     }
     @Override public void unbindService(ServiceConnection connection) {
         if (webViewProviderServices.unbind(connection)) return;
@@ -799,8 +823,49 @@ public final class GuestContext extends GuestHostOperationDenyContext {
 
     @Override public Context createContextForSplit(String splitName)
             throws PackageManager.NameNotFoundException {
-        if (splitName != null && !splitName.trim().isEmpty() && spec.hasSplit(splitName)) return this;
+        if (splitName != null && !splitName.trim().isEmpty() && spec.hasSplit(splitName)) {
+            synchronized (splitContexts) {
+                GuestSplitContext existing = splitContexts.get(splitName);
+                if (existing != null) return existing;
+                // Match LoadedApk.SplitDependencyLoaderImpl: the split loader's parent is the
+                // real defining PathClassLoader for the base revision. GuestClassLoader is only
+                // a policy facade; using it as the parent creates a second NativeLoader owner
+                // and Android rejects a provider library as already opened by another loader.
+                ClassLoader splitParent = classLoader instanceof GuestClassLoader guestLoader
+                        ? guestLoader.definingLoader() : classLoader;
+                // The split path is a member of the broker-verified revision set; no Host Context
+                // or arbitrary Host path is introduced at this boundary.
+                ClassLoader splitLoader = new PathClassLoader(spec.splitPath(splitName), splitParent);
+                GuestSplitContext created = new GuestSplitContext(this, splitLoader);
+                splitContexts.put(splitName, created);
+                android.util.Log.i("CS_SPLIT_CONTEXT", "request=" + splitName
+                        + " result=GUEST_SPLIT_CONTEXT loader=" + describeClassLoader(splitLoader));
+                return created;
+            }
+        }
         throw new PackageManager.NameNotFoundException("Guest split is not installed: " + splitName);
+    }
+
+    private static String describeClassLoader(ClassLoader value) {
+        if (value == null) return "<null>";
+        ClassLoader parent = value.getParent();
+        return value.getClass().getName() + "@"
+                + Integer.toHexString(System.identityHashCode(value)) + " parent="
+                + (parent == null ? "<null>" : parent.getClass().getName() + "@"
+                        + Integer.toHexString(System.identityHashCode(parent)));
+    }
+
+    /** Guest-only wrapper with a split loader; its delegate never exposes the Host Context. */
+    private static final class GuestSplitContext extends ContextWrapper {
+        private final ClassLoader splitClassLoader;
+
+        GuestSplitContext(GuestContext owner, ClassLoader splitClassLoader) {
+            super(owner);
+            this.splitClassLoader = java.util.Objects.requireNonNull(splitClassLoader,
+                    "split ClassLoader is required");
+        }
+
+        @Override public ClassLoader getClassLoader() { return splitClassLoader; }
     }
 
     @Override public Context createConfigurationContext(Configuration overrideConfiguration) {
@@ -927,9 +992,29 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         if (added == 0) {
             throw new IllegalStateException("WEBVIEW_PROVIDER_ASSETS_REJECTED");
         }
+        // Android's ResourcesManager keeps application APKs as the embedding resource view;
+        // provider APKs are an additive shared-library view. AssetManager resolves a colliding
+        // asset name from the last path, so appending the provider paths directly would make a
+        // WebView resources.pak shadow Chrome's verified resources.pak. Re-assert only the
+        // broker-verified Guest base/split paths after provider registration. This preserves the
+        // provider-only assets (for example Trichrome's icudtl.dat) while keeping the Guest
+        // application's own asset namespace authoritative; no Host path is introduced here.
+        if (addNormal == null) {
+            throw new IllegalStateException("GUEST_APPLICATION_ASSET_PATH_API_UNAVAILABLE");
+        }
+        int guestPathsReasserted = 0;
+        if (assetPathCookie(addNormal, spec.apkPath) != 0) guestPathsReasserted++;
+        for (String splitPath : spec.splitPathArray()) {
+            if (assetPathCookie(addNormal, splitPath) != 0) guestPathsReasserted++;
+        }
+        int expectedGuestPaths = 1 + spec.splitPathArray().length;
+        if (guestPathsReasserted != expectedGuestPaths) {
+            throw new IllegalStateException("GUEST_APPLICATION_ASSETS_REASSERT_FAILED:"
+                    + guestPathsReasserted + "/" + expectedGuestPaths);
+        }
         android.util.Log.i("CS_WEBVIEW_ASSETS", "API36 provider=" + providerPackage
                 + " candidates=" + paths.size() + " added=" + added
-                + " method=" + methodName);
+                + " method=" + methodName + " guestPathsReasserted=" + guestPathsReasserted);
     }
 
     private static Method findAssetPathMethod(String name) {
@@ -1116,6 +1201,10 @@ public final class GuestContext extends GuestHostOperationDenyContext {
                 themeResId = component.themeResId();
                 break;
             }
+        }
+        if (themeResId == 0) {
+            ApplicationInfo applicationInfo = spec.packageState.applicationInfo();
+            if (applicationInfo != null) themeResId = applicationInfo.theme;
         }
         if (themeResId != 0) theme.applyStyle(themeResId, true);
         else theme.applyStyle(android.R.style.Theme_DeviceDefault_Light_NoActionBar, true);

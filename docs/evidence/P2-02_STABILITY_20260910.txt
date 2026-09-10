@@ -1,0 +1,29 @@
+P2-02 device-side stability rerun
+Device: 100.77.213.4:5555 / Xiaomi 25019PNF3C
+Command: one long-lived adb shell; 20 samples; sleep 30s between samples
+Error filters: InputDispatcher unresponsive, ANR in, FATAL EXCEPTION, AndroidRuntime
+
+P2_02_STABILITY_START
+T=30s   mCurrentFocus=Window{2189c0 u0 com.android.chrome/com.google.android.apps.chrome.Main}
+T=60s   mCurrentFocus=Window{2189c0 u0 com.android.chrome/com.google.android.apps.chrome.Main}
+T=90s   mCurrentFocus=Window{2189c0 u0 com.android.chrome/com.google.android.apps.chrome.Main}
+T=120s  mCurrentFocus=Window{2189c0 u0 com.android.chrome/com.google.android.apps.chrome.Main}
+T=150s  mCurrentFocus=Window{2189c0 u0 com.android.chrome/com.google.android.apps.chrome.Main}
+T=180s  mCurrentFocus=Window{2189c0 u0 com.android.chrome/com.google.android.apps.chrome.Main}
+T=210s  mCurrentFocus=Window{2189c0 u0 com.android.chrome/com.google.android.apps.chrome.Main}
+T=240s  mCurrentFocus=Window{2189c0 u0 com.android.chrome/com.google.android.apps.chrome.Main}
+T=270s  mCurrentFocus=Window{2189c0 u0 com.android.chrome/com.google.android.apps.chrome.Main}
+T=300s  mCurrentFocus=Window{2189c0 u0 com.android.chrome/com.google.android.apps.chrome.Main}
+T=330s  mCurrentFocus=Window{2189c0 u0 com.android.chrome/com.google.android.apps.chrome.Main}
+T=360s  mCurrentFocus=Window{2189c0 u0 com.android.chrome/com.google.android.apps.chrome.Main}
+T=390s  mCurrentFocus=Window{2189c0 u0 com.android.chrome/com.google.android.apps.chrome.Main}
+T=420s  mCurrentFocus=Window{2189c0 u0 com.android.chrome/com.google.android.apps.chrome.Main}
+T=450s  mCurrentFocus=Window{2189c0 u0 com.android.chrome/com.google.android.apps.chrome.Main}
+T=480s  mCurrentFocus=Window{2189c0 u0 com.android.chrome/com.google.android.apps.chrome.Main}
+T=510s  mCurrentFocus=Window{2189c0 u0 com.android.chrome/com.google.android.apps.chrome.Main}
+T=540s  mCurrentFocus=Window{2189c0 u0 com.android.chrome/com.google.android.apps.chrome.Main}
+T=570s  mCurrentFocus=Window{2189c0 u0 com.android.chrome/com.google.android.apps.chrome.Main}
+T=600s  mCurrentFocus=Window{2189c0 u0 com.android.chrome/com.google.android.apps.chrome.Main}
+P2_02_STABILITY_END
+
+Result: 20/20 foreground samples were Chrome; the error filters produced no lines.

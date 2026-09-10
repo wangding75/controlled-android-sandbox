@@ -115,6 +115,14 @@ public final class CapabilityServiceInterceptor {
             return "";
         }
         if ("audio".equals(service)) {
+            // AudioManager's capture-policy accessors control playback capture, not microphone
+            // acquisition. AOSP forwards them to IAudioService for the caller UID; NBB/VA do
+            // not install a separate hook. Do not let the broad "capture" heuristic classify
+            // these compatibility calls as microphone capability operations.
+            if ("setallowedcapturepolicy".equals(name)
+                    || "getallowedcapturepolicy".equals(name)) {
+                return "";
+            }
             if (containsAny(name, "record", "capture", "microphone", "input")) {
                 return CapabilityAccessPolicy.MICROPHONE;
             }

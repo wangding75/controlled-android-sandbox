@@ -394,7 +394,12 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
 
     @Override public void onLaunch(SandboxItem item) {
         if (appStatus != null) appStatus.setText("正在启动 " + item.record.label + "…");
-        viewModel.execute(() -> viewModel.application().launch(item.record, item.instance.virtualUserId),
+        // The product launch() contract ends at ActivityStarter acceptance and may return
+        // LAUNCH_ACCEPTED while the Guest lifecycle/first-frame observer is still pending.
+        // The UI reports a terminal launch status, so use the readiness-aware operation instead
+        // of misclassifying that normal asynchronous acknowledgement as a failure.
+        viewModel.execute(() -> viewModel.application().launchAndAwaitReadiness(
+                        item.record, item.instance.virtualUserId),
                 result -> runOnUiThread(() -> completeOperation(item, result, "启动")),
                 error -> runOnUiThread(() -> showFailure("启动失败", error)));
     }

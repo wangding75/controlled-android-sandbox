@@ -13,6 +13,8 @@ import com.warden.controlledsandbox.framework.identity.VirtualPendingIntentToken
 import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceState;
 import com.warden.controlledsandbox.contract.IRuntimeBroker;
 import com.warden.controlledsandbox.runtime.broker.RuntimePendingIntentRelayReceiver;
+import com.warden.controlledsandbox.runtime.broker.RuntimePendingIntentRelayActivity;
+import com.warden.controlledsandbox.runtime.broker.RuntimePendingIntentRelayService;
 import com.warden.controlledsandbox.contract.RuntimeOperationRequest;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
@@ -200,20 +202,21 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
     private boolean rewriteIntentsForSystemHolder(Object[] arguments, String tokenId) {
         if (arguments == null || tokenId == null || tokenId.isEmpty()) return false;
         boolean rewritten = false;
+        int senderType = senderType(arguments);
         for (int index = 0; index < arguments.length; index++) {
             if (arguments[index] instanceof String value && spec.packageName.equals(value)) {
                 arguments[index] = hostPackageName;
                 continue;
             }
             if (arguments[index] instanceof Intent intent) {
-                arguments[index] = systemHolderRelayIntent(intent, tokenId);
+                arguments[index] = systemHolderRelayIntent(intent, tokenId, senderType);
                 rewritten = true;
                 continue;
             }
             if (!(arguments[index] instanceof Intent[] intents) || intents.length == 0) continue;
             Intent[] relayIntents = new Intent[intents.length];
             for (int cursor = 0; cursor < intents.length; cursor++) {
-                relayIntents[cursor] = systemHolderRelayIntent(intents[cursor], tokenId);
+                relayIntents[cursor] = systemHolderRelayIntent(intents[cursor], tokenId, senderType);
             }
             arguments[index] = relayIntents;
             rewritten = true;
@@ -222,9 +225,18 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
             android.util.Log.i("CS_PENDING_INTENT", "SYSTEM_HOLDER_REWRITE token=" + tokenId
                     + " kind=" + issuedKind(arguments)
                     + " host=" + hostPackageName + " component="
-                    + new ComponentName(hostPackageName, RuntimePendingIntentRelayReceiver.CLASS_NAME));
+                    + new ComponentName(hostPackageName, relayClassName(senderType)));
         }
         return rewritten;
+    }
+
+    private static int senderType(Object[] arguments) {
+        if (arguments != null) for (Object value : arguments) {
+            if (value instanceof Integer integer && integer >= 1 && integer <= 5) {
+                return integer;
+            }
+        }
+        return 1;
     }
 
     private static String issuedKind(Object[] arguments) {
@@ -236,13 +248,22 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
         return "unknown";
     }
 
-    private Intent systemHolderRelayIntent(Intent original, String tokenId) {
+    private static String relayClassName(int senderType) {
+        return switch (senderType) {
+            case 2 -> RuntimePendingIntentRelayActivity.CLASS_NAME;
+            case 4, 5 -> RuntimePendingIntentRelayService.CLASS_NAME;
+            default -> RuntimePendingIntentRelayReceiver.CLASS_NAME;
+        };
+    }
+
+    private Intent systemHolderRelayIntent(Intent original, String tokenId, int senderType) {
         String originalAction = original == null ? null : original.getAction();
         Intent relay = new Intent(originalAction == null || originalAction.isEmpty()
                 ? RuntimePendingIntentRelayReceiver.ACTION : originalAction);
         relay.setComponent(new ComponentName(hostPackageName,
-                RuntimePendingIntentRelayReceiver.CLASS_NAME));
+                relayClassName(senderType)));
         relay.setPackage(hostPackageName);
+        if (senderType == 2) relay.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         relay.putExtra(RuntimeKeys.PENDING_INTENT_TOKEN_ID, tokenId);
         if (original != null) {
             relay.putExtra("cas.originalPendingIntentAction", originalAction);

@@ -72,6 +72,10 @@ final class GuestSystemServiceBoundary {
         result.put("storage", "storage");
         result.put("camera", "camera");
         result.put("location", "location");
+        // Android 13+ LocaleManager has no dedicated NBB/VA Binder proxy in the checked
+        // snapshots; FrameworkHooks explicitly validates and registers the Host manager as the
+        // bounded pass-through equivalent.
+        result.put("locale", "locale");
         result.put("phone", "telephony");
         result.put("telecom", "telecom");
         result.put("telephony_subscription_service", "subscription");

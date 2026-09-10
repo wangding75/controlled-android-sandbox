@@ -35,6 +35,15 @@ public final class IsolatedProcessRoutePolicySelfTest {
                 "isolated process name must be deterministic");
         expectOrdinaryBlocked(isolatedRequest);
 
+        Bundle virtualBindFallback = request(state, ".IsolatedService",
+                ComponentOperations.BIND_SERVICE);
+        virtualBindFallback.putBoolean(RuntimeKeys.ISOLATED_SERVICE_BIND_FALLBACK, true);
+        check(IsolatedProcessRoutePolicy.isVirtualBindFallback(virtualBindFallback),
+                "virtual bind fallback marker must be recognized");
+        check(IsolatedProcessRoutePolicy.match(virtualBindFallback) == null,
+                "NBB/VA bindIsolatedService compatibility must bypass platform isolated route");
+        IsolatedProcessRoutePolicy.rejectOrdinaryRoute(virtualBindFallback);
+
         Bundle providerRequest = request(state, "", ComponentOperations.PROVIDER_QUERY);
         providerRequest.putString(ComponentOperations.AUTHORITY, "com.example.private.alt");
         check(IsolatedProcessRoutePolicy.match(providerRequest) != null, "isolated provider lookup failed");

@@ -74,6 +74,15 @@ final class GuestLoadedApkBridge implements AutoCloseable {
                 ApplicationInfo.class, compatibilityType, ClassLoader.class,
                 boolean.class, boolean.class, boolean.class);
         ApplicationInfo guestInfo = new ApplicationInfo(session.context.getApplicationInfo());
+        // Android's isolated-split LoadedApk path creates another framework-owned
+        // ClassLoader from splitDependencies.  CAS has already verified and loaded
+        // every split into the single defining loader above, while GuestContext
+        // provides the explicit per-split context boundary.  Keep the platform
+        // projection on that one loader; otherwise a split Activity can ask
+        // LoadedApk for a second native namespace and reopen the same provider APK.
+        // The broker/ApplicationInfo snapshot remains unchanged; this is only the
+        // private copy passed to the framework bridge.
+        setOptional(guestInfo, "splitDependencies", null);
         ClassLoader processLoader = session.context.getClassLoader();
         // LoadedApk is also the NativeLoader namespace owner. When the controlled wrapper is
         // used as the lookup facade, publish its real PathClassLoader to framework code so

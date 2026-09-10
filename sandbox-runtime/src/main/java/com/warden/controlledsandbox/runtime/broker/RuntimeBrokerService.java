@@ -945,7 +945,14 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
     Set<String> validateDeclaredProcess(String packageName, int virtualUserId,
                                         String requestedProcess) throws Exception {
         return guestRequestValidator.validateDeclaredProcess(packageName, virtualUserId,
-                requestedProcess);
+                requestedProcess, false);
+    }
+
+    Set<String> validateDeclaredProcess(String packageName, int virtualUserId,
+                                        String requestedProcess,
+                                        boolean allowIsolatedBindFallback) throws Exception {
+        return guestRequestValidator.validateDeclaredProcess(packageName, virtualUserId,
+                requestedProcess, allowIsolatedBindFallback);
     }
 
     Bundle unregisterProviderObserver(Bundle request, String requestedPackage, int requestedUser) {

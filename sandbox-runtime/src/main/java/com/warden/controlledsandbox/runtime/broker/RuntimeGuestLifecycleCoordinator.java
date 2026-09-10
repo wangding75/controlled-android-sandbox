@@ -159,7 +159,8 @@ final class RuntimeGuestLifecycleCoordinator {
                 userId = input.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1);
                 processName = RuntimeBrokerService.processName(input, packageName);
                 Set<String> declaredProcesses = owner.validateDeclaredProcess(
-                        packageName, userId, processName);
+                        packageName, userId, processName,
+                        IsolatedProcessRoutePolicy.isVirtualBindFallback(input));
                 lifecycleStage(input, null, "PROCESS_VALIDATE_RETURN", lifecycleStarted);
                 validationCacheKey = validationCacheKey(input, packageName, userId);
                 if (!validationCacheKey.isEmpty()
@@ -282,7 +283,8 @@ final class RuntimeGuestLifecycleCoordinator {
                     packageName = input.getString(RuntimeKeys.PACKAGE_NAME, "");
                     userId = input.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1);
                     processName = RuntimeBrokerService.processName(input, packageName);
-                    owner.validateDeclaredProcess(packageName, userId, processName);
+                    owner.validateDeclaredProcess(packageName, userId, processName,
+                            IsolatedProcessRoutePolicy.isVirtualBindFallback(input));
                     lifecycleStage(input, session, "PROCESS_VALIDATE_RECOVERY_RETURN", lifecycleStarted);
                     packageRevision = RuntimeBrokerService.required(input,
                             RuntimeKeys.PACKAGE_REVISION);

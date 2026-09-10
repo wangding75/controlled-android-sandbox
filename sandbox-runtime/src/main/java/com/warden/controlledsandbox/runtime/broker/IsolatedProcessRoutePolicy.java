@@ -26,8 +26,30 @@ final class IsolatedProcessRoutePolicy {
 
     private IsolatedProcessRoutePolicy() { }
 
+    /**
+     * NBB's bindIsolatedService hook clears the instance name and enters ordinary virtual
+     * BindServiceCommon. Keep that compatibility decision explicit and limited to the service
+     * binding operations emitted by GuestContext; every other isolated component still requires
+     * the dedicated platform transport.
+     */
+    static boolean isVirtualBindFallback(Bundle request) {
+        if (request == null
+                || !request.getBoolean(RuntimeKeys.ISOLATED_SERVICE_BIND_FALLBACK, false)) {
+            return false;
+        }
+        String operation = request.getString(ComponentOperations.OPERATION, "");
+        return ComponentOperations.BIND_SERVICE.equals(operation)
+                || ComponentOperations.UNBIND_SERVICE.equals(operation)
+                || ComponentOperations.ROUTE_FRAMEWORK_SERVICE.equals(operation)
+                // A framework-owned Service callback is the second half of the same ordinary
+                // virtual bind transaction. Keep its Broker lifecycle commit on the virtual
+                // process selected above; it must not re-enter the dedicated isolated worker.
+                || ComponentOperations.FRAMEWORK_SERVICE_EVENT.equals(operation);
+    }
+
     static Match match(Bundle request) {
         if (request == null) return null;
+        if (isVirtualBindFallback(request)) return null;
         // API 32 may restore a Binder-delivered Bundle with the boot class loader.  Set the
         // contract loader before reading the Parcelable or the runtime peer dies with a
         // NoClassDefFoundError instead of reaching the isolated-route policy.

@@ -16,6 +16,10 @@ public final class RuntimePendingIntentRelayReceiver extends BroadcastReceiver {
     public static final String CLASS_NAME = RuntimePendingIntentRelayReceiver.class.getName();
 
     @Override public void onReceive(Context context, Intent intent) {
+        dispatchToBroker(context, intent);
+    }
+
+    static void dispatchToBroker(Context context, Intent intent) {
         if (intent == null) return;
         String tokenId = intent.getStringExtra(RuntimeKeys.PENDING_INTENT_TOKEN_ID);
         android.util.Log.i("CS_PENDING_INTENT", "SYSTEM_HOLDER_RELAY token=" + tokenId);

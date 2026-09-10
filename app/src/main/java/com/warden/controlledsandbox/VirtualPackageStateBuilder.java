@@ -258,6 +258,7 @@ final class VirtualPackageStateBuilder {
                 set.applicationLargeHeap = manifest.applicationLargeHeap();
                 set.applicationHardwareAccelerated = manifest.applicationHardwareAccelerated();
                 set.applicationNetworkSecurityConfigResId = manifest.applicationNetworkSecurityConfigResId();
+                set.applicationThemeResId = manifest.applicationThemeResId();
                 set.minSdk = manifest.minSdk();
                 set.targetSdk = manifest.targetSdk();
                 if (context != null) {
@@ -712,7 +713,7 @@ final class VirtualPackageStateBuilder {
                     component.isolatedProcess(), component.authorities(), component.permission(),
                     component.readPermission(), component.writePermission(), component.grantUriPermissions(),
                     enabledSetting, component.actions(), filters, providerPathRules,
-                    component.themeResId(), component.launchMode(), component.taskAffinity(),
+                    effectiveActivityTheme(components, type, component), component.launchMode(), component.taskAffinity(),
                     component.documentLaunchMode(), component.configChanges(),
                     component.screenOrientation(), component.windowSoftInputMode(), component.flags(),
                     component.excludeFromRecents(), component.noHistory(),
@@ -730,6 +731,40 @@ final class VirtualPackageStateBuilder {
                         + component.foregroundServiceType());
             }
         }
+    }
+
+    /**
+     * Android resolves an activity-alias to its target ActivityInfo before ActivityThread consumes
+     * its theme.  Keep the alias's public component identity and filters, while projecting that
+     * target theme into the immutable state used by both the virtual PMS and Guest bootstrap.
+     * A malformed/missing target is intentionally left untouched; the existing launch resolver
+     * remains responsible for reporting that invalid component rather than substituting a theme.
+     */
+    private static int effectiveActivityTheme(List<ManifestModel.Component> components, String type,
+                                              ManifestModel.Component component) {
+        if (!"ACTIVITY".equals(type) || component.targetActivity().isEmpty()) {
+            return component.themeResId();
+        }
+        Map<String, ManifestModel.Component> byClass = new LinkedHashMap<>();
+        for (ManifestModel.Component candidate : components) {
+            byClass.put(candidate.className(), candidate);
+        }
+        Set<String> visited = new LinkedHashSet<>();
+        ManifestModel.Component resolved = component;
+        while (!resolved.targetActivity().isEmpty() && visited.add(resolved.className())) {
+            ManifestModel.Component target = byClass.get(resolved.targetActivity());
+            if (target == null) return component.themeResId();
+            resolved = target;
+        }
+        if (!visited.add(resolved.className()) && !resolved.targetActivity().isEmpty()) {
+            return component.themeResId();
+        }
+        if (resolved.themeResId() != component.themeResId()) {
+            android.util.Log.i("CS_PMS_ALIAS", "effective theme alias=" + component.className()
+                    + " target=" + resolved.className() + " themeResId=0x"
+                    + Integer.toHexString(resolved.themeResId()));
+        }
+        return resolved.themeResId();
     }
 
     static List<VirtualComponentMetadataSnapshot> toMetadataSnapshots(Bundle bundle) {
@@ -789,7 +824,7 @@ final class VirtualPackageStateBuilder {
         boolean applicationDebuggable; boolean applicationDirectBootAware;
         boolean applicationExtractNativeLibs = true; boolean applicationUsesCleartextTraffic = true;
         boolean applicationLargeHeap; boolean applicationHardwareAccelerated = true;
-        int applicationNetworkSecurityConfigResId; int minSdk; int targetSdk;
+        int applicationNetworkSecurityConfigResId; int applicationThemeResId; int minSdk; int targetSdk;
         Bundle applicationMetadata;
         final Map<String, Bundle> componentMetadata = new LinkedHashMap<>();
         final List<ManifestModel.Component> activities = new ArrayList<>();
@@ -841,6 +876,10 @@ final class VirtualPackageStateBuilder {
         setOptionalApplicationField(info, "sharedLibraryFiles", null);
         info.minSdkVersion = set.minSdk;
         info.targetSdkVersion = set.targetSdk;
+        // ActivityInfo.theme falls back to ApplicationInfo.theme when an Activity (including one
+        // declared in a feature split) has no explicit theme of its own. Preserve that parser
+        // contract in the virtual package projection before ActivityThread selects a callback.
+        info.theme = set.applicationThemeResId;
         info.flags = ApplicationInfo.FLAG_HAS_CODE;
         if (set.applicationDebuggable) info.flags |= ApplicationInfo.FLAG_DEBUGGABLE;
         if (set.applicationLargeHeap) info.flags |= ApplicationInfo.FLAG_LARGE_HEAP;

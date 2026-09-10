@@ -73,6 +73,14 @@ import java.util.Set;
         }
         require(secureDenied, "secure settings mutation is denied");
         AutofillApi autofill = proxy(AutofillApi.class, new AutofillDelegate(), identity, "autofill");
+        ResultReceiverRecorder clientResult = new ResultReceiverRecorder();
+        autofill.addClient(new Object(), "guest.pkg", 0, clientResult, false);
+        require(clientResult.code == 1, "autofill addClient result receiver completed");
+        ResultReceiverRecorder sessionResult = new ResultReceiverRecorder();
+        autofill.startSession(new Object(), new Object(), new Object(), new Object(),
+                new Object(), 0, false, 0, "guest.pkg", false, sessionResult);
+        require(sessionResult.code > 0, "autofill startSession result receiver completed");
+        autofill.finishSession(sessionResult.code, 0);
         Object autofillClient = new Object();
         int session = autofill.startSession(autofillClient, "guest.pkg");
         require(session > 0 && autofill.isServiceEnabled(), "autofill session reserved");
@@ -163,9 +171,20 @@ import java.util.Set;
         public String getPackageName() { return packageName; }
     }
     interface AutofillApi {
+        void addClient(Object client, String packageName, int userId, Object result,
+                       boolean credmanRequested);
+        void startSession(Object activityToken, Object appCallback, Object autoFillId,
+                          Object bounds, Object value, int userId, boolean hasCallback, int flags,
+                          String packageName, boolean compatMode, Object result);
         int startSession(Object client, String packageName);
         void finishSession(int sessionId, int userId);
         boolean isServiceEnabled();
+    }
+    static final class ResultReceiverRecorder {
+        int code = Integer.MIN_VALUE;
+        private void send(int resultCode, android.os.Bundle data) {
+            code = resultCode;
+        }
     }
     interface BiometricApi {
         boolean isHardwareDetected(String packageName);
@@ -241,6 +260,12 @@ import java.util.Set;
         }
     }
     static final class AutofillDelegate implements AutofillApi {
+        public void addClient(Object c, String p, int u, Object r, boolean credman) {
+        }
+        public void startSession(Object a, Object b, Object id, Object bounds, Object value,
+                                 int u, boolean callback, int flags, String p, boolean compat,
+                                 Object result) {
+        }
         public int startSession(Object c, String p){
             return -1;
         }

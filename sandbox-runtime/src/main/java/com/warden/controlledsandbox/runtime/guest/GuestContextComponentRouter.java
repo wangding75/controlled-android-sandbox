@@ -38,6 +38,10 @@ final class GuestContextComponentRouter {
     private final IdentityHashMap<ServiceConnection, ConnectionRecord> connections = new IdentityHashMap<>();
     private final IdentityHashMap<ServiceConnection, HostConnectionRecord> hostConnections =
             new IdentityHashMap<>();
+    private final IdentityHashMap<ServiceConnection, Boolean> failedConnections =
+            new IdentityHashMap<>();
+    private final IdentityHashMap<ServiceConnection, Boolean> failedHostConnections =
+            new IdentityHashMap<>();
     private volatile boolean closed;
 
     GuestContextComponentRouter(GuestContext context, GuestPackageSpec spec,
@@ -155,11 +159,31 @@ final class GuestContextComponentRouter {
 
     synchronized boolean bindService(Intent intent, ServiceConnection connection, int flags,
             Executor executor) {
+        // NBB/VA route ordinary bindService and bindIsolatedService through the same virtual
+        // service path. Mark both Guest-owned entry points so a manifest service whose process
+        // name is historically isolated cannot fall through to the platform isolated worker.
+        return bindServiceInternal(intent, connection, flags, executor, true);
+    }
+
+    /**
+     * NBB/VA compatibility path for Context.bindIsolatedService: after clearing the instance
+     * name, the virtual AMS treats the target as an ordinary virtual Service. The Broker marker
+     * is consumed only by the isolated-route policy and does not mint an Android isolated UID.
+     */
+    synchronized boolean bindIsolatedService(Intent intent, ServiceConnection connection, int flags,
+            Executor executor) {
+        return bindServiceInternal(intent, connection, flags, executor, true);
+    }
+
+    private boolean bindServiceInternal(Intent intent, ServiceConnection connection, int flags,
+            Executor executor, boolean isolatedServiceFallback) {
         if (closed) throw new IllegalStateException("GUEST_COMPONENT_ROUTER_CLOSED");
         if (connection == null) throw new IllegalArgumentException("connection is required");
         if (connections.containsKey(connection) || hostConnections.containsKey(connection)) {
             throw new IllegalArgumentException("ServiceConnection already bound");
         }
+        failedConnections.remove(connection);
+        failedHostConnections.remove(connection);
         GuestIntentResolver.Target target = resolver.resolveOptionalService(intent);
         if (target == null) {
             logServiceAbsence("bindService", intent);
@@ -177,6 +201,7 @@ final class GuestContextComponentRouter {
                                 callbackExecutor, relay);
                 if (!accepted) {
                     relay.close();
+                    failedHostConnections.put(connection, Boolean.TRUE);
                     return false;
                 }
                 hostConnections.put(connection, new HostConnectionRecord(relay, component));
@@ -186,6 +211,7 @@ final class GuestContextComponentRouter {
                 return true;
             } catch (Throwable error) {
                 relay.close();
+                failedHostConnections.put(connection, Boolean.TRUE);
                 com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy
                         .rethrowIfFatal(error);
                 if (error instanceof RuntimeException runtime) throw runtime;
@@ -196,6 +222,9 @@ final class GuestContextComponentRouter {
         String connectionId = java.util.UUID.randomUUID().toString();
         Bundle request = bridge.baseRequest();
         request.putAll(resolver.request(intent, target));
+        if (isolatedServiceFallback) {
+            request.putBoolean(RuntimeKeys.ISOLATED_SERVICE_BIND_FALLBACK, true);
+        }
         GuestActivityThreadServiceBridge framework = context.serviceFrameworkBridge();
         if (framework != null) {
             boolean accepted = framework.bind(request, target.className(), connection, flags, executor);
@@ -208,10 +237,17 @@ final class GuestContextComponentRouter {
         request.putString(ComponentOperations.OPERATION, ComponentOperations.BIND_SERVICE);
         request.putString(RuntimeKeys.CONNECTION_ID, connectionId);
         request.putInt(RuntimeKeys.SERVICE_BIND_FLAGS, flags);
-        Bundle result = bridge.invokeComponent(request);
+        Bundle result;
+        try {
+            result = bridge.invokeComponent(request);
+        } catch (RuntimeException error) {
+            failedConnections.put(connection, Boolean.TRUE);
+            throw error;
+        }
         android.os.IBinder binder = result.getBinder(RuntimeKeys.BINDER);
         ComponentName component = new ComponentName(target.packageName(), target.className());
-        ConnectionRecord record = new ConnectionRecord(connectionId, target, component);
+        ConnectionRecord record = new ConnectionRecord(connectionId, target, component,
+                isolatedServiceFallback);
         connections.put(connection, record);
         Executor callbackExecutor = executor == null ? context.getMainExecutor() : executor;
         if (binder == null) callbackExecutor.execute(() -> {
@@ -248,9 +284,19 @@ final class GuestContextComponentRouter {
             }
             return;
         }
+        if (failedHostConnections.remove(connection) != null) {
+            android.util.Log.i("CS_GUEST_SERVICE",
+                    "unbind ignored after failed host bind");
+            return;
+        }
         GuestActivityThreadServiceBridge framework = context.serviceFrameworkBridge();
         if (framework != null) {
             framework.unbind(connection);
+            return;
+        }
+        if (failedConnections.remove(connection) != null) {
+            android.util.Log.i("CS_GUEST_SERVICE",
+                    "unbind ignored after failed Guest bind");
             return;
         }
         ConnectionRecord record = connections.remove(connection);
@@ -271,12 +317,55 @@ final class GuestContextComponentRouter {
         request.putString(RuntimeKeys.COMPONENT_CLASS, record.target.className());
         request.putString(RuntimeKeys.PROCESS_NAME, processName(record.target));
         request.putString(RuntimeKeys.CONNECTION_ID, record.connectionId);
+        if (record.isolatedServiceBindFallback) {
+            request.putBoolean(RuntimeKeys.ISOLATED_SERVICE_BIND_FALLBACK, true);
+        }
         try {
             bridge.invokeComponent(request);
         } catch (RuntimeException error) {
             connections.put(connection, record);
             throw error;
         }
+    }
+
+    synchronized void updateServiceGroup(ServiceConnection connection, int group, int importance) {
+        if (connection == null) throw new IllegalArgumentException("connection is null");
+        if (closed) {
+            android.util.Log.i("CS_GUEST_SERVICE",
+                    "late updateServiceGroup ignored after component-router teardown");
+            return;
+        }
+        HostConnectionRecord hostRecord = hostConnections.get(connection);
+        if (hostRecord != null) {
+            // The relay is the actual host AMS binding, just as NBB/VA's IServiceConnection
+            // delegate is. Do not pass the Guest callback object to host ContextImpl.
+            context.hostServiceContext().updateServiceGroup(hostRecord.relay, group, importance);
+            return;
+        }
+        if (failedHostConnections.containsKey(connection)) {
+            android.util.Log.i("CS_GUEST_SERVICE",
+                    "updateServiceGroup ignored after failed host bind");
+            return;
+        }
+        GuestActivityThreadServiceBridge framework = context.serviceFrameworkBridge();
+        if (framework != null && framework.updateServiceGroup(connection, group, importance)) {
+            return;
+        }
+        if (failedConnections.containsKey(connection)) {
+            android.util.Log.i("CS_GUEST_SERVICE",
+                    "updateServiceGroup ignored after failed Guest bind");
+            return;
+        }
+        ConnectionRecord record = connections.get(connection);
+        if (record != null) {
+            // Broker-owned services do not have a physical per-connection process group. The
+            // group is advisory, so retain the valid call without leaking a Host AMS handle.
+            android.util.Log.i("CS_GUEST_SERVICE", "virtual updateServiceGroup component="
+                    + record.component.flattenToShortString() + " group=" + group
+                    + " importance=" + importance);
+            return;
+        }
+        throw new IllegalArgumentException("ServiceConnection not bound");
     }
 
     /**
@@ -300,6 +389,8 @@ final class GuestContextComponentRouter {
         }
         hostConnections.clear();
         connections.clear();
+        failedConnections.clear();
+        failedHostConnections.clear();
         receivers.clear();
     }
 
@@ -556,7 +647,8 @@ final class GuestContextComponentRouter {
     }
 
     private record ConnectionRecord(String connectionId, GuestIntentResolver.Target target,
-                                    ComponentName component) { }
+                                    ComponentName component,
+                                    boolean isolatedServiceBindFallback) { }
 
     private record HostConnectionRecord(GuestServiceConnectionRelay relay,
                                         ComponentName component) { }

@@ -24,6 +24,12 @@ public final class RuntimeKeys {
     public static final String SLOT_TARGET = "slotTarget";
     public static final String PROCESS_NAME = "processName";
     public static final String ISOLATED_PROCESS = "isolatedProcess";
+    /**
+     * Internal compatibility marker for GuestContext.bindIsolatedService. NBB/VA clear the
+     * isolated instance name and route this API through their ordinary virtual BindService path;
+     * CAS uses the marker to select the same path without granting a platform isolated UID.
+     */
+    public static final String ISOLATED_SERVICE_BIND_FALLBACK = "isolatedServiceBindFallback";
     public static final String ISOLATED_CAPABILITY_TOKEN = "isolatedCapabilityToken";
     /** Broker-owned admission Binder used by isolated workers to register their platform UID. */
     public static final String ISOLATED_PEER_ADMISSION = "isolatedPeerAdmission";

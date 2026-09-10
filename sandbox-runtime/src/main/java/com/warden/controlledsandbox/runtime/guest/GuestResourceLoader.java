@@ -31,7 +31,7 @@ public final class GuestResourceLoader {
     /**
      * Reads component-level manifest metadata for the Binder-owned PackageManager projection.
      * The returned map is keyed by the fully qualified component class name and contains fresh
-     * Bundle copies.  AssetManager remains the parser of record so resource-backed values follow
+     * Bundle copies. AssetManager remains the parser of record so resource-backed values follow
      * the same decoding rules as the Guest LoadedApk bootstrap path.
      */
     public static java.util.Map<String, android.os.Bundle> readComponentMetadata(
@@ -45,15 +45,32 @@ public final class GuestResourceLoader {
     }
 
     static LoadedResources load(Context host, String apkPath, String[] splitPaths) throws Exception {
+        return load(host, apkPath, splitPaths, null);
+    }
+
+    static LoadedResources loadWithProviderAssetsFirst(Context host, String apkPath,
+                                                       String[] splitPaths,
+                                                       List<String> providerPaths) throws Exception {
+        return load(host, apkPath, splitPaths, providerPaths);
+    }
+
+    private static LoadedResources load(Context host, String apkPath, String[] splitPaths,
+                                        List<String> providerPaths) throws Exception {
         AssetManager assets = AssetManager.class.getDeclaredConstructor().newInstance();
         Method addAssetPath = AssetManager.class.getDeclaredMethod("addAssetPath", String.class);
         addAssetPath.setAccessible(true);
+        if (providerPaths != null && !providerPaths.isEmpty()) {
+            addProviderAssetsFirst(assets, providerPaths);
+        }
         addRequiredAssetPath(addAssetPath, assets, apkPath, "base");
         if (splitPaths != null) {
-            for (String splitPath : splitPaths) addRequiredAssetPath(addAssetPath, assets, splitPath, "split");
+            for (String splitPath : splitPaths) {
+                addRequiredAssetPath(addAssetPath, assets, splitPath, "split");
+            }
         }
         Resources hostResources = host.getResources();
-        Resources resources = new Resources(assets, hostResources.getDisplayMetrics(), hostResources.getConfiguration());
+        Resources resources = new Resources(assets, hostResources.getDisplayMetrics(),
+                hostResources.getConfiguration());
         // AssetManager resolves a colliding AndroidManifest.xml entry to the last added path on
         // API 36. That is usually a configuration split manifest and can omit base metadata.
         AssetManager baseManifestAssets = AssetManager.class.getDeclaredConstructor().newInstance();
@@ -66,6 +83,30 @@ public final class GuestResourceLoader {
                 + (application == null ? 0 : application.size()));
         return new LoadedResources(assets, resources, metadata, baseManifestAssets,
                 Collections.emptyList());
+    }
+
+    private static void addProviderAssetsFirst(AssetManager assets,
+                                               List<String> providerPaths) throws Exception {
+        Method addShared = AssetManager.class.getDeclaredMethod(
+                "addAssetPathAsSharedLibrary", String.class);
+        addShared.setAccessible(true);
+        int added = 0;
+        java.util.LinkedHashSet<String> paths = new java.util.LinkedHashSet<>();
+        for (String path : providerPaths) addAssetPath(paths, path);
+        for (String path : paths) {
+            if (path == null || !path.endsWith(".apk")) continue;
+            addRequiredAssetPath(addShared, assets, path, "provider shared APK");
+            added++;
+        }
+        if (added == 0) {
+            throw new IllegalStateException("SHARED_LIBRARY_PROVIDER_ASSETS_EMPTY");
+        }
+        android.util.Log.i("CS_WEBVIEW_ASSETS", "PRELOAD owner=guest-authority"
+                + " sharedApkPaths=" + added + " order=provider-before-guest");
+    }
+
+    private static void addAssetPath(java.util.Set<String> paths, String path) {
+        if (path != null && !path.trim().isEmpty()) paths.add(path.trim());
     }
 
     /**

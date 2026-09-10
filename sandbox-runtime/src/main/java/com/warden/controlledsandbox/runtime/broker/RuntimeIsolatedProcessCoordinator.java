@@ -63,6 +63,15 @@ import java.util.function.Supplier;
 final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
     static final int SLOT_COUNT = ProcessSlotContract.ISOLATED_SLOT_COUNT;
     private static final long SHUTDOWN_TIMEOUT_MILLIS = TimeUnit.SECONDS.toMillis(10L);
+    /**
+     * The worker Binder is an internal, client-critical transport. A plain AUTO_CREATE bind can
+     * let a platform scheduler freeze the freshly-created isolated process before the first
+     * synchronous prepare() transaction reaches it; AOSP's BIND_IMPORTANT contract keeps a
+     * service at least as important as its visible client. This does not alter the Guest's
+     * requested bind flags; it protects only CAS's host-side worker channel.
+     */
+    private static final int ISOLATED_WORKER_BIND_FLAGS =
+            Context.BIND_AUTO_CREATE | Context.BIND_IMPORTANT;
 
     private static final Class<?>[] ISOLATED_SERVICE_CLASSES = {
             IsolatedGuestProcessService0.class, IsolatedGuestProcessService1.class,
@@ -533,8 +542,9 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
                 connection = new IsolatedConnection(slot);
                 connections.put(slot, connection);
                 Intent intent = new Intent(host, serviceClassFor(slot));
-                boolean bound = host.bindService(intent, connection, Context.BIND_AUTO_CREATE);
+                boolean bound = host.bindService(intent, connection, ISOLATED_WORKER_BIND_FLAGS);
                 Log.i("CS_ISOLATED_BIND", "bind slot=" + slot + " accepted=" + bound
+                        + " flags=0x" + Integer.toHexString(ISOLATED_WORKER_BIND_FLAGS)
                         + " connection=" + System.identityHashCode(connection));
                 if (!bound) {
                     connections.remove(slot);

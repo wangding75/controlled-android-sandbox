@@ -173,6 +173,15 @@ final class MediaCommunicationInvocationInterceptor {
         if (containsAny(name, "getringermode")) return Decision.handled(numeric(method.getReturnType(), profile.ringerMode()));
         if (containsAny(name, "isspeakerphoneon")) return Decision.handled(booleanValue(method.getReturnType(), profile.speakerphoneOn()));
         if (containsAny(name, "isbluetoothscoon")) return Decision.handled(booleanValue(method.getReturnType(), profile.bluetoothScoOn()));
+        if (containsAny(name, "issupportfakehfp")) {
+            // Xiaomi's API-36 AudioManager calls this read-only capability query from
+            // broadcastDeviceListChange_sync() before deciding whether BLE devices should
+            // be converted to SCO. AOSP has no fake-HFP capability in the guest contract,
+            // and NBB/VA leave this OEM extension on their base IAudioService. Keep the
+            // virtual boundary explicit: a Guest never claims host Fake-HFP support, while
+            // HOST mode above still delegates unchanged.
+            return Decision.handled(booleanValue(method.getReturnType(), false));
+        }
         if (containsAny(name, "ismicrophonemuted")) return Decision.handled(booleanValue(method.getReturnType(), profile.microphoneMuted()));
         if (containsAny(name, "getstreammaxvolume")) return Decision.handled(numeric(method.getReturnType(), profile.musicVolumeMax()));
         if (containsAny(name, "getstreamvolume", "getlastaudible")) return Decision.handled(numeric(method.getReturnType(), profile.musicVolume()));
@@ -188,6 +197,14 @@ final class MediaCommunicationInvocationInterceptor {
             // constructs the root. A reference IAudioService proxy passes unknown audio
             // methods through; throwing here leaves Guest Stub windows=[] / reportedDrawn=false.
             return Decision.handled(booleanValue(method.getReturnType(), false));
+        }
+        if (containsAny(name, "playsoundeffect")) {
+            // AOSP View.performClick() calls AudioManager.playSoundEffect() before the
+            // click listener. NBB/VA do not register this method, so their Binder proxy
+            // preserves the void-success contract by falling through to the service. A
+            // static Guest must not emit a host-wide UI sound, but it must acknowledge the
+            // same no-result call so an otherwise valid click cannot terminate the Guest.
+            return Decision.handled(successValue(method.getReturnType()));
         }
         if (containsAny(name, "requestaudiofocus", "registeraudiofocusclient")) {
             if (!profile.allowAudioFocus()) throw new SecurityException("VIRTUAL_AUDIO_FOCUS_DENIED");

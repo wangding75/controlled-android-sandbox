@@ -64,6 +64,7 @@ import com.warden.controlledsandbox.framework.service.PersistentDataBlockService
 import com.warden.controlledsandbox.framework.service.SystemUpdateServiceHook;
 import com.warden.controlledsandbox.framework.service.CaptioningManagerHook;
 import com.warden.controlledsandbox.framework.service.UiModeManagerHook;
+import com.warden.controlledsandbox.framework.service.LocaleServiceHook;
 
 
 import android.content.Context;
@@ -160,6 +161,11 @@ public final class FrameworkHooks implements AutoCloseable {
             return new FrameworkHooks(hooks,
                     new FrameworkHookReport(installed, failures, bindingDetails), identity);
         }
+        // NBB/VA leave LocaleManager on the base Context because the checked sources have no
+        // dedicated locale Binder proxy.  Materialize that same pass-through only after the Host
+        // manager is proven non-null, so GuestContext can keep its fail-closed service boundary.
+        attempt("locale", installed, failures, hooks,
+                () -> LocaleServiceHook.install(guestContext, hostServiceContext));
         attempt("camera", installed, failures, hooks, bindingDetails,
                 () -> CameraServiceHook.install(hostServiceContext, identity));
         attempt("location", installed, failures, hooks, bindingDetails,
@@ -296,6 +302,9 @@ public final class FrameworkHooks implements AutoCloseable {
     }
 
     public FrameworkHookReport report() { return report; }
+
+    /** Identity used when framework objects are created after process bootstrap. */
+    public GuestIdentity identity() { return identity; }
 
     @Override public void close() {
         // Fence Binder leases before reversing framework hooks. Late callbacks can therefore

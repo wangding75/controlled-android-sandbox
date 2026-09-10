@@ -23,8 +23,8 @@ import java.util.Map;
  * <p>InputManager is a Java facade over a hidden IInputManager Binder.  Replacing only the
  * public facade would leave InputManagerGlobal/InputManager's static cache able to retain the
  * Host transport, so this hook audits and replaces the Binder cache and then creates a separate
- * Guest facade.  The facade exposes an empty virtual device catalog and controlled defaults;
- * raw Binder transactions and all mutating operations are fail-closed.</p>
+ * Guest facade.  The facade exposes only AOSP's generic virtual keyboard entry and controlled
+ * defaults; raw Binder transactions and all mutating operations are fail-closed.</p>
  */
 public final class InputManagerServiceHook implements AutoCloseable {
     private final Map<String, Object> cache;
@@ -101,7 +101,7 @@ public final class InputManagerServiceHook implements AutoCloseable {
         Object controlledService = Proxy.newProxyInstance(
                 proxyLoader(originalService.getClass()),
                 new Class<?>[] {serviceInterface},
-                new ControlledInputServiceInvocationHandler(binderHolder));
+                new ControlledInputServiceInvocationHandler(binderHolder, originalService));
         BinderInterceptionFoundation binderBoundary = BinderInterceptionFoundation
                 .builder(binder, BinderIdentity.fromGuestIdentity(identity))
                 .descriptor(InputManagerServiceContract.DESCRIPTOR)
@@ -277,9 +277,11 @@ public final class InputManagerServiceHook implements AutoCloseable {
     private static final class ControlledInputServiceInvocationHandler
             implements InvocationHandler {
         private final Object[] binderHolder;
+        private final Object originalService;
 
-        ControlledInputServiceInvocationHandler(Object[] binderHolder) {
+        ControlledInputServiceInvocationHandler(Object[] binderHolder, Object originalService) {
             this.binderHolder = binderHolder;
+            this.originalService = originalService;
         }
 
         @Override public Object invoke(Object proxy, Method method, Object[] args) {
@@ -289,9 +291,27 @@ public final class InputManagerServiceHook implements AutoCloseable {
                     case "hashCode" -> System.identityHashCode(proxy);
                     case "equals" -> proxy == (args == null ? null : args[0]);
                     default -> null;
-                };
+            };
             }
             if ("asBinder".equals(method.getName())) return binderHolder[0];
+            if ("getInputDevice".equals(method.getName())
+                    && args != null && args.length == 1
+                    && args[0] instanceof Integer
+                    && ((Integer) args[0]) == InputManagerServiceContract.VIRTUAL_KEYBOARD_ID) {
+                // AOSP KeyCharacterMap.load(-1) needs the framework's generic Virtual.kcm.  The
+                // returned InputDevice is synthetic (not a physical keyboard) and carries no
+                // host hardware identity; all other device IDs remain fail-closed below.
+                try {
+                    return method.invoke(originalService, args);
+                } catch (InvocationTargetException error) {
+                    Throwable cause = error.getCause();
+                    if (cause instanceof RuntimeException runtime) throw runtime;
+                    if (cause instanceof Error fatal) throw fatal;
+                    throw new IllegalStateException("VIRTUAL_KEYBOARD_QUERY_FAILED", cause);
+                } catch (IllegalAccessException error) {
+                    throw new IllegalStateException("VIRTUAL_KEYBOARD_QUERY_FAILED", error);
+                }
+            }
             return InputManagerServiceContract.controlledResult(method.getName(), method.getReturnType());
         }
     }

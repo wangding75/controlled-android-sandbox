@@ -1,6 +1,7 @@
 package com.warden.controlledsandbox.runtime.guest;
 
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
@@ -70,8 +71,8 @@ public final class GuestContextBoundarySelfTest {
             Context boundary = context.getBaseContext();
             require(boundary != context && boundary != host,
                     "base Context must not expose host or self-cycle");
-            require(boundary.getBaseContext() == null,
-                    "Guest base Context unwrap terminates at null");
+            require(!(boundary instanceof ContextWrapper),
+                    "Guest base Context unwrap terminates at a non-wrapper boundary");
             require(spec.packageName.equals(boundary.getPackageName()),
                     "Guest base Context preserves package identity");
             require(context.getApplicationContext() == context, "application Context before bootstrap");
@@ -91,6 +92,20 @@ public final class GuestContextBoundarySelfTest {
                                 @Override public void onServiceDisconnected(
                                         android.content.ComponentName name) { }
                             }), "missing Service executor bind returns false rather than a routing exception");
+            boolean unboundServiceGroupRejected = false;
+            try {
+                context.updateServiceGroup(new android.content.ServiceConnection() {
+                    @Override public void onServiceConnected(
+                            android.content.ComponentName name, android.os.IBinder binder) { }
+                    @Override public void onServiceDisconnected(
+                            android.content.ComponentName name) { }
+                }, 0, 0);
+            } catch (IllegalArgumentException expected) {
+                unboundServiceGroupRejected = String.valueOf(expected.getMessage())
+                        .contains("ServiceConnection not bound");
+            }
+            require(unboundServiceGroupRejected,
+                    "unbound updateServiceGroup stays strict without Host denial");
             require(context.getContentResolver() != null,
                     "ContentResolver is exposed through the framework interception boundary");
             Object firstInflater = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);

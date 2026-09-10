@@ -296,6 +296,11 @@ public final class GuestPackageSpec {
     }
     String[] splitPathArray() { return splitPaths.toArray(new String[0]); }
     boolean hasSplit(String splitName) { return splitName != null && splitNames.contains(splitName); }
+    String splitPath(String splitName) {
+        int index = splitNames.indexOf(splitName);
+        if (index < 0) throw new IllegalArgumentException("Guest split is not installed: " + splitName);
+        return splitPaths.get(index);
+    }
     List<PackageRevisionSetVerifier.Artifact> splitArtifacts() {
         List<PackageRevisionSetVerifier.Artifact> result = new ArrayList<>();
         for (int index = 0; index < splitNames.size(); index++) {

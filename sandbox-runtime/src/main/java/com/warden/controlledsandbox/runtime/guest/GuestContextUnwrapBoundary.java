@@ -17,6 +17,8 @@ import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.database.DatabaseErrorHandler;
 import android.database.sqlite.SQLiteDatabase;
+import android.graphics.Bitmap;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -26,26 +28,29 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.concurrent.Executor;
 
 /**
- * A finite, Host-free ContextWrapper base exposed only through GuestContext.getBaseContext().
- * It preserves the common Guest identity surface while deliberately ending wrapper traversal at
- * null. This prevents generic ContextWrapper walkers from re-entering GuestContext forever.
+ * A finite, Host-free terminal Context exposed only through GuestContext.getBaseContext().
+ * It is intentionally not a ContextWrapper: Chromium's split compatibility path walks every
+ * ContextWrapper and expects the terminal to carry a mutable mClassLoader field. Keeping that
+ * field Guest-local lets the platform-compatible repair finish without exposing a Host Context.
  */
-final class GuestContextUnwrapBoundary extends GuestHostOperationDenyContext {
+final class GuestContextUnwrapBoundary extends Context {
     private final GuestContext owner;
+    @SuppressWarnings("unused") // Chromium locates this exact terminal field reflectively.
+    private ClassLoader mClassLoader;
 
     GuestContextUnwrapBoundary(GuestContext owner) {
-        super(null);
         this.owner = java.util.Objects.requireNonNull(owner, "owner");
+        this.mClassLoader = owner.getClassLoader();
     }
 
-    @Override public Context getBaseContext() { return null; }
     @Override public String getPackageName() { return owner.getPackageName(); }
     @Override public String getOpPackageName() { return owner.getOpPackageName(); }
     @Override public Context getApplicationContext() { return owner.getApplicationContext(); }
-    @Override public ClassLoader getClassLoader() { return owner.getClassLoader(); }
+    @Override public ClassLoader getClassLoader() { return mClassLoader; }
     @Override public Resources getResources() { return owner.getResources(); }
     @Override public AssetManager getAssets() { return owner.getAssets(); }
     @Override public Resources.Theme getTheme() { return owner.getTheme(); }
@@ -71,14 +76,41 @@ final class GuestContextUnwrapBoundary extends GuestHostOperationDenyContext {
     @Override public void enforcePermission(String permission, int pid, int uid, String message) {
         owner.enforcePermission(permission, pid, uid, message);
     }
+    @Override public void enforceCallingPermission(String permission, String message) {
+        throw new SecurityException("GUEST_CONTEXT_HOST_OPERATION_DENIED:enforceCallingPermission");
+    }
+    @Override public void enforceCallingOrSelfPermission(String permission, String message) {
+        throw new SecurityException("GUEST_CONTEXT_HOST_OPERATION_DENIED:enforceCallingOrSelfPermission");
+    }
     @Override public void grantUriPermission(String toPackage, Uri uri, int modeFlags) {
         owner.grantUriPermission(toPackage, uri, modeFlags);
     }
     @Override public void revokeUriPermission(Uri uri, int modeFlags) {
         owner.revokeUriPermission(uri, modeFlags);
     }
+    @Override public void revokeUriPermission(String targetPackage, Uri uri, int modeFlags) {
+        owner.revokeUriPermission(targetPackage, uri, modeFlags);
+    }
     @Override public int checkUriPermission(Uri uri, int pid, int uid, int modeFlags) {
         return owner.checkUriPermission(uri, pid, uid, modeFlags);
+    }
+    @Override public int checkCallingUriPermission(Uri uri, int modeFlags) {
+        throw deniedUriPermission();
+    }
+    @Override public int checkCallingOrSelfUriPermission(Uri uri, int modeFlags) {
+        throw deniedUriPermission();
+    }
+    @Override public int checkUriPermission(Uri uri, String readPermission,
+            String writePermission, int pid, int uid, int modeFlags) { throw deniedUriPermission(); }
+    @Override public void enforceUriPermission(Uri uri, int pid, int uid,
+            int modeFlags, String message) { throw deniedUriPermission(); }
+    @Override public void enforceCallingUriPermission(Uri uri, int modeFlags,
+            String message) { throw deniedUriPermission(); }
+    @Override public void enforceCallingOrSelfUriPermission(Uri uri, int modeFlags,
+            String message) { throw deniedUriPermission(); }
+    @Override public void enforceUriPermission(Uri uri, String readPermission,
+            String writePermission, int pid, int uid, int modeFlags, String message) {
+        throw deniedUriPermission();
     }
     @Override public Object getSystemService(String name) { return owner.getSystemService(name); }
     @Override public ContentResolver getContentResolver() { return owner.getContentResolver(); }
@@ -91,6 +123,27 @@ final class GuestContextUnwrapBoundary extends GuestHostOperationDenyContext {
     @Override public void startActivities(Intent[] intents, Bundle options) {
         owner.startActivities(intents, options);
     }
+    @Override public void startIntentSender(IntentSender intent, Intent fillInIntent,
+            int flagsMask, int flagsValues, int extraFlags)
+            throws IntentSender.SendIntentException {
+        owner.startIntentSender(intent, fillInIntent, flagsMask, flagsValues, extraFlags);
+    }
+    @Override public void startIntentSender(IntentSender intent, Intent fillInIntent,
+            int flagsMask, int flagsValues, int extraFlags, Bundle options)
+            throws IntentSender.SendIntentException {
+        owner.startIntentSender(intent, fillInIntent, flagsMask, flagsValues, extraFlags, options);
+    }
+    public boolean startInstrumentation(ComponentName className,
+            String profileFile, Bundle arguments) {
+        throw new SecurityException("GUEST_CONTEXT_HOST_OPERATION_DENIED:startInstrumentation");
+    }
+    public void setWallpaper(Bitmap bitmap) throws IOException { denyWallpaper(); }
+    public void setWallpaper(java.io.InputStream data) throws IOException { denyWallpaper(); }
+    public void clearWallpaper() throws IOException { denyWallpaper(); }
+    public Drawable getWallpaper() { throw deniedWallpaper(); }
+    public Drawable peekWallpaper() { throw deniedWallpaper(); }
+    public int getWallpaperDesiredMinimumWidth() { throw deniedWallpaper(); }
+    public int getWallpaperDesiredMinimumHeight() { throw deniedWallpaper(); }
     @Override public ComponentName startService(Intent service) { return owner.startService(service); }
     @Override public ComponentName startForegroundService(Intent service) {
         return owner.startForegroundService(service);
@@ -150,6 +203,28 @@ final class GuestContextUnwrapBoundary extends GuestHostOperationDenyContext {
         owner.sendOrderedBroadcast(intent, permission, options, resultReceiver, scheduler,
                 initialCode, initialData, initialExtras);
     }
+    @Override public void sendBroadcastAsUser(Intent intent, UserHandle user) {
+        denyUserBroadcast();
+    }
+    public void sendBroadcastAsUser(Intent intent, UserHandle user,
+            String receiverPermission) { denyUserBroadcast(); }
+    public void sendOrderedBroadcastAsUser(Intent intent, UserHandle user,
+            String receiverPermission, BroadcastReceiver resultReceiver, Handler scheduler,
+            int initialCode, String initialData, Bundle initialExtras) { denyUserBroadcast(); }
+    @Override public void sendStickyBroadcast(Intent intent) { denyStickyBroadcast(); }
+    public void sendStickyBroadcastAsUser(Intent intent, UserHandle user) {
+        denyStickyBroadcast();
+    }
+    @Override public void sendStickyOrderedBroadcast(Intent intent,
+            BroadcastReceiver resultReceiver, Handler scheduler, int initialCode,
+            String initialData, Bundle initialExtras) { denyStickyBroadcast(); }
+    public void sendStickyOrderedBroadcastAsUser(Intent intent, UserHandle user,
+            BroadcastReceiver resultReceiver, Handler scheduler, int initialCode,
+            String initialData, Bundle initialExtras) { denyStickyBroadcast(); }
+    @Override public void removeStickyBroadcast(Intent intent) { denyStickyBroadcast(); }
+    public void removeStickyBroadcastAsUser(Intent intent, UserHandle user) {
+        denyStickyBroadcast();
+    }
     @Override public File getDataDir() { return owner.getDataDir(); }
     @Override public File getFilesDir() { return owner.getFilesDir(); }
     @Override public File getCacheDir() { return owner.getCacheDir(); }
@@ -165,12 +240,18 @@ final class GuestContextUnwrapBoundary extends GuestHostOperationDenyContext {
         return owner.openOrCreateDatabase(name, mode, factory, errorHandler);
     }
     @Override public boolean deleteDatabase(String name) { return owner.deleteDatabase(name); }
+    @Override public boolean moveDatabaseFrom(Context sourceContext, String name) {
+        return owner.moveDatabaseFrom(sourceContext, name);
+    }
     @Override public String[] databaseList() { return owner.databaseList(); }
     @Override public SharedPreferences getSharedPreferences(String name, int mode) {
         return owner.getSharedPreferences(name, mode);
     }
     @Override public boolean deleteSharedPreferences(String name) {
         return owner.deleteSharedPreferences(name);
+    }
+    @Override public boolean moveSharedPreferencesFrom(Context sourceContext, String name) {
+        return owner.moveSharedPreferencesFrom(sourceContext, name);
     }
     @Override public FileInputStream openFileInput(String name) throws FileNotFoundException {
         return owner.openFileInput(name);
@@ -203,6 +284,9 @@ final class GuestContextUnwrapBoundary extends GuestHostOperationDenyContext {
     @Override public Context createConfigurationContext(Configuration overrideConfiguration) {
         return owner.createConfigurationContext(overrideConfiguration);
     }
+    @Override public Context createDisplayContext(android.view.Display display) {
+        return owner.createDisplayContext(display);
+    }
     public Context createCredentialProtectedStorageContext() {
         return owner.createCredentialProtectedStorageContext();
     }
@@ -210,4 +294,18 @@ final class GuestContextUnwrapBoundary extends GuestHostOperationDenyContext {
         return owner.createDeviceProtectedStorageContext();
     }
     @Override public boolean isDeviceProtectedStorage() { return owner.isDeviceProtectedStorage(); }
+
+    private static SecurityException deniedWallpaper() {
+        return new SecurityException("GUEST_CONTEXT_HOST_OPERATION_DENIED:wallpaper");
+    }
+    private static void denyWallpaper() { throw deniedWallpaper(); }
+    private static void denyStickyBroadcast() {
+        throw new SecurityException("GUEST_CONTEXT_HOST_OPERATION_DENIED:stickyBroadcast");
+    }
+    private static void denyUserBroadcast() {
+        throw new SecurityException("GUEST_CONTEXT_HOST_OPERATION_DENIED:userBroadcast");
+    }
+    private static SecurityException deniedUriPermission() {
+        return new SecurityException("GUEST_CONTEXT_HOST_OPERATION_DENIED:uriPermission");
+    }
 }
