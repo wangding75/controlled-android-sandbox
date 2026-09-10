@@ -50,5 +50,12 @@
       "screenshot_valid_non_black": true
     }
   },
+  "trichrome_provider": {
+    "package": "com.google.android.trichromelibrary",
+    "catalog_kind": "STATIC",
+    "catalog_version": 777818033,
+    "direct_pm_path": "NOT_EXPOSED_AS_STANDALONE_PACKAGE_PATH",
+    "evidence": "P2-02 Chrome shared-library projection"
+  },
   "next_task": "P2-02"
 }
