@@ -1,12 +1,12 @@
 # P2-01 Xiaomi device and commercial-sample baseline
 
-**Status:** `BLOCKED_DEVICE_APP_LOCK` — 2026-09-10 (Asia/Shanghai)
+**Status:** `DONE` — 2026-09-10 (Asia/Shanghai)
 
-P2-01 has established the real-device and ARM64 fixture baseline, but cannot
-close while the required native Quark control is behind HyperOS Application
-Lock.  This is a device-side authentication condition, not a CAS product
-failure.  No attempt was made to disable, bypass, or otherwise alter that
-security control.
+P2-01 established the real-device and ARM64 fixture baseline, then completed
+the required native Quark control after the device owner unlocked it through
+the normal HyperOS UI.  The earlier Application Lock interception remains
+retained as the first environment condition; it was not bypassed, disabled, or
+altered by CAS or ADB.
 
 ## Fixed execution coordinate
 
@@ -77,13 +77,23 @@ assertion about any upstream store account.
 * Quark's resolved launcher was
   `com.quark.browser/com.ucpro.MainActivity`.  Package-only launch syntax was
   not resolvable on this device, so the returned explicit component was used.
-  That launch was redirected to
-  `com.miui.securitycenter/com.miui.applicationlock.AppLockActivity`; Quark
-  did not become top-resumed and no Quark PID was available.
-* The first Quark condition is therefore `BLOCKED_DEVICE_APP_LOCK`, not
-  `CAS_FAILURE`, `OEM_PRODUCT_DEFECT`, or `QUARK_BASIC_SMOKE=FAIL`.  It must
-  not be hidden by retrying, by changing package/component routing, or by
-  weakening the device security policy.
+  Before owner intervention, that route reached
+  `com.miui.securitycenter/com.miui.applicationlock.AppLockActivity`; this
+  first condition remains recorded as `BLOCKED_DEVICE_APP_LOCK` and is not a
+  CAS failure.
+* After the normal device-side unlock, a fresh dynamic-device check followed by
+  a forced cold native launch completed in 331 ms.  The top-resumed activity
+  and current focus were both `com.quark.browser/com.ucpro.BrowserActivity`,
+  the Quark PID was `19557`, and the WindowManager reported a valid Quark
+  Surface.  The direct capture at
+  `out/verification/p2-01-xiaomi-s01-s04-20260910/native-controls/quark-native-unlocked-screenshot.png`
+  is a valid non-black 1080×2400 PNG (mean luma 208.86).  The launch log
+  contained no Java `FATAL EXCEPTION` or ANR for Quark.  It did record normal
+  platform-denied provider and proc accesses, which are native-baseline facts,
+  not a permission expansion or a CAS result.
+* This establishes only the original installed app's native launch baseline.
+  It is not `QUARK_BASIC_SMOKE=PASS`; Service/Provider ownership and browsing
+  remain P2-03.
 
 ## Acceptance accounting and next action
 
@@ -93,11 +103,9 @@ assertion about any upstream store account.
 | Candidate Host hashes equal P1-16 manifest | PASS |
 | ARM64-only lane excludes companion32 | PASS |
 | Chrome native control operable | PASS (baseline only) |
-| Quark native control operable | BLOCKED_DEVICE_APP_LOCK |
-| P2-01 close | BLOCKED_DEVICE_APP_LOCK |
+| Quark native control operable | PASS (baseline only) |
+| P2-01 close | DONE |
 
-P2-02, P2-03, and P2-07 remain unstarted because their P2-01 dependency is
-not complete.  Resume P2-01 only after the device owner unlocks Quark through
-the phone's normal UI; do not provide or transmit the unlock credential.  On
-resumption, rerun fresh discovery and the single native Quark control before
-declaring this baseline complete.
+P2-02, P2-03, and P2-07 are now eligible but unstarted.  P2-02 is next by the
+task-book priority.  The sample manifest is also available in machine-readable
+form at `P2-01_XIAOMI_BASELINE.json`.

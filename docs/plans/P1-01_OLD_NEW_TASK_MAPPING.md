@@ -12,6 +12,6 @@ This mapping preserves prior task identifiers and evidence provenance. It does n
 | P1-02 | Prior broad NBB/VA comparison work | Replaced by a per-product-change reference decision record and a failing pre-fix fixture. |
 | P1-03 / P1-04 | REALAPP-COMPAT-02 | Own shared-library projection and startup/Application/LoadedApk investigations, respectively. |
 | P1-05 to P1-15 | C1/C2/C3/C6 evidence | Prior evidence supplies hypotheses and regression context only; each task needs its own current fixture and acceptance. |
-| P1-16 then P2-01 | C6-T02C and C7 planning | Candidate freeze preceded fresh Xiaomi discovery. P2-01 now has a current ARM64 fixture baseline, but remains `BLOCKED_DEVICE_APP_LOCK` until the native Quark control is unlocked; see `P2-01_XIAOMI_BASELINE_REPORT.md`. |
+| P1-16 then P2-01 | C6-T02C and C7 planning | Candidate freeze preceded fresh Xiaomi discovery. P2-01 now has a current Xiaomi ARM64 fixture and native Chrome/Quark baseline; the retained Application Lock condition was resolved only through the device's normal UI. See `P2-01_XIAOMI_BASELINE_REPORT.md`. |
 
 The old ledger remains an historical ledger. This two-stage plan is the current execution ordering.

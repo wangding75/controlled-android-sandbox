@@ -1,0 +1,54 @@
+{
+  "task_id": "P2-01",
+  "status": "DONE",
+  "completed_on": "2026-09-10",
+  "source_head": "bc9570cc5e32e9249bcf3101d76ec4f6ef921676",
+  "device": {
+    "discovered_serial": "192.168.137.210:35927",
+    "manufacturer": "Xiaomi",
+    "model": "25019PNF3C",
+    "api_level": 36,
+    "android_version": "16",
+    "abi_list": ["arm64-v8a"],
+    "page_size": 4096,
+    "fingerprint": "Xiaomi/xuanyuan/xuanyuan:16/BP2A.250605.031.A3/OS3.0.312.0.WOACNXM:user/release-keys"
+  },
+  "candidate_artifacts": {
+    "host": {
+      "path": "app/build/outputs/apk/debug/app-debug.apk",
+      "sha256": "a136cea2897a0f0f2c61064fdf7da8db543efd2da01d17f68ced93afde2e787e"
+    },
+    "arm64_fixture": {
+      "path": "fixture-basic/build/outputs/apk/debug/fixture-basic-debug.apk",
+      "sha256": "35230e85bdc9a6c254cbfc3b2a226eb3c33da399b845b6ee1c0171e9bcc2969f"
+    },
+    "companion32": "NOT_INSTALLED_ARM64_ONLY"
+  },
+  "fixture_smoke": {
+    "run_id": "p2-01-xiaomi-s01-s04-20260910",
+    "retry_policy": "attempt=1; diagnostic_retry=false",
+    "results": {
+      "S01-host-build-install-launch": "PASS",
+      "S02-guest-import-add": "PASS",
+      "S03-cold-launch-first-frame": "PASS",
+      "S04-warm-launch-reuse": "PASS"
+    }
+  },
+  "native_controls": {
+    "chrome": {
+      "result": "PASS_BASELINE_ONLY",
+      "cold_launch_ms": 493,
+      "top_activity": "com.android.chrome/com.google.android.apps.chrome.Main"
+    },
+    "quark": {
+      "first_condition": "BLOCKED_DEVICE_APP_LOCK",
+      "resolution": "device owner unlocked through normal HyperOS UI",
+      "result": "PASS_BASELINE_ONLY",
+      "cold_launch_ms": 331,
+      "top_activity": "com.quark.browser/com.ucpro.BrowserActivity",
+      "screenshot": "out/verification/p2-01-xiaomi-s01-s04-20260910/native-controls/quark-native-unlocked-screenshot.png",
+      "screenshot_valid_non_black": true
+    }
+  },
+  "next_task": "P2-02"
+}
