@@ -563,7 +563,8 @@ public final class DebugCommandActivity extends Activity {
                 components.put("serviceStop", bundleJson(serviceStop));
                 result.put("components", components);
                 operation = runtime.prepare(record, virtualUserId);
-                requireStatus("prepare", operation, "PREPARED", "ALREADY_PREPARED");
+                requireStatus("prepare", operation, "PREPARED", "ALREADY_PREPARED",
+                        "PREPARED_DEGRADED", "ALREADY_PREPARED_DEGRADED");
             } else if ("service-lifecycle-suite".equals(command)) {
                 String component = extras.getString("serviceComponent", record.serviceClass).trim();
                 if (component.isEmpty()) throw new IllegalArgumentException(

@@ -1,16 +1,16 @@
 # P2-03 reference decision — Quark Service/Provider and revision re-entry
 
-状态：`BLOCKED_ENVIRONMENT`（2026-09-11，Asia/Shanghai；CAS Native 修复已通过定向回归，真机 UI 闭环被 Xiaomi App Lock 阻断）
+状态：`BLOCKED_QUARK_WEBVIEW_ANR`（2026-09-11，Asia/Shanghai；CAS Native 与 Service/Provider 定向回归通过，真实浏览闭环在夸克 U4/Chromium 原生路径发生 ANR）
 
 ## 固定执行坐标
 
-- 当前源码基线：`f84adb488342fe52ac8c09a575de64982855ff7e`（本次变更待提交）
+- 当前源码基线：`70738f3cabf82f94019cf0dedba1431b5ab284e9`，另有本次 Debug 验收白名单修改待提交
 - 设备：Xiaomi `25019PNF3C` / `xuanyuan`，Android 16 / API 36，`arm64-v8a`，4096 bytes
 - 夸克：`com.quark.browser` `10.15.5.1130` / `1130`，base-only，APK SHA-256
   `81bddb678f3918b683cdc48c0ccf8682137e0c1cbf23930df17b36120446206a`
 - Host APK：`0.5.19.1-source-debug` / `19`，SHA-256
-  `1e321d60a93fbad6d3388659ae88f51f40b0c4111d6c0882f619507cdeef3791`；设备已安装同 hash。
-- 当前任务首错坐标：首帧后 Guest 原生路径；`fstat64` 与公开 ashmem FD ledger 缺口已修复，业务路径现在进入 Service/Provider，但真实窗口交互被设备 App Lock 阻断。
+  `9eeb759d9a54ae02012c18209cdcaed612735fdfc63ccbef752a7a3647f713f1`；设备已安装同 hash。
+- 当前任务首错坐标：`fstat64` 与公开 ashmem FD ledger 缺口已修复，Service/Provider 已进入真实路由；正常设备解锁后，夸克 U4/Chromium 的 `loadDataWithBaseURL` 后置路径触发输入分发 ANR。
 
 ## CAS、NBB、VA 方法对照
 
@@ -71,11 +71,38 @@
   `com.miui.securitycenter/.applicationlock.AppLockActivity` 控制，不能作为业务 smoke PASS。
 - 设备 UI hierarchy 明确显示“请用指纹解锁 / 使用密码解锁”；未修改 App Lock 配置，也没有猜测或绕过凭据。
 
+## 2026-09-11 续接：CAS/NBB/VA 与平台行为复核
+
+调试 harness 的首错 request 为 `658eab97-1d47-407d-aba3-a478d7a90295`：组件子步骤均
+成功，只有 `ALREADY_PREPARED_DEGRADED` 被错误地当作失败。CAS 的生命周期协调器已将
+该状态定义为可继续使用的降级准备态；NBB/VA 的对应方法仍是宿主 owner/proxy 持有
+系统侧生命周期、Guest 侧投影组件并继续调用。因此没有改 Service/Provider owner、权限
+或 fallback，只把该合法状态加入 Debug 验收白名单。
+
+修复后的 request `e5c7c86b-0551-4293-a386-eb496203bfd2` 返回 `PASS`，Service、Receiver、
+Provider 分别为 `SERVICE_STARTED`、`BROADCAST_DELIVERED`、`PROVIDER_ALREADY_READY`。
+
+随后使用真实 Host“应用→夸克→启动”入口，不调用 `uiautomator`。CAS 的
+`GuestActivityThreadInstrumentation`/`ActivityFieldBridge` 负责客户端 Guest 记录投影，
+`WindowManagerHook`/`InteractionObjectRewriter` 负责 WindowManager Binder 边界的 Host
+包名投影；WMS 实测为 Host Stub ActivityRecord + Guest 窗口名 + Host LayoutParams package，
+与 NBB/VA 的 proxy/stub 行为一致。Android 16 的 TaskInfo 同时为 `mBehindAppLockPkg=null`，
+故当前失败不是 App Lock。
+
+首帧之后，Quark 自有 U4/Chromium 日志出现 `WebCoreManager` NPE、
+`nativeSetEnabledMremap` 缺失提示和 `loadDataWithBaseURL` 栈，随后进程收到 ANR signal；
+系统 ANR 记录的 native 栈落在冻结 revision 的 `libunet.so` 等 Quark native payload。
+没有出现 `NO_GUEST_SERVICE_MATCH`、Provider authority 未虚拟化、Guest/Host 身份污染或
+CAS Native ashmem 首错。基于现有证据不能安全推出 CAS/NBB/VA 修复点，因此本次不猜测
+增加 WebView fallback、禁用 NativePolicy 或加入 Quark 特判；P2-03 保持阻断，后续应先
+建立同一 U4/Chromium 首次 `loadDataWithBaseURL` 的平台/原生对照。
+
 ## P2-03 验收边界
 
 `QUARK_FIRST_FRAME=PASS`（CAS 内部首帧）；`QUARK_SERVICE_PROVIDER=PASS`（真实 Provider/Service
-路由标记）；`QUARK_BASIC_SMOKE=BLOCKED_ENVIRONMENT`。网页导航、搜索/输入、标签、返回、前后台、
-文件选择与测试下载尚未取得可交互窗口，因此 P2-03 不能升级为完整 PASS；P2-90/P2-91 未执行。
+路由标记）；`QUARK_BASIC_SMOKE=BLOCKED_QUARK_WEBVIEW_ANR`。历史 App Lock 首错仍保留，
+但当前复测已不再被 App Lock 拦截；网页导航、搜索/输入、标签、返回、前后台、文件选择
+与测试下载尚未取得稳定窗口，因此 P2-03 不能升级为完整 PASS；P2-90/P2-91 未执行。
 
 ## 最小修复决定
 
