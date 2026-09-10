@@ -473,7 +473,7 @@ bool NativeHookRuntime::is_target_symbol(std::string_view symbol) noexcept {
             "prctl", "ptrace", "fork", "vfork", "clone", "clone3", "execve", "execveat",
             "seccomp", "getcwd", "chdir", "fchdir", "realpath", "chmod", "fchmod",
             "fchmodat", "chown", "fchown", "fchownat", "truncate", "ftruncate", "fstat",
-            "getdents", "closedir", "dlsym"});
+            "fstat64", "getdents", "closedir", "dlsym"});
     return std::find(targets.begin(), targets.end(), symbol) != targets.end();
 }
 

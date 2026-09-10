@@ -36,6 +36,7 @@ int main(int argc, char** argv) {
     require_hook(NativeHookRuntime::is_target_symbol("lstat"), "lstat target");
     require_hook(NativeHookRuntime::is_target_symbol("readlink"), "readlink target");
     require_hook(NativeHookRuntime::is_target_symbol("fstatat"), "fstatat target");
+    require_hook(NativeHookRuntime::is_target_symbol("fstat64"), "fstat64 target");
     require_hook(NativeHookRuntime::is_target_symbol("openat2"), "openat2 target");
     require_hook(NativeHookRuntime::is_target_symbol("statx"), "statx target");
     require_hook(NativeHookRuntime::is_target_symbol("renameat2"), "renameat2 target");

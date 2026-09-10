@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <cstdio>
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -107,6 +108,7 @@ std::atomic<FchownAtFn> real_fchownat{nullptr};
 std::atomic<TruncateFn> real_truncate{nullptr};
 std::atomic<FtruncateFn> real_ftruncate{nullptr};
 std::atomic<FstatFn> real_fstat{nullptr};
+std::atomic<FstatFn> real_fstat64{nullptr};
 std::atomic<GetdentsFn> real_getdents{nullptr};
 std::atomic<ClosedirFn> real_closedir{nullptr};
 std::atomic<DlsymFn> real_dlsym{nullptr};
@@ -187,10 +189,45 @@ bool resolve_fd_checked(int descriptor, NativeResolvedPath& resolved) {
     }
 }
 
+bool admit_public_ashmem_fd(int descriptor) noexcept {
+    if (descriptor <= STDERR_FILENO) return false;
+#if defined(SYS_readlinkat)
+    char proc_path[64]{};
+    const int path_length = std::snprintf(proc_path, sizeof(proc_path),
+            "/proc/self/fd/%d", descriptor);
+    if (path_length <= 0 || static_cast<std::size_t>(path_length) >= sizeof(proc_path)) {
+        return false;
+    }
+    char target[PATH_MAX]{};
+    const long length = trusted_syscall6(SYS_readlinkat, AT_FDCWD,
+            reinterpret_cast<long>(proc_path), reinterpret_cast<long>(target),
+            static_cast<long>(sizeof(target) - 1U));
+    if (length <= 0 || length >= static_cast<long>(sizeof(target))) return false;
+    const std::string_view value(target, static_cast<std::size_t>(length));
+    constexpr std::string_view prefix = "/dev/ashmem";
+    if (value == prefix || value.rfind(prefix, 0) != 0) return false;
+    if (value.size() == prefix.size()) return true;
+    return value.find('/', prefix.size()) == std::string_view::npos;
+#else
+    return false;
+#endif
+}
+
 bool fd_operation_current(int descriptor) noexcept {
     const auto record = NativeFdLedger::lookup(descriptor);
     if (!record) {
         if (descriptor > STDERR_FILENO) {
+            // Android 16 keeps the legacy ashmem device as a public kernel
+            // compatibility surface.  Some WebView/UC paths create these
+            // descriptors in a system-owned helper before the Guest ELF
+            // touches them, so they arrive without a Guest ledger record.
+            // Admit only that exact public device target; all other unknown
+            // descriptors remain fail-closed.
+            if (admit_public_ashmem_fd(descriptor)) {
+                NativeFdLedger::register_fd(descriptor, NativeFdOwnership::GuestOwned,
+                        global_policy().snapshot().revision);
+                return true;
+            }
             errno = EACCES;
             return false;
         }
@@ -623,6 +660,17 @@ extern "C" int controlled_fstat(int descriptor, struct stat* value) {
     return function(descriptor, value);
 }
 
+extern "C" int controlled_fstat64(int descriptor, struct stat* value) {
+    FstatFn function = require_real(real_fstat64, "fstat64");
+    if (function == nullptr) { errno = ENOSYS; return -1; }
+    if (value == nullptr) { errno = EFAULT; return -1; }
+    if (configured()) {
+        if (!fd_operation_current(descriptor)) return -1;
+        if (!NativeFdLedger::guest_visible(descriptor)) { errno = EACCES; return -1; }
+    }
+    return function(descriptor, value);
+}
+
 extern "C" ssize_t controlled_getdents(int descriptor, void* buffer, std::size_t size) {
     GetdentsFn function = require_real(real_getdents, "getdents");
     if (function == nullptr) { errno = ENOSYS; return -1; }
@@ -682,6 +730,7 @@ void* native_process_replacement_for_symbol(std::string_view symbol) noexcept {
     if (symbol == "truncate") return reinterpret_cast<void*>(&controlled_truncate);
     if (symbol == "ftruncate") return reinterpret_cast<void*>(&controlled_ftruncate);
     if (symbol == "fstat") return reinterpret_cast<void*>(&controlled_fstat);
+    if (symbol == "fstat64") return reinterpret_cast<void*>(&controlled_fstat64);
     if (symbol == "getdents") return reinterpret_cast<void*>(&controlled_getdents);
     if (symbol == "closedir") return reinterpret_cast<void*>(&controlled_closedir);
     if (symbol == "dlsym") return reinterpret_cast<void*>(&controlled_dlsym);

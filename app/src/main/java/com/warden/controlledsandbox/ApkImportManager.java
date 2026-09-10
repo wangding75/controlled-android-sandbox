@@ -1005,37 +1005,47 @@ final class ApkImportManager {
     }
 
     /**
-     * Older revisions may already contain ART's generated current-profile sidecars.  They are
-     * not APK/native content and are the only runtime files accepted during migration; any
-     * other unexpected entry still fails the immutable tree comparison below.
+     * Older revisions may already contain ART's generated profile/compiled-code sidecars. They
+     * are not APK/native content and are the only runtime files accepted during migration; any
+     * other unexpected entry still fails the immutable tree comparison below. On current
+     * Android, the sidecars can be nested below lib/<abi>/oat rather than lib/oat.
      */
     private static void removeKnownRuntimeProfileSidecars(File revision) throws Exception {
-        File profileDirectory = new File(new File(revision, "lib"), "oat");
-        if (!profileDirectory.exists()) return;
-        if (java.nio.file.Files.isSymbolicLink(profileDirectory.toPath())
-                || !profileDirectory.isDirectory()) {
+        File nativeRoot = new File(revision, "lib");
+        if (!nativeRoot.exists()) return;
+        if (java.nio.file.Files.isSymbolicLink(nativeRoot.toPath())
+                || !nativeRoot.isDirectory()) {
+            throw new SecurityException("PUBLISHED_NATIVE_DIRECTORY_INVALID");
+        }
+        removeKnownRuntimeProfileSidecarsIn(nativeRoot, false);
+    }
+
+    private static void removeKnownRuntimeProfileSidecarsIn(File directory, boolean inOat)
+            throws Exception {
+        if (java.nio.file.Files.isSymbolicLink(directory.toPath()) || !directory.isDirectory()) {
             throw new SecurityException("PUBLISHED_PROFILE_DIRECTORY_INVALID");
         }
-        File[] children = profileDirectory.listFiles();
+        File[] children = directory.listFiles();
         if (children == null) throw new IllegalStateException(
-                "Cannot list published profile directory " + profileDirectory);
+                "Cannot list published native directory " + directory);
         for (File child : children) {
-            if (java.nio.file.Files.isSymbolicLink(child.toPath())
-                    || !child.isFile() || !child.getName().endsWith(".prof")) {
+            if (java.nio.file.Files.isSymbolicLink(child.toPath())) continue;
+            if (child.isDirectory()) {
+                removeKnownRuntimeProfileSidecarsIn(child, inOat || "oat".equals(child.getName()));
                 continue;
             }
+            if (!inOat || !child.isFile() || !isKnownRuntimeProfileSidecar(child)) continue;
             child.setWritable(true, false);
             if (!child.delete() && child.exists()) {
                 throw new IllegalStateException("Cannot remove runtime profile sidecar " + child);
             }
         }
-        File[] remaining = profileDirectory.listFiles();
-        if (remaining != null && remaining.length == 0) {
-            profileDirectory.setWritable(true, false);
-            if (!profileDirectory.delete() && profileDirectory.exists()) {
-                throw new IllegalStateException("Cannot remove empty runtime profile directory");
-            }
-        }
+    }
+
+    private static boolean isKnownRuntimeProfileSidecar(File file) {
+        String name = file.getName().toLowerCase(java.util.Locale.ROOT);
+        return name.endsWith(".prof") || name.endsWith(".odex")
+                || name.endsWith(".vdex") || name.endsWith(".art");
     }
 
     private static void moveFile(File source, File destination) throws Exception {

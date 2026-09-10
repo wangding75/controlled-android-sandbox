@@ -44,6 +44,7 @@ extern "C" int controlled_fchownat(int directory, const char* path, uid_t owner,
 extern "C" int controlled_truncate(const char* path, off_t length);
 extern "C" int controlled_ftruncate(int descriptor, off_t length);
 extern "C" int controlled_fstat(int descriptor, struct stat* value);
+extern "C" int controlled_fstat64(int descriptor, struct stat* value);
 extern "C" ssize_t controlled_getdents(int descriptor, void* buffer, std::size_t size);
 extern "C" int controlled_closedir(DIR* directory);
 extern "C" void* controlled_dlsym(void* handle, const char* name);
