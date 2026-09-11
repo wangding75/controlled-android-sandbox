@@ -83,6 +83,13 @@ public final class NativePolicy {
                 networkIdentity.privateDnsServerName(), networkIdentity.dnsServers());
     }
 
+    /** Configures the process-local U4 metadata alias after the main policy identity is bound. */
+    public static boolean configureNativeLibraryAlias(String aliasRoot, String targetRoot) {
+        if (!AVAILABLE) return false;
+        return nativeConfigureNativeLibraryAlias(aliasRoot == null ? "" : aliasRoot,
+                targetRoot == null ? "" : targetRoot);
+    }
+
     public static boolean configure(String sessionId, long generation, String packageName,
                                     String processName, int virtualUserId, int virtualUid,
                                     int virtualPid, String abiName, String instanceRoot, String apkPath,
@@ -349,6 +356,8 @@ public final class NativePolicy {
                                                   int networkId, String transport, boolean vpnActive,
                                                   boolean metered, boolean validated, int mtu,
                                                   String privateDnsServerName, String[] dnsServers);
+    private static native boolean nativeConfigureNativeLibraryAlias(String aliasRoot,
+                                                                     String targetRoot);
     private static native boolean nativeConfigureFileCapabilities(int dataRootFd, int apkParentFd,
                                                                    String apkEntryName,
                                                                    int nativeLibraryRootFd);

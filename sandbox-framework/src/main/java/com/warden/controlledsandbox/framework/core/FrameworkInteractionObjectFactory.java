@@ -1,6 +1,7 @@
 package com.warden.controlledsandbox.framework.core;
 
 import com.warden.controlledsandbox.contract.VirtualDisplaySnapshot;
+import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -31,7 +32,38 @@ final class FrameworkInteractionObjectFactory {
         put(value, profile.flags(), "flags", "mFlags");
         put(value, 1, "type", "mType");
         put(value, 1, "modeId", "defaultModeId");
+        // Display.getMode()/getDefaultMode() resolve these IDs through the mode arrays.  A
+        // DisplayInfo with only modeId/defaultModeId populated is internally inconsistent and
+        // makes Chromium throw "Unable to locate mode ... supportedModes=[]" on its display
+        // listener.  Keep the synthetic DisplayInfo self-consistent across API levels while
+        // leaving the hidden DisplayInfo type reflection-only.
+        Object mode = displayMode(profile);
+        if (mode == null || !putModeArrays(value, mode)) return null;
+        putObject(value, new float[]{profile.refreshRate()}, "supportedRefreshRates");
         return value;
+    }
+
+    private static Object displayMode(VirtualDisplaySnapshot profile) {
+        try {
+            Class<?> modeClass = Class.forName("android.view.Display$Mode");
+            Constructor<?> constructor = modeClass.getDeclaredConstructor(
+                    int.class, int.class, int.class, float.class);
+            constructor.setAccessible(true);
+            return constructor.newInstance(1, profile.widthPixels(), profile.heightPixels(),
+                    profile.refreshRate());
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static boolean putModeArrays(Object target, Object mode) {
+        if (target == null || mode == null) return false;
+        Class<?> modeClass = mode.getClass();
+        Object modes = Array.newInstance(modeClass, 1);
+        Array.set(modes, 0, mode);
+        boolean supported = putObject(target, modes, "supportedModes");
+        putObject(target, modes, "appsSupportedModes");
+        return supported;
     }
 
     static Object point(Class<?> returnType, int x, int y) {
@@ -115,10 +147,31 @@ final class FrameworkInteractionObjectFactory {
                     else if (type == long.class || type == Long.class) field.set(target, number.longValue());
                     else if (type == double.class || type == Double.class) field.set(target, number.doubleValue());
                     else continue;
-                } else if (value == null || type.isInstance(value) || type == String.class) {
-                    field.set(target, value == null ? null : String.valueOf(value));
+                } else if (value == null) {
+                    field.set(target, null);
+                } else if (type.isInstance(value)) {
+                    field.set(target, value);
+                } else if (type == String.class) {
+                    field.set(target, String.valueOf(value));
                 } else continue;
                 wrote = true;
+            } catch (Throwable ignored) { }
+        }
+        return wrote;
+    }
+
+    private static boolean putObject(Object target, Object value, String... names) {
+        if (target == null) return false;
+        boolean wrote = false;
+        for (String name : names) {
+            Field field = findField(target.getClass(), name);
+            if (field == null || Modifier.isStatic(field.getModifiers())) continue;
+            try {
+                field.setAccessible(true);
+                if (value == null || field.getType().isInstance(value)) {
+                    field.set(target, value);
+                    wrote = true;
+                }
             } catch (Throwable ignored) { }
         }
         return wrote;

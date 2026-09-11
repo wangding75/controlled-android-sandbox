@@ -22,6 +22,7 @@ import android.os.Bundle;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.UserHandle;
 import android.view.LayoutInflater;
 import dalvik.system.PathClassLoader;
 import java.io.File;
@@ -177,6 +178,13 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         this.storageNames = new GuestStorageNameCodec(instanceRoot, capabilityBackedStorage);
         this.applicationInfo = GuestApplicationInfoFactory.create(spec, dataRoot.getAbsolutePath(),
                 applicationMetadata, appComponentFactory, parsedApplicationInfo);
+        // Keep ApplicationInfo.nativeLibraryDir on the Android logical path
+        // (/data/app/<pkg>/lib/<abi>). NBB's BPackageManager uses /data/app-lib/<pkg>;
+        // VA uses the virtual lib path plus IO redirect. The Host-files alias is created
+        // once in prepareNativeBootstrap; re-creating it here runs after system IO hooks
+        // and Files.createDirectories(/data/user/0/<host>/files) is denied as a
+        // cross-package private path. Window decor calls createConfigurationContext on
+        // every Activity start, so that throw killed the previously working homepage.
         // ContentResolver captures its Context attribution source at construction time. Use the
         // physical Host context for the platform-facing resolver: Android 12+ validates the
         // first AttributionSource against the real Binder caller and rejects a virtual UID when
@@ -491,6 +499,14 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         // services; delegating to the deny boundary would make Chrome's own
         // SandboxedProcessService crash before its first frame.
         return componentRouter.bindIsolatedService(service, connection, flags, executor);
+    }
+    @Override public boolean bindServiceAsUser(Intent service, ServiceConnection connection,
+            int flags, UserHandle user) {
+        // U4's API-24+ child-process helper unwraps every ContextWrapper and then invokes this
+        // exact API reflectively. NBB/VA send the same call back through their ordinary virtual
+        // bind-service path; keep the Guest virtual user/session authoritative instead of
+        // delegating the unwrapped boundary to the physical ActivityManager.
+        return componentRouter.bindService(service, connection, flags, null);
     }
     @Override public void updateServiceGroup(ServiceConnection connection, int group,
             int importance) {

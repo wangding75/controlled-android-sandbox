@@ -135,7 +135,11 @@ std::string NativeFdLedger::project_path(std::string_view raw_target) {
         if (virtual_path != raw_target || has_prefix(raw_target, policy.instance_root)
                 || raw_target == policy.apk_path
                 || (!policy.native_library_root.empty()
-                    && has_prefix(raw_target, policy.native_library_root))) {
+                    && has_prefix(raw_target, policy.native_library_root))
+                || (!policy.native_library_alias_root.empty()
+                    && has_prefix(raw_target, policy.native_library_alias_root))
+                || (!policy.native_library_alias_target_root.empty()
+                    && has_prefix(raw_target, policy.native_library_alias_target_root))) {
             return virtual_path;
         }
     }

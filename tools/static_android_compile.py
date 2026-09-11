@@ -36,7 +36,7 @@ def decode_process_output(value):
             pass
     return value.decode('utf-8', errors='replace')
 
-w('android/os/IBinder.java','''package android.os; public interface IBinder { int FIRST_CALL_TRANSACTION=1; int INTERFACE_TRANSACTION=1598968902; interface DeathRecipient { void binderDied(); } default String getInterfaceDescriptor(){return "";} default IInterface queryLocalInterface(String descriptor){return null;} default boolean isBinderAlive(){return true;} default void linkToDeath(DeathRecipient r,int f)throws RemoteException{} default boolean unlinkToDeath(DeathRecipient r,int f){return true;} }''')
+w('android/os/IBinder.java','''package android.os; public interface IBinder { int FIRST_CALL_TRANSACTION=1; int INTERFACE_TRANSACTION=1598968902; int FLAG_ONEWAY=1; interface DeathRecipient { void binderDied(); } default String getInterfaceDescriptor(){return "";} default IInterface queryLocalInterface(String descriptor){return null;} default boolean isBinderAlive(){return true;} default void linkToDeath(DeathRecipient r,int f)throws RemoteException{} default boolean unlinkToDeath(DeathRecipient r,int f){return true;} }''')
 w('dalvik/system/InMemoryDexClassLoader.java','''package dalvik.system; import java.nio.ByteBuffer; public class InMemoryDexClassLoader extends ClassLoader { public InMemoryDexClassLoader(ByteBuffer[] buffers,ClassLoader parent){super(parent);} public InMemoryDexClassLoader(ByteBuffer[] buffers,String librarySearchPath,ClassLoader parent){super(parent);} }''')
 w('android/os/IInterface.java','''package android.os; public interface IInterface { default IBinder asBinder(){ return null; } }''')
 ibinder_stub = stubs / 'android/os/IBinder.java'
@@ -301,6 +301,9 @@ context_stub.write_text(context_stub.read_text(encoding='utf-8').replace(
     'SENSOR_SERVICE="sensor", LOCATION_SERVICE="location", TELEPHONY_SERVICE="phone"'),
     encoding='utf-8')
 context_source = context_stub.read_text(encoding='utf-8')
+context_source = context_source.replace(
+    'public boolean bindIsolatedService(Intent i,int f,String n,java.util.concurrent.Executor e,ServiceConnection c){return true;}',
+    'public boolean bindIsolatedService(Intent i,int f,String n,java.util.concurrent.Executor e,ServiceConnection c){return true;} public boolean bindServiceAsUser(Intent i,ServiceConnection c,int f,android.os.UserHandle u){return true;}')
 context_source = context_source.replace(
     'TELEPHONY_SERVICE="phone"',
     'TELEPHONY_SERVICE="phone", TELEPHONY_SUBSCRIPTION_SERVICE="telephony_subscription", LAYOUT_INFLATER_SERVICE="layout_inflater"')

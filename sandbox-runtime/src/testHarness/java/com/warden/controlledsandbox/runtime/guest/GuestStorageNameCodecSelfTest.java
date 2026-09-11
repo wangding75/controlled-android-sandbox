@@ -30,6 +30,8 @@ public final class GuestStorageNameCodecSelfTest {
             runRegistryWorker(new File(args[1]), args[2], args[3]);
             return;
         }
+        testCanonicalParentAcceptsNativePolicyReverseMap();
+        testNativeAliasContainmentUsesLexicalHostPath();
         testCollisionFreeContextSurfaces();
         testLegacyMigrationRequiresProvableOwnership();
         testLegacyEnumerationMigratesUniqueAndRejectsAmbiguous();
@@ -39,6 +41,40 @@ public final class GuestStorageNameCodecSelfTest {
         testLongNameRestartStabilityAndClaimCleanup();
         testLegacyV2DirectoryRace();
         System.out.println("PASS Guest storage name codec transactional mapping self-test");
+    }
+
+    private static void testCanonicalParentAcceptsNativePolicyReverseMap() {
+        File root = new File("/sandbox/users/0/apps/com.quark.browser");
+        File lexical = new File(root, "data/databases");
+        File projected = new File("/data/user/0/com.quark.browser/databases");
+        File chosen = GuestStorageNameCodec.resolveCanonicalParent(root, projected, lexical);
+        require(chosen.equals(lexical),
+                "NativePolicy reverse-mapped realpath must stay on the instance path");
+
+        File hostCanonical = new File(root, "data/databases");
+        require(GuestStorageNameCodec.resolveCanonicalParent(root, hostCanonical, lexical)
+                        .equals(hostCanonical),
+                "pre-hook host canonical parent must keep working");
+
+        File escaped = new File("/tmp/evil");
+        boolean rejected = false;
+        try {
+            GuestStorageNameCodec.resolveCanonicalParent(root, escaped, lexical);
+        } catch (SecurityException error) {
+            rejected = "GUEST_STORAGE_PARENT_OUTSIDE_INSTANCE".equals(error.getMessage());
+        }
+        require(rejected, "symlink escape through hooked realpath must stay fail-closed");
+    }
+
+    private static void testNativeAliasContainmentUsesLexicalHostPath() {
+        File hostFiles = new File("/data/user/0/com.warden.controlledsandbox.debug/files");
+        File packaged = new File(hostFiles,
+                "packages/com.quark.browser/revisions/abc/lib/arm64-v8a");
+        require(GuestNativeLibraryAlias.containedBy(hostFiles, packaged),
+                "CAS packaged native dir must stay inside host files");
+        File projected = new File("/data/app/com.quark.browser/lib/arm64-v8a");
+        require(!GuestNativeLibraryAlias.containedBy(hostFiles, projected),
+                "reverse-mapped /data/app path is not itself the host-files confinement");
     }
 
     private static void testCollisionFreeContextSurfaces() throws Exception {

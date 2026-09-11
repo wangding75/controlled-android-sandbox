@@ -18,7 +18,8 @@ void revoke_native_audio_captures() noexcept;
  * Direct Guest native termination (CrashSDK, splash recycle) must not SIGKILL the sandbox-owned
  * slot. The translated Java Runtime.nativeExit bridge temporarily opens this gate only while
  * entering the platform's original process-exit implementation; GuestProcessService teardown
- * sets it true for its intentional killProcess().
+ * sets it true for its intentional killProcess(). Forked helper children are not the slot
+ * process: NBB/VA leave _exit unintercepted, so those children must still be able to exit.
  */
 void set_guest_process_exit_allowed(bool allowed) noexcept;
 [[nodiscard]] bool guest_process_exit_allowed() noexcept;

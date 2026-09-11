@@ -277,7 +277,10 @@ bool NativeHookRuntime::install(std::string guest_library_root) {
 
 bool NativeHookRuntime::install_system_io() {
     const NativePolicySnapshot policy = global_policy().snapshot();
-    if (!policy.configured || !global_policy().file_capabilities_configured()) return false;
+    // Isolated workers need Binder-passed directory capabilities. Ordinary guests
+    // still need libjavacore/openjdk PLT mapping so Java File.exists() follows
+    // NativePolicy path rewrites (NBB OsStub). Capabilities are not required for that.
+    if (!policy.configured) return false;
     {
         auto& state = hook_state();
         std::lock_guard lock(state.mutex);
@@ -458,7 +461,8 @@ bool NativeHookRuntime::is_target_symbol(std::string_view symbol) noexcept {
     static constexpr auto targets = std::to_array<std::string_view>({
             "open", "open64", "openat", "openat64", "__open_2", "__openat_2", "openat2",
             "access", "faccessat", "faccessat2", "stat", "lstat", "fstatat", "statx",
-            "rename", "renameat", "renameat2", "unlink", "unlinkat", "mkdir", "mkdirat", "rmdir", "opendir",
+            "rename", "renameat", "renameat2", "unlink", "unlinkat", "mkdir", "mkdirat", "rmdir",
+            "fopen", "fopen64", "fclose", "opendir",
             "readlink", "readlinkat", "getdents64", "mmap",
             "socket", "close", "dup", "dup2", "dup3", "fcntl", "fcntl64", "bind", "connect",
             "send", "sendto", "sendmsg", "recv", "recvfrom", "recvmsg", "read", "write",

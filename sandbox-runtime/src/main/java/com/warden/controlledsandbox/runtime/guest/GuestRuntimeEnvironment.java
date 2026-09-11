@@ -334,6 +334,8 @@ public final class GuestRuntimeEnvironment {
             }
             String nativeAbi = nativeBootstrap.nativeAbi;
             String packagedNativeLibraryDir = nativeBootstrap.packagedNativeLibraryDir;
+            String applicationNativeLibraryDir = nativeBootstrap.applicationNativeLibraryDir;
+            String nativeLibraryAliasRoot = nativeBootstrap.nativeLibraryAliasRoot;
             File guestDataRoot = nativeBootstrap.guestDataRoot;
             String runtimeNativeLibraryDir = nativeBootstrap.runtimeNativeLibraryDir;
             String nativeLibrarySearchPath = nativeBootstrap.nativeLibrarySearchPath;
@@ -367,6 +369,8 @@ public final class GuestRuntimeEnvironment {
                     + (!runtimeNativeLibraryDir.equals(packagedNativeLibraryDir))
                     + " runtimeDir=" + runtimeNativeLibraryDir
                     + " packagedDir=" + packagedNativeLibraryDir
+                    + " applicationDir=" + applicationNativeLibraryDir
+                    + " applicationAlias=" + nativeLibraryAliasRoot
                     + " dexPathProjected=" + !guestDexPath.equals(spec.dexPath())
                     + " coreDexMode=" + coreDexMode);
             if (Build.VERSION.SDK_INT >= 29 && !NativePolicy.installHiddenApiBridge()) {
@@ -489,6 +493,13 @@ public final class GuestRuntimeEnvironment {
             if (enableNativeHooks && !nativeHooksInstalled) {
                 throw new IllegalStateException("NATIVE_FILE_HOOK_INSTALL_FAILED:" + NativePolicy.hookStatus());
             }
+            if (enableNativeHooks && nativeHooksInstalled && !systemIoHooksInstalled) {
+                if (!NativePolicy.installSystemIoHooks()) {
+                    throw new IllegalStateException("NATIVE_SYSTEM_IO_HOOK_INSTALL_FAILED:"
+                            + NativePolicy.hookStatus());
+                }
+                systemIoHooksInstalled = true;
+            }
             boolean nativeBoundaryAvailable = nativeHooksInstalled || translatedGuestAbi;
             // Runtime.nativeLoad is an ART native-method registration boundary. Replacing that
             // method in an ARM64 guest running through the x86_64 native bridge is not safe: the
@@ -504,7 +515,12 @@ public final class GuestRuntimeEnvironment {
             // PathClassLoader already owns the verified guest native directory, so translated
             // guests use the platform loader unchanged. Native-ABI guests keep the diagnostic
             // wrapper and the PLT/IO policy above.
-            boolean nativeLoadRedirect = false;
+            boolean nativeLoadRedirect = nativeCodePresent && !translatedGuestAbi
+                    && NativePolicy.installNativeLoadRedirect();
+            if (nativeCodePresent && !translatedGuestAbi && !nativeLoadRedirect) {
+                throw new IllegalStateException("NATIVE_LOAD_REDIRECT_INSTALL_FAILED:"
+                        + NativePolicy.hookStatus());
+            }
             String nativeBoundaryMode = translatedGuestAbi
                     ? (nativeLoadRedirect ? "translated-loader-redirect" : "translated-platform-loader")
                     : (nativeHooksInstalled ? "native-plt-io" : "java-framework-only");
@@ -858,6 +874,12 @@ public final class GuestRuntimeEnvironment {
         }
         String nativeAbi = spec.nativeAbi;
         String packagedNativeLibraryDir = spec.effectiveNativeLibraryDir();
+        String applicationNativeLibraryDir = GuestNativeLibraryAlias.ensure(
+                host, spec, packagedNativeLibraryDir);
+        String nativeLibraryAliasRoot = applicationNativeLibraryDir.equals(
+                packagedNativeLibraryDir) ? "" : applicationNativeLibraryDir;
+        String nativeLibraryAliasTargetRoot = nativeLibraryAliasRoot.isEmpty()
+                ? "" : packagedNativeLibraryDir;
         File guestDataRoot = new File(spec.dataRootFile(), "data");
         String runtimeNativeLibraryDir = GuestNativeRuntimeProjection.select(
                 spec, guestDataRoot, packagedNativeLibraryDir);
@@ -889,6 +911,11 @@ public final class GuestRuntimeEnvironment {
                 nativePolicyLibraryRoot, true, new String[0], new String[0], new String[0], new String[0],
                 new String[0], new String[0],
                 nativeNetworkIdentity(spec.packageName, spec.virtualUserId, nativeNetworkProfile));
+        if (nativePolicyConfigured && !NativePolicy.configureNativeLibraryAlias(
+                nativeLibraryAliasRoot, nativeLibraryAliasTargetRoot)) {
+            throw new IllegalStateException("NATIVE_LIBRARY_ALIAS_POLICY_UNAVAILABLE"
+                    + ":" + NativePolicy.hookStatus());
+        }
         boolean systemIoHooksInstalled = installIsolatedIoCapabilities(spec);
         RuntimeDiagnostics.install(host, "guest-slot-" + spec.processSlot,
                 spec.isolatedProcess ? new File(spec.dataRootFile(), "diagnostics") : null);
@@ -901,7 +928,8 @@ public final class GuestRuntimeEnvironment {
                 && !isTranslatedGuestAbi(spec.nativeAbi)
                 && nativeCrashFile != null
                 && NativePolicy.installCrashRecorder(nativeCrashFile.getAbsolutePath());
-        return new NativeBootstrap(nativeAbi, packagedNativeLibraryDir, guestDataRoot,
+        return new NativeBootstrap(nativeAbi, packagedNativeLibraryDir,
+                applicationNativeLibraryDir, nativeLibraryAliasRoot, guestDataRoot,
                 runtimeNativeLibraryDir, nativeLibrarySearchPath, guestDexPath, coreDexMode,
                 nativePolicyLibraryRoot, nativePolicyConfigured, systemIoHooksInstalled,
                 nativeCrashRecorderInstalled);
@@ -1580,6 +1608,8 @@ public final class GuestRuntimeEnvironment {
     private static final class NativeBootstrap {
         final String nativeAbi;
         final String packagedNativeLibraryDir;
+        final String applicationNativeLibraryDir;
+        final String nativeLibraryAliasRoot;
         final File guestDataRoot;
         final String runtimeNativeLibraryDir;
         final String nativeLibrarySearchPath;
@@ -1590,13 +1620,17 @@ public final class GuestRuntimeEnvironment {
         final boolean systemIoHooksInstalled;
         final boolean nativeCrashRecorderInstalled;
 
-        NativeBootstrap(String nativeAbi, String packagedNativeLibraryDir, File guestDataRoot,
+        NativeBootstrap(String nativeAbi, String packagedNativeLibraryDir,
+                        String applicationNativeLibraryDir, String nativeLibraryAliasRoot,
+                        File guestDataRoot,
                         String runtimeNativeLibraryDir, String nativeLibrarySearchPath,
                         String guestDexPath, String coreDexMode, String nativePolicyLibraryRoot,
                         boolean nativePolicyConfigured, boolean systemIoHooksInstalled,
                         boolean nativeCrashRecorderInstalled) {
             this.nativeAbi = nativeAbi;
             this.packagedNativeLibraryDir = packagedNativeLibraryDir;
+            this.applicationNativeLibraryDir = applicationNativeLibraryDir;
+            this.nativeLibraryAliasRoot = nativeLibraryAliasRoot;
             this.guestDataRoot = guestDataRoot;
             this.runtimeNativeLibraryDir = runtimeNativeLibraryDir;
             this.nativeLibrarySearchPath = nativeLibrarySearchPath;

@@ -305,7 +305,12 @@ int native_prctl_argument_count(int option) noexcept {
 }
 
 extern "C" pid_t controlled_getpid() {
-    if (configured()) return NativeProcessIdentity::guest_pid();
+    // A native PID is a kernel process handle.  Native components use it to
+    // address /proc/<pid>, wait on the process, and exchange it with Android
+    // framework APIs.  NBB and VA keep this value physical; projecting the
+    // synthetic guest PID here makes those kernel-facing paths point at a
+    // process that does not exist.  Keep the virtual PID projection in
+    // NativeProcessIdentity for the explicit /proc guest view instead.
     GetPidFn function = require_real(real_getpid, "getpid");
     return function == nullptr ? NativeProcessIdentity::host_pid() : function();
 }
@@ -317,7 +322,12 @@ extern "C" pid_t controlled_getppid() {
 }
 
 extern "C" pid_t controlled_gettid() {
-    if (configured()) return NativeProcessIdentity::guest_tid();
+    // A Linux TID is a kernel handle, not a process label.  Guest native code
+    // passes the result to framework APIs such as Process.getThreadPriority(),
+    // which resolve it against the real process task table.  Returning the
+    // synthetic virtual PID here therefore makes the framework reject the
+    // current thread as nonexistent.  Keep the virtual process/TID projection
+    // for procfs text, but return the real current kernel TID at this API edge.
     GetPidFn function = require_real(real_gettid, "gettid");
     return function == nullptr ? NativeProcessIdentity::host_tid() : function();
 }

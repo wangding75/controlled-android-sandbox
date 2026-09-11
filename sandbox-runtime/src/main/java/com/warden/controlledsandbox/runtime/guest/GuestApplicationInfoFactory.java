@@ -42,13 +42,10 @@ public final class GuestApplicationInfoFactory {
         setOptionalField(info, "splitNames", spec.splitNames.toArray(new String[0]));
         info.splitSourceDirs = spec.splitPathArray();
         info.splitPublicSourceDirs = spec.splitPathArray();
-        // ApplicationInfo.nativeLibraryDir is the Guest APK's package-owned library root.  A
-        // U4/WebView core may be selected separately for the defining ClassLoader, but exposing
-        // that runtime-only directory here breaks SDKs which resolve their own APK libraries
-        // through ApplicationInfo (for example SecurityGuard's libsgmainso).  Keep the platform
-        // ApplicationInfo contract aligned with the immutable APK revision; the CAS runtime
-        // projection remains available through the ClassLoader search path and NativePolicy.
-        info.nativeLibraryDir = spec.effectiveNativeLibraryDir();
+        // Logical Android library path. NBB OsStub + native IO make File.exists and
+        // System.load observe the CAS directory; publishing the Host-files alias or the
+        // nested packages/... path makes U4 classify a "multi open env" and SIGKILL.
+        info.nativeLibraryDir = logicalNativeLibraryDir(spec);
         setOptionalField(info, "primaryCpuAbi", emptyToNull(spec.nativeAbi));
         setOptionalField(info, "secondaryCpuAbi", null);
         List<String> sharedLibraryFiles = GuestSharedLibraryPathResolver.resolvedSharedLibraryFiles(
@@ -57,7 +54,7 @@ public final class GuestApplicationInfoFactory {
                 ? null : sharedLibraryFiles.toArray(new String[0]));
         ApplicationInfo packageTemplate = spec.packageState.applicationInfo();
         if (packageTemplate != null) info.flags = packageTemplate.flags;
-        info.dataDir = dataDir;
+        info.dataDir = logicalDataDir(spec);
         info.uid = spec.virtualUid;
         info.enabled = spec.packageState.enabled();
         setOptionalField(info, "appComponentFactory", emptyToNull(appComponentFactory));
@@ -67,6 +64,16 @@ public final class GuestApplicationInfoFactory {
             info.metaData = merged;
         }
         return info;
+    }
+
+    private static String logicalDataDir(GuestPackageSpec spec) {
+        return "/data/user/" + spec.virtualUserId + "/" + spec.packageName;
+    }
+
+    private static String logicalNativeLibraryDir(GuestPackageSpec spec) {
+        String packagedNativeLibraryDir = spec.effectiveNativeLibraryDir();
+        if (packagedNativeLibraryDir == null || packagedNativeLibraryDir.isEmpty()) return "";
+        return "/data/app/" + spec.packageName + "/lib/" + spec.nativeAbi;
     }
 
     /** Reads the API-28 factory field without linking it on older platform images. */

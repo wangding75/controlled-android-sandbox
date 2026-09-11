@@ -43,8 +43,8 @@ public final class GuestContextStorageTransferSelfTest {
             require(!credential.getDataDir().getCanonicalFile().equals(
                             device.getDataDir().getCanonicalFile()),
                     "credential and device data directories overlap");
-            require(device.getApplicationInfo().dataDir.equals(device.getDataDir().getAbsolutePath()),
-                    "device ApplicationInfo dataDir is incorrect");
+            require(device.getApplicationInfo().dataDir.equals("/data/user/3/com.example.guest"),
+                    "ApplicationInfo dataDir must use the Android logical path");
             require(credential.getExternalFilesDir("Pictures").getCanonicalFile().equals(
                             device.getExternalFilesDir("Pictures").getCanonicalFile()),
                     "external storage should not fork by protected-storage domain");

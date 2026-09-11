@@ -5,9 +5,11 @@
 
 #include <algorithm>
 #include <array>
+#include <android/log.h>
 #include <atomic>
 #include <cerrno>
 #include <cstdarg>
+#include <cstdint>
 #include <cstring>
 #include <dlfcn.h>
 #include <fcntl.h>
@@ -15,6 +17,7 @@
 #include <mutex>
 #include <new>
 #include <netinet/in.h>
+#include <optional>
 #include <sys/socket.h>
 #include <sys/uio.h>
 #include <unistd.h>
@@ -44,6 +47,7 @@ using Dup3Fn = int (*)(int, int, int);
 using FcntlFn = int (*)(int, int, ...);
 using ReadFn = ssize_t (*)(int, void*, size_t);
 using WriteFn = ssize_t (*)(int, const void*, size_t);
+using FdsanGetOwnerTagFn = std::uint64_t (*)(int);
 
 std::atomic<SocketFn> real_socket{nullptr};
 std::atomic<BindFn> real_bind{nullptr};
@@ -65,6 +69,31 @@ std::atomic<Dup3Fn> real_dup3{nullptr};
 std::atomic<FcntlFn> real_fcntl{nullptr};
 std::atomic<ReadFn> real_read{nullptr};
 std::atomic<WriteFn> real_write{nullptr};
+
+FdsanGetOwnerTagFn resolve_fdsan_get_owner_tag() noexcept {
+    static const FdsanGetOwnerTagFn function = reinterpret_cast<FdsanGetOwnerTagFn>(
+            dlsym(RTLD_DEFAULT, "android_fdsan_get_owner_tag"));
+    return function;
+}
+
+void log_tagged_close_attempt(int descriptor, const void* return_address) noexcept {
+    const FdsanGetOwnerTagFn get_owner_tag = resolve_fdsan_get_owner_tag();
+    if (get_owner_tag == nullptr) return;
+    const std::uint64_t owner_tag = get_owner_tag(descriptor);
+    if (owner_tag == 0) return;
+
+    Dl_info caller_info{};
+    const char* caller_module = dladdr(return_address, &caller_info) != 0
+            && caller_info.dli_fname != nullptr ? caller_info.dli_fname : "<unknown>";
+    const std::optional<NativeFdRecord> record = NativeFdLedger::lookup(descriptor);
+    const int ownership = record ? static_cast<int>(record->ownership) : -1;
+    const unsigned long long revision = record
+            ? static_cast<unsigned long long>(record->policy_revision) : 0ULL;
+    __android_log_print(ANDROID_LOG_WARN, "CS_FD_CLOSE_DIAG",
+            "fd=%d ownerTag=0x%llx caller=%s ledgerOwnership=%d ledgerRevision=%llu",
+            descriptor, static_cast<unsigned long long>(owner_tag), caller_module,
+            ownership, revision);
+}
 
 void* resolve_next(const char* name) {
     dlerror();
@@ -435,6 +464,7 @@ extern "C" int controlled_socket(int domain, int type, int protocol) {
 extern "C" int controlled_close(int descriptor) {
     CloseFn function = require_real(real_close, "close");
     if (function == nullptr) { errno = ENOSYS; return -1; }
+    log_tagged_close_attempt(descriptor, __builtin_return_address(0));
     // Linux releases the descriptor before reporting late close errors. Remove policy state first so
     // another thread cannot reuse the numeric descriptor and then have its new state erased here.
     native_unregister_socket(descriptor);

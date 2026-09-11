@@ -38,6 +38,10 @@ abstract class GuestHostOperationDenyContext extends ContextWrapper {
             Executor executor, ServiceConnection connection) {
         throw deniedHostOperation("bindIsolatedService");
     }
+    @Override public boolean bindServiceAsUser(Intent service, ServiceConnection connection,
+            int flags, UserHandle user) {
+        throw deniedHostOperation("bindServiceAsUser");
+    }
     @Override public void updateServiceGroup(
             ServiceConnection connection, int group, int importance) {
         throw deniedHostOperation("updateServiceGroup");

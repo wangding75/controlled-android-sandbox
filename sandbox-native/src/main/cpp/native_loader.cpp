@@ -157,8 +157,11 @@ NativeLibraryDecision NativeLibraryLoaderPolicy::resolve(const char* name) {
     if (value.front() == '/' || value.find('/') != std::string::npos) {
         NativeResolvedPath resolved = NativeFileSystemResolver::resolve(name);
         NativeFileSystemResolver::validate_confinement(resolved, true);
-        if (!policy.native_library_root.empty()
-                && path_has_prefix(resolved.path, policy.native_library_root)) {
+        if ((!policy.native_library_root.empty()
+                    && path_has_prefix(resolved.path, policy.native_library_root))
+                || (!policy.native_library_alias_target_root.empty()
+                    && path_has_prefix(resolved.path,
+                            policy.native_library_alias_target_root))) {
             return NativeLibraryDecision{resolved.path, policy.revision, true, false};
         }
         if (is_allowed_system_path(resolved.path)) {

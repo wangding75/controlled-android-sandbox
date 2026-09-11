@@ -63,6 +63,8 @@ int main() {
     assert(NativeProcFileSystem::is_virtual_path("/proc/self/status"));
     assert(NativeProcFileSystem::is_virtual_path("/proc/thread-self/task/" +
             std::to_string(first.virtual_pid) + "/status"));
+    assert(NativeProcFileSystem::is_virtual_path("/proc/" +
+            std::to_string(NativeProcessIdentity::host_pid()) + "/fd"));
     assert(NativeProcFileSystem::is_proc_fd_path(
             "/proc/" + std::to_string(first.virtual_pid) + "/fd/7"));
     assert(NativeProcFileSystem::is_proc_fdinfo_path("/proc/self/fdinfo/7"));
@@ -87,7 +89,10 @@ int main() {
     NativeFdLedger::close(9);
 
     assert(NativeProcessIdentity::guest_pid() == first.virtual_pid);
+    assert(controlled_getpid() == NativeProcessIdentity::host_pid());
+    assert(first.principal_host_pid == static_cast<int>(NativeProcessIdentity::host_pid()));
     assert(NativeProcessIdentity::guest_ppid() == 1);
+    assert(controlled_gettid() == NativeProcessIdentity::host_tid());
     assert(NativeProcessIdentity::guest_uid() == static_cast<uid_t>(first.virtual_uid));
     assert(NativeProcessIdentity::guest_gid() == static_cast<gid_t>(first.virtual_uid));
     assert(NativeProcessIdentity::sanitize_process_name("a\n(b)") == "a__b_");

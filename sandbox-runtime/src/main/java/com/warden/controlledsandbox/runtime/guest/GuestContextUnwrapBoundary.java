@@ -160,6 +160,10 @@ final class GuestContextUnwrapBoundary extends Context {
             Executor executor, ServiceConnection connection) {
         return owner.bindIsolatedService(service, flags, instanceName, executor, connection);
     }
+    @Override public boolean bindServiceAsUser(Intent service, ServiceConnection connection,
+            int flags, UserHandle user) {
+        return owner.bindServiceAsUser(service, connection, flags, user);
+    }
     @Override public void unbindService(ServiceConnection connection) {
         owner.unbindService(connection);
     }

@@ -64,7 +64,8 @@ int main() {
     require(cmdline == std::string("com.example.guest:worker\0", 25), "virtual cmdline");
     const std::string status = NativeProcFileSystem::render_status(snapshot);
     require(status.find("Name:\tcom.example.guest:worker") != std::string::npos, "virtual status name");
-    require(status.find("Pid:\t20304") != std::string::npos, "virtual status pid");
+    require(status.find("Pid:\t" + std::to_string(getpid())) != std::string::npos,
+            "status pid matches kernel getpid");
     require(status.find("Uid:\t103000\t103000\t103000\t103000") != std::string::npos,
             "virtual status uid");
 

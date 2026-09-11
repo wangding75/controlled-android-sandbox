@@ -73,15 +73,21 @@ bool own_proc_target(std::string_view target, const NativePolicySnapshot& policy
     if (target == "self" || target == "thread-self") return true;
     const int value = parse_number(target);
     if (value < 0) return false;
-    return policy.configured ? value == policy.virtual_pid
-            : value == NativeProcessIdentity::host_pid();
+    if (!policy.configured) return value == NativeProcessIdentity::host_pid();
+    // Native PID/TID APIs remain physical kernel handles (as in NBB and VA),
+    // while the procfs content exposed to the Guest remains virtualized.  Accept
+    // only this process's physical PID as an alias for its virtual PID; arbitrary
+    // host proc targets stay outside the Guest view.
+    return value == policy.virtual_pid || value == NativeProcessIdentity::host_pid();
 }
 
 bool own_thread(std::string_view target, const NativePolicySnapshot& policy) {
     const int value = parse_number(target);
     if (value < 0) return false;
-    return policy.configured ? value == policy.virtual_pid
-            : value == NativeProcessIdentity::host_tid();
+    if (!policy.configured) return value == NativeProcessIdentity::host_tid();
+    // Keep the same restricted alias for a physical current TID.  The materialized
+    // contents still use the Guest identity and never expose other host threads.
+    return value == policy.virtual_pid || value == NativeProcessIdentity::host_tid();
 }
 
 std::optional<ProcPath> classify(std::string_view path) {
@@ -190,7 +196,11 @@ std::string sanitize_map_path(std::string_view path, const NativePolicySnapshot&
     if (path.empty() || path.front() == '[') return std::string(path);
     if (path == policy.apk_path || path_has_prefix(path, policy.instance_root)
             || (!policy.native_library_root.empty()
-                && path_has_prefix(path, policy.native_library_root))) {
+                && path_has_prefix(path, policy.native_library_root))
+            || (!policy.native_library_alias_root.empty()
+                && path_has_prefix(path, policy.native_library_alias_root))
+            || (!policy.native_library_alias_target_root.empty()
+                && path_has_prefix(path, policy.native_library_alias_target_root))) {
         return global_policy().reverse_map_path(path);
     }
     for (const std::string_view root : {"/system", "/apex", "/vendor", "/product", "/odm"}) {
@@ -689,11 +699,14 @@ std::string NativeProcFileSystem::render_cmdline(const NativePolicySnapshot& pol
 std::string NativeProcFileSystem::render_status(const NativePolicySnapshot& policy) {
     const std::string raw = read_raw_file("/proc/self/status");
     const NativeSeccompSnapshot seccomp = NativeSeccompPolicy::snapshot();
+    const int kernel_pid = policy.principal_host_pid > 0
+            ? policy.principal_host_pid
+            : static_cast<int>(NativeProcessIdentity::host_pid());
     std::ostringstream out;
     out << "Name:\t" << NativeProcessIdentity::sanitize_process_name(policy.process_name) << "\n";
     out << "Umask:\t0077\nState:\tS (sleeping)\n";
-    out << "Tgid:\t" << policy.virtual_pid << "\nNgid:\t0\nPid:\t"
-        << policy.virtual_pid << "\nPPid:\t" << NativeProcessIdentity::guest_ppid() << "\n";
+    out << "Tgid:\t" << kernel_pid << "\nNgid:\t0\nPid:\t"
+        << kernel_pid << "\nPPid:\t" << NativeProcessIdentity::guest_ppid() << "\n";
     out << "TracerPid:\t0\nUid:\t" << policy.virtual_uid << '\t' << policy.virtual_uid
         << '\t' << policy.virtual_uid << '\t' << policy.virtual_uid << "\nGid:\t"
         << NativeProcessIdentity::guest_gid() << '\t' << NativeProcessIdentity::guest_gid()
@@ -706,7 +719,10 @@ std::string NativeProcFileSystem::render_status(const NativePolicySnapshot& poli
 
 std::string NativeProcFileSystem::render_stat(const NativePolicySnapshot& policy) {
     const std::string name = NativeProcessIdentity::sanitize_process_name(policy.process_name);
-    return std::to_string(policy.virtual_pid) + " (" + name + ") S "
+    const int kernel_pid = policy.principal_host_pid > 0
+            ? policy.principal_host_pid
+            : static_cast<int>(NativeProcessIdentity::host_pid());
+    return std::to_string(kernel_pid) + " (" + name + ") S "
             + std::to_string(NativeProcessIdentity::guest_ppid())
             + " 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n";
 }

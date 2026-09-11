@@ -12,6 +12,7 @@ struct open_how { std::uint64_t flags; std::uint64_t mode; std::uint64_t resolve
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <cstdio>
 
 extern "C" int openat2(int, const char*, const struct open_how*, std::size_t);
 extern "C" int faccessat2(int, const char*, int, int);
@@ -25,6 +26,32 @@ extern "C" int fixture_open_read(const char* path, char* output, int capacity) {
     const int saved = errno;
     close(fd);
     if (count < 0) return -saved;
+    return static_cast<int>(count);
+}
+
+extern "C" int fixture_fopen_proc_fd_read(char* output, int capacity) {
+    if (output == nullptr || capacity <= 0) return -EINVAL;
+    int source = open("/data/data/com.example.guest/files/hello.txt", O_RDONLY);
+    if (source < 0) return -errno;
+    char proc_path[64]{};
+    const int length = std::snprintf(proc_path, sizeof(proc_path), "/proc/%d/fd/%d",
+            static_cast<int>(getpid()), source);
+    if (length < 0 || static_cast<std::size_t>(length) >= sizeof(proc_path)) {
+        close(source);
+        return -ENAMETOOLONG;
+    }
+    FILE* stream = std::fopen(proc_path, "r");
+    if (stream == nullptr) {
+        const int saved = errno;
+        close(source);
+        return -saved;
+    }
+    const std::size_t count = std::fread(output, 1, static_cast<std::size_t>(capacity), stream);
+    const bool failed = std::ferror(stream) != 0;
+    const int saved = errno;
+    std::fclose(stream);
+    close(source);
+    if (failed) return -(saved == 0 ? EIO : saved);
     return static_cast<int>(count);
 }
 

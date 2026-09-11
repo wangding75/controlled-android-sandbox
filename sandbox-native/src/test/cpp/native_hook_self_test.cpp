@@ -1,4 +1,6 @@
+#include "controlled_sandbox/native_boundary.h"
 #include "controlled_sandbox/native_hook.h"
+#include "controlled_sandbox/native_interceptors.h"
 #include "controlled_sandbox/native_policy.h"
 
 #include <cerrno>
@@ -8,9 +10,14 @@
 #include <fstream>
 #include <fcntl.h>
 #include <iostream>
+#include <signal.h>
 #include <stdexcept>
 #include <string>
+#include <sys/syscall.h>
+#include <sys/wait.h>
 #include <unistd.h>
+
+extern "C" void controlled_underscore_exit(int status);
 
 using controlled_sandbox::NativeHookRuntime;
 
@@ -42,6 +49,9 @@ int main(int argc, char** argv) {
     require_hook(NativeHookRuntime::is_target_symbol("renameat2"), "renameat2 target");
     require_hook(NativeHookRuntime::is_target_symbol("faccessat2"), "faccessat2 target");
     require_hook(NativeHookRuntime::is_target_symbol("getdents64"), "getdents64 target");
+    require_hook(NativeHookRuntime::is_target_symbol("fopen"), "fopen target");
+    require_hook(NativeHookRuntime::is_target_symbol("fopen64"), "fopen64 target");
+    require_hook(NativeHookRuntime::is_target_symbol("fclose"), "fclose target");
     require_hook(NativeHookRuntime::is_target_symbol("mmap"), "mmap target");
     require_hook(NativeHookRuntime::is_target_symbol("socket"), "socket target");
     require_hook(NativeHookRuntime::is_target_symbol("close"), "socket close target");
@@ -132,12 +142,39 @@ int main(int argc, char** argv) {
     require_hook(status.relocations_patched >= 12, "extended targets patched");
     require_hook(status.policy_revision > 0, "policy revision captured");
     require_hook(status.patch_failures == 0, "no patch failures");
+    // U4/Chromium creates helper processes with a raw clone/fork and then _exit(0) in the
+    // unused child. CAS must keep the principal slot alive, but a helper that cannot exit
+    // stays mapped and is later SIGKILL'd as a process group. NBB/VA do not intercept _exit.
+    controlled_sandbox::set_guest_process_exit_allowed(false);
+    const pid_t helper = static_cast<pid_t>(syscall(SYS_clone, SIGCHLD, 0));
+    require_hook(helper >= 0, "raw clone of a helper child");
+    if (helper == 0) {
+        controlled_underscore_exit(42);
+        controlled_sandbox::trusted_syscall6(SYS_exit_group, 99);
+    }
+    int helper_status = 0;
+    bool helper_reaped = false;
+    for (int attempt = 0; attempt < 100; ++attempt) {
+        const pid_t reaped = waitpid(helper, &helper_status, WNOHANG);
+        if (reaped == helper) {
+            helper_reaped = true;
+            break;
+        }
+        usleep(10000);
+    }
+    if (!helper_reaped) {
+        kill(helper, SIGKILL);
+        waitpid(helper, &helper_status, 0);
+    }
+    require_hook(helper_reaped && WIFEXITED(helper_status) && WEXITSTATUS(helper_status) == 42,
+            "helper child _exit terminates without blocking the principal Guest");
 
     using ReadFn = int (*)(const char*, char*, int);
     using ReadAtFn = int (*)(int, const char*, char*, int);
     using UnaryFn = int (*)(const char*, int);
     using PathFn = int (*)(const char*);
     auto fixture_open_read = load_symbol<ReadFn>(fixture, "fixture_open_read");
+    auto fixture_fopen_proc_fd_read = load_symbol<ReadFn>(fixture, "fixture_fopen_proc_fd_read");
     auto fixture_openat_read = load_symbol<ReadAtFn>(fixture, "fixture_openat_read");
     auto fixture_openat2_read = load_symbol<ReadAtFn>(fixture, "fixture_openat2_read");
     auto fixture_access = load_symbol<UnaryFn>(fixture, "fixture_access");
@@ -215,9 +252,14 @@ int main(int argc, char** argv) {
             "com.example.guest:main") != std::string::npos, "virtual proc cmdline");
     count = fixture_open_read("/proc/self/status", proc_buffer.data(), static_cast<int>(proc_buffer.size()));
     std::string proc_status(proc_buffer.data(), static_cast<std::size_t>(count > 0 ? count : 0));
-    require_hook(count > 0 && proc_status.find("Pid:\t20000") != std::string::npos,
-            "virtual proc status pid");
+    require_hook(count > 0 && proc_status.find("Pid:\t" + std::to_string(getpid()))
+                    != std::string::npos,
+            "proc status pid matches kernel getpid");
     require_hook(proc_status.find("Uid:\t10000") != std::string::npos, "virtual proc status uid");
+    std::fill(std::begin(buffer), std::end(buffer), '\0');
+    count = fixture_fopen_proc_fd_read(buffer, static_cast<int>(sizeof(buffer)));
+    require_hook(count == 5 && std::string(buffer, 5) == "hello",
+            "fopen physical proc fd alias stays Guest-visible");
     count = fixture_open_read("/proc/self/maps", proc_buffer.data(), static_cast<int>(proc_buffer.size()));
     std::string proc_maps(proc_buffer.data(), static_cast<std::size_t>(count > 0 ? count : 0));
     require_hook(count > 0 && proc_maps.find(root.string()) == std::string::npos,

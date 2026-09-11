@@ -518,6 +518,19 @@ Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeConfigure(
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeConfigureNativeLibraryAlias(
+        JNIEnv* env, jclass, jstring alias_root, jstring target_root) {
+    try {
+        controlled_sandbox::global_policy().configure_native_library_alias(
+                string_value(env, alias_root), string_value(env, target_root));
+        return JNI_TRUE;
+    } catch (const std::exception& error) {
+        throw_java(env, "java/lang/IllegalArgumentException", error.what());
+        return JNI_FALSE;
+    }
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
 Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeConfigureFileCapabilities(
         JNIEnv* env, jclass, jint data_root_fd, jint apk_parent_fd, jstring apk_entry_name,
         jint native_library_fd) {

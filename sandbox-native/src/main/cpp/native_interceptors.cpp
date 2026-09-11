@@ -20,6 +20,7 @@
 #include <dlfcn.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <cstdio>
 #include <ifaddrs.h>
 #include <netdb.h>
 #include <sys/mman.h>
@@ -120,6 +121,8 @@ using UnlinkAtFn = int (*)(int, const char*, int);
 using MkdirFn = int (*)(const char*, mode_t);
 using MkdirAtFn = int (*)(int, const char*, mode_t);
 using RmdirFn = int (*)(const char*);
+using FopenFn = FILE* (*)(const char*, const char*);
+using FcloseFn = int (*)(FILE*);
 using OpendirFn = DIR* (*)(const char*);
 using Getdents64Fn = ssize_t (*)(int, void*, std::size_t);
 using MmapFn = void* (*)(void*, std::size_t, int, int, int, off_t);
@@ -169,6 +172,9 @@ std::atomic<UnlinkAtFn> real_unlinkat{nullptr};
 std::atomic<MkdirFn> real_mkdir{nullptr};
 std::atomic<MkdirAtFn> real_mkdirat{nullptr};
 std::atomic<RmdirFn> real_rmdir{nullptr};
+std::atomic<FopenFn> real_fopen{nullptr};
+std::atomic<FopenFn> real_fopen64{nullptr};
+std::atomic<FcloseFn> real_fclose{nullptr};
 std::atomic<OpendirFn> real_opendir{nullptr};
 std::atomic<Getdents64Fn> real_getdents64{nullptr};
 std::atomic<MmapFn> real_mmap{nullptr};
@@ -278,6 +284,92 @@ void register_opened_capability(const NativeResolvedPath& resolved, int descript
         NativeFdLedger::register_fd(descriptor, ownership, resolved.policy_revision,
                 resolved.virtual_path);
     }
+}
+
+bool fopen_mode_flags(const char* mode, int& flags) noexcept {
+    if (mode == nullptr || mode[0] == '\0') return false;
+    switch (mode[0]) {
+        case 'r': flags = O_RDONLY; break;
+        case 'w': flags = O_WRONLY | O_CREAT | O_TRUNC; break;
+        case 'a': flags = O_WRONLY | O_CREAT | O_APPEND; break;
+        default: return false;
+    }
+    bool plus = false;
+    for (const char* cursor = mode + 1; *cursor != '\0'; ++cursor) {
+        switch (*cursor) {
+            case '+':
+                if (plus) return false;
+                plus = true;
+                flags = (flags & ~(O_RDONLY | O_WRONLY)) | O_RDWR;
+                break;
+            case 'b':
+                break;
+            case 'e':
+#ifdef O_CLOEXEC
+                flags |= O_CLOEXEC;
+#endif
+                break;
+            case 'x':
+#ifdef O_EXCL
+                flags |= O_EXCL;
+#endif
+                break;
+            case 'c':
+            case 'm':
+                // Android's libc accepts these GNU fopen mode extensions. They do not
+                // alter the path or ownership decision at this boundary.
+                break;
+            default:
+                return false;
+        }
+    }
+    return true;
+}
+
+FILE* fopen_resolved(const NativeResolvedPath& resolved, const char* mode,
+                     FopenFn function) {
+    if (!resolved.capability) {
+        if (function == nullptr) { errno = ENOSYS; return nullptr; }
+        FILE* stream = function(resolved.path.c_str(), mode);
+        if (stream != nullptr) register_opened_capability(resolved, ::fileno(stream));
+        return stream;
+    }
+    int flags = 0;
+    if (!fopen_mode_flags(mode, flags)) { errno = EINVAL; return nullptr; }
+    const int descriptor = call_open_resolved(resolved, nullptr, flags, false, 0);
+    if (descriptor < 0) return nullptr;
+    FILE* stream = ::fdopen(descriptor, mode);
+    if (stream == nullptr) {
+        const int saved = errno;
+        global_policy().unregister_capability_fd(descriptor);
+        NativeFdLedger::close(descriptor);
+        (void) ::close(descriptor);
+        errno = saved;
+        return nullptr;
+    }
+    register_opened_capability(resolved, descriptor);
+    return stream;
+}
+
+FILE* fopen_proc_fd_path(const char* path, const char* mode) {
+    int flags = 0;
+    if (!fopen_mode_flags(mode, flags)) { errno = EINVAL; return nullptr; }
+    // /proc/<pid>/fd/<fd> is a capability to an already-open Guest descriptor.
+    // Use the same restricted duplication path as controlled_open(); resolving
+    // this name through the filesystem resolver would reject the proc special
+    // path before the descriptor ownership check can run.
+    const int descriptor = NativeProcFileSystem::open_fd_path(path, flags);
+    if (descriptor < 0) return nullptr;
+    FILE* stream = ::fdopen(descriptor, mode);
+    if (stream == nullptr) {
+        const int saved = errno;
+        global_policy().unregister_capability_fd(descriptor);
+        NativeFdLedger::close(descriptor);
+        (void) ::close(descriptor);
+        errno = saved;
+        return nullptr;
+    }
+    return stream;
 }
 
 int call_access_resolved(const NativeResolvedPath& resolved, AccessFn function, int mode) {
@@ -886,6 +978,52 @@ extern "C" int controlled_rmdir(const char* path) {
     return function(resolved.path.c_str());
 }
 
+extern "C" FILE* controlled_fopen(const char* path, const char* mode) {
+    FopenFn function = require_real(real_fopen, "fopen");
+    if (!global_policy().configured()) {
+        if (function == nullptr) { errno = ENOSYS; return nullptr; }
+        return function(path, mode);
+    }
+    if (path != nullptr && NativeProcFileSystem::is_proc_fd_path(path)) {
+        return fopen_proc_fd_path(path, mode);
+    }
+    NativeResolvedPath resolved;
+    if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(path); }, true, resolved)) {
+        return nullptr;
+    }
+    return fopen_resolved(resolved, mode, function);
+}
+
+extern "C" FILE* controlled_fopen64(const char* path, const char* mode) {
+    FopenFn function = require_real(real_fopen64, "fopen64");
+    if (function == nullptr) function = require_real(real_fopen, "fopen");
+    if (!global_policy().configured()) {
+        if (function == nullptr) { errno = ENOSYS; return nullptr; }
+        return function(path, mode);
+    }
+    if (path != nullptr && NativeProcFileSystem::is_proc_fd_path(path)) {
+        return fopen_proc_fd_path(path, mode);
+    }
+    NativeResolvedPath resolved;
+    if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(path); }, true, resolved)) {
+        return nullptr;
+    }
+    return fopen_resolved(resolved, mode, function);
+}
+
+extern "C" int controlled_fclose(FILE* stream) {
+    FcloseFn function = require_real(real_fclose, "fclose");
+    if (function == nullptr) { errno = ENOSYS; return EOF; }
+    if (stream != nullptr && global_policy().configured()) {
+        const int descriptor = ::fileno(stream);
+        if (descriptor >= 0) {
+            global_policy().unregister_capability_fd(descriptor);
+            NativeFdLedger::close(descriptor);
+        }
+    }
+    return function(stream);
+}
+
 extern "C" DIR* controlled_opendir(const char* path) {
     OpendirFn function = require_real(real_opendir, "opendir");
     if (path != nullptr && NativeProcFileSystem::is_proc_fd_path(path)) {
@@ -1233,15 +1371,32 @@ bool terminating_signal(int signal_number) {
     return signal_number == SIGKILL || signal_number == SIGTERM || signal_number == SIGABRT;
 }
 
+bool matches_pid(pid_t pid, pid_t target) {
+    return target > 0 && (pid == target || pid == -target);
+}
+
+bool principal_guest_process() {
+    const NativePolicySnapshot policy = global_policy().snapshot();
+    return policy.configured && policy.principal_host_pid > 0
+            && NativeProcessIdentity::host_pid()
+                    == static_cast<pid_t>(policy.principal_host_pid);
+}
+
+bool guest_termination_blocked() {
+    return !process_exit_allowed.load(std::memory_order_acquire) && principal_guest_process();
+}
+
 bool self_process_target(pid_t pid) {
     const NativePolicySnapshot policy = global_policy().snapshot();
-    const pid_t me = policy.configured ? static_cast<pid_t>(policy.virtual_pid)
-            : NativeProcessIdentity::host_pid();
-    return pid == me || pid == 0 || pid == -me;
+    const pid_t host_pid = NativeProcessIdentity::host_pid();
+    return pid == 0
+            || matches_pid(pid, host_pid)
+            || (policy.configured && matches_pid(pid, static_cast<pid_t>(policy.virtual_pid)))
+            || (policy.configured && matches_pid(pid, static_cast<pid_t>(policy.principal_host_pid)));
 }
 
 bool block_self_termination(pid_t pid, int signal_number) {
-    return !process_exit_allowed.load(std::memory_order_acquire)
+    return guest_termination_blocked()
             && self_process_target(pid)
             && terminating_signal(signal_number);
 }
@@ -1304,7 +1459,7 @@ extern "C" int controlled_tkill(int thread_id, int signal_number) {
 }
 
 extern "C" void controlled_exit(int status) {
-    if (!process_exit_allowed.load(std::memory_order_acquire)) {
+    if (guest_termination_blocked()) {
         __android_log_print(ANDROID_LOG_INFO, "CS_GUEST_LIFETIME",
                 "guest exit(%d) ignored", status);
         return;
@@ -1315,7 +1470,7 @@ extern "C" void controlled_exit(int status) {
 }
 
 extern "C" void controlled_abort() {
-    if (!process_exit_allowed.load(std::memory_order_acquire)) {
+    if (guest_termination_blocked()) {
         __android_log_print(ANDROID_LOG_INFO, "CS_GUEST_LIFETIME",
                 "guest abort() ignored");
         return;
@@ -1326,7 +1481,7 @@ extern "C" void controlled_abort() {
 }
 
 extern "C" void controlled_underscore_exit(int status) {
-    if (!process_exit_allowed.load(std::memory_order_acquire)) {
+    if (guest_termination_blocked()) {
         __android_log_print(ANDROID_LOG_INFO, "CS_GUEST_LIFETIME",
                 "guest _exit(%d) ignored", status);
         return;
@@ -2013,7 +2168,7 @@ extern "C" long controlled_syscall(long number, ...) {
     ) {
         const int status = va_arg(values, int);
         va_end(values);
-        if (!process_exit_allowed.load(std::memory_order_acquire)) {
+        if (guest_termination_blocked()) {
             __android_log_print(ANDROID_LOG_INFO, "CS_GUEST_LIFETIME",
                     "guest direct syscall exit(%d) ignored", status);
             return 0;
@@ -2025,7 +2180,7 @@ extern "C" long controlled_syscall(long number, ...) {
     if (number == SYS_exit_group) {
         const int status = va_arg(values, int);
         va_end(values);
-        if (!process_exit_allowed.load(std::memory_order_acquire)) {
+        if (guest_termination_blocked()) {
             __android_log_print(ANDROID_LOG_INFO, "CS_GUEST_LIFETIME",
                     "guest direct syscall exit(%d) ignored", status);
             return 0;
@@ -2077,6 +2232,9 @@ void* replacement_for(std::string_view name) {
     if (name == "mkdir") return reinterpret_cast<void*>(&controlled_mkdir);
     if (name == "mkdirat") return reinterpret_cast<void*>(&controlled_mkdirat);
     if (name == "rmdir") return reinterpret_cast<void*>(&controlled_rmdir);
+    if (name == "fopen") return reinterpret_cast<void*>(&controlled_fopen);
+    if (name == "fopen64") return reinterpret_cast<void*>(&controlled_fopen64);
+    if (name == "fclose") return reinterpret_cast<void*>(&controlled_fclose);
     if (name == "opendir") return reinterpret_cast<void*>(&controlled_opendir);
     if (name == "getdents64") return reinterpret_cast<void*>(&controlled_getdents64);
     if (name == "readlink") return reinterpret_cast<void*>(&controlled_readlink);

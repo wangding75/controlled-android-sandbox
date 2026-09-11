@@ -241,6 +241,15 @@ std::string data_app_library_suffix(std::string_view path, std::string_view pack
     return std::string(rest.substr(abi_end + 1));
 }
 
+bool is_data_app_library_root(std::string_view path, std::string_view package_name,
+                              std::string_view abi_name) {
+    if (!path_has_prefix(path, "/data/app") || abi_name.empty()) return false;
+    const std::size_t marker = path.find("/lib/");
+    if (marker == std::string_view::npos
+            || !data_app_path_belongs_to_package(path, package_name, marker)) return false;
+    return path.substr(marker + 5) == abi_name;
+}
+
 bool is_sensitive_proc_path(std::string_view path) {
     return path == "/proc/self/mem" || path == "/proc/self/pagemap"
             || path == "/proc/self/clear_refs" || path == "/proc/self/syscall";
@@ -388,6 +397,11 @@ void NativePolicyEngine::configure(std::string session_id, std::uint64_t generat
     instance_root_ = std::move(instance_root);
     apk_path_ = std::move(apk_path);
     native_library_root_ = std::move(native_library_root);
+    native_library_alias_root_.clear();
+    native_library_alias_target_root_.clear();
+    if (!configured_) {
+        principal_host_pid_ = static_cast<int>(NativeProcessIdentity::host_pid());
+    }
     guest_cwd_ = "/";
     default_network_allow_ = default_network_allow;
     allow_hosts_ = std::move(allow_hosts);
@@ -398,6 +412,25 @@ void NativePolicyEngine::configure(std::string session_id, std::uint64_t generat
     deny_cidrs_v6_ = std::move(deny_cidrs_v6);
     network_identity_ = std::move(network_identity);
     configured_ = true;
+}
+
+void NativePolicyEngine::configure_native_library_alias(std::string alias_root,
+                                                        std::string alias_target_root) {
+    if (alias_root.empty() != alias_target_root.empty()) {
+        throw std::invalid_argument("native library alias must include root and target");
+    }
+    if (!alias_root.empty()) {
+        alias_root = trim_root(std::move(alias_root), "native library alias root");
+        alias_target_root = trim_root(std::move(alias_target_root),
+                "native library alias target root");
+    }
+    std::unique_lock lock(mutex_);
+    if (!configured_) throw std::logic_error("NATIVE_POLICY_NOT_CONFIGURED");
+    if (alias_root == native_library_alias_root_
+            && alias_target_root == native_library_alias_target_root_) return;
+    native_library_alias_root_ = std::move(alias_root);
+    native_library_alias_target_root_ = std::move(alias_target_root);
+    revision_++;
 }
 
 void NativePolicyEngine::configure_file_capabilities(int data_root_fd, int apk_file_fd,
@@ -546,6 +579,9 @@ void NativePolicyEngine::reset() noexcept {
     instance_root_.clear();
     apk_path_.clear();
     native_library_root_.clear();
+    native_library_alias_root_.clear();
+    native_library_alias_target_root_.clear();
+    principal_host_pid_ = 0;
     guest_cwd_ = "/";
     default_network_allow_ = true;
     allow_hosts_.clear();
@@ -624,6 +660,15 @@ NativePathDecision NativePolicyEngine::resolve_path(std::string_view guest_path)
         }
         return NativePathDecision{apk_path_, {}, revision_, true};
     }
+    if (is_data_app_library_root(normalized, package_name_, abi_name_)) {
+        if (native_library_fd_ >= 0) {
+            return NativePathDecision{".", {}, revision_, true, native_library_fd_, true};
+        }
+        if (native_library_root_.empty()) {
+            throw PathPolicyError(ENOENT, "NATIVE_LIBRARY_ROOT_MISSING");
+        }
+        return NativePathDecision{native_library_root_, native_library_root_, revision_, true};
+    }
     const std::string library_suffix = data_app_library_suffix(normalized, package_name_);
     if (!library_suffix.empty()) {
         if (native_library_fd_ >= 0) {
@@ -633,6 +678,20 @@ NativePathDecision NativePolicyEngine::resolve_path(std::string_view guest_path)
         if (native_library_root_.empty()) throw PathPolicyError(ENOENT, "NATIVE_LIBRARY_ROOT_MISSING");
         return NativePathDecision{append_relative(native_library_root_, library_suffix),
                 native_library_root_, revision_, true};
+    }
+
+    if (!native_library_alias_root_.empty()
+            && path_has_prefix(normalized, native_library_alias_root_)) {
+        if (native_library_alias_target_root_.empty()) {
+            throw PathPolicyError(ENOENT, "NATIVE_LIBRARY_ALIAS_TARGET_MISSING");
+        }
+        const std::string suffix = suffix_after(normalized, native_library_alias_root_);
+        if (native_library_fd_ >= 0) {
+            return NativePathDecision{normalize_relative(suffix), {}, revision_, true,
+                    native_library_fd_, true};
+        }
+        return NativePathDecision{append_relative(native_library_alias_target_root_, suffix),
+                native_library_alias_target_root_, revision_, true};
     }
 
     if (path_has_prefix(normalized, instance_root_)) {
@@ -677,6 +736,11 @@ std::string NativePolicyEngine::reverse_map_path(std::string_view host_path) con
     std::shared_lock lock(mutex_);
     if (!configured_) return normalized;
     if (normalized == apk_path_) return "/data/app/" + package_name_ + "/base.apk";
+    if (!native_library_alias_target_root_.empty()
+            && path_has_prefix(normalized, native_library_alias_target_root_)) {
+        const std::string suffix = suffix_after(normalized, native_library_alias_target_root_);
+        return append_relative("/data/app/" + package_name_ + "/lib/" + abi_name_, suffix);
+    }
     if (!native_library_root_.empty() && path_has_prefix(normalized, native_library_root_)) {
         const std::string suffix = suffix_after(normalized, native_library_root_);
         return append_relative("/data/app/" + package_name_ + "/lib/" + abi_name_, suffix);
@@ -740,7 +804,8 @@ NativePolicySnapshot NativePolicyEngine::snapshot() const {
     std::shared_lock lock(mutex_);
     return NativePolicySnapshot{configured_, session_id_, generation_, revision_, package_name_,
             process_name_, virtual_user_id_, virtual_uid_, virtual_pid_, abi_name_,
-            instance_root_, apk_path_, native_library_root_, guest_cwd_, network_identity_};
+            instance_root_, apk_path_, native_library_root_, native_library_alias_root_,
+            native_library_alias_target_root_, principal_host_pid_, guest_cwd_, network_identity_};
 }
 
 NativePolicyEngine& global_policy() {

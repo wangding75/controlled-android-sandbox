@@ -52,6 +52,8 @@ int main() {
             "/sandbox/packages/com.example.guest/base.apk", "modern apk alias");
     require(policy.map_path("/data/app/com.example.guest/lib/arm64/libguest.so") ==
             "/sandbox/packages/com.example.guest/lib/arm64/libguest.so", "native library alias");
+    require(policy.map_path("/data/app/com.example.guest/lib/arm64") ==
+            "/sandbox/packages/com.example.guest/lib/arm64", "native library root alias");
     require(policy.map_path("/data/data/com.example.guest/lib/libguest.so") ==
             "/sandbox/packages/com.example.guest/lib/arm64/libguest.so", "legacy native library alias");
     require(policy.map_path("/storage/emulated/3/DCIM/photo.jpg") ==

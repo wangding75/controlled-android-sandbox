@@ -91,6 +91,9 @@ struct NativePolicySnapshot {
     std::string instance_root;
     std::string apk_path;
     std::string native_library_root;
+    std::string native_library_alias_root;
+    std::string native_library_alias_target_root;
+    int principal_host_pid{};
     std::string guest_cwd;
     NativeNetworkIdentity network_identity;
 };
@@ -109,6 +112,10 @@ public:
                    std::vector<CidrV6> allow_cidrs_v6 = {},
                    std::vector<CidrV6> deny_cidrs_v6 = {},
                    NativeNetworkIdentity network_identity = {});
+
+    /** Maps the Java-visible U4 library alias back to its verified CAS directory. */
+    void configure_native_library_alias(std::string alias_root,
+                                        std::string alias_target_root);
 
     /** Installs duplicated Binder directory capabilities for an isolated Guest process. */
     void configure_file_capabilities(int data_root_fd, int apk_file_fd,
@@ -152,6 +159,9 @@ private:
     std::string instance_root_;
     std::string apk_path_;
     std::string native_library_root_;
+    std::string native_library_alias_root_;
+    std::string native_library_alias_target_root_;
+    int principal_host_pid_{};
     std::string guest_cwd_{"/"};
     bool default_network_allow_{true};
     bool configured_{false};

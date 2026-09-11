@@ -365,22 +365,60 @@ final class GuestStorageNameCodec {
         return false;
     }
 
+    /**
+     * Chooses the instance-local parent after {@code File.getCanonicalFile()}.
+     *
+     * <p>NBB OsStub rewrites {@code libcore.io.Os} inputs and leaves the host path in the
+     * result. CAS {@code controlled_realpath} reverse-maps that host path onto the Guest
+     * logical tree ({@code /data/user/<id>/<pkg>/...}). The codec root is frozen to the
+     * pre-hook host instance directory, so a reverse-mapped canonical value is not a prefix
+     * of {@code root} even when the caller passed an instance-local parent. Keep that parent
+     * on the instance path; a real symlink escape still fails closed.
+     */
+    static File resolveCanonicalParent(File root, File canonicalValue, File lexicalParent) {
+        if (root == null || canonicalValue == null) {
+            throw new SecurityException("GUEST_STORAGE_PARENT_OUTSIDE_INSTANCE");
+        }
+        if (containedBy(root, canonicalValue)) return canonicalValue;
+        if (lexicalParent != null
+                && containedBy(root, lexicalParent)
+                && isGuestLogicalProjection(canonicalValue)) {
+            return lexicalParent;
+        }
+        throw new SecurityException("GUEST_STORAGE_PARENT_OUTSIDE_INSTANCE");
+    }
+
+    private static boolean containedBy(File root, File value) {
+        String rootPath = root.getPath();
+        String valuePath = value.getPath();
+        return valuePath.equals(rootPath) || valuePath.startsWith(rootPath + File.separator);
+    }
+
+    private static boolean isGuestLogicalProjection(File value) {
+        String path = value.getPath().replace('\\', '/');
+        int colon = path.indexOf(':');
+        if (colon >= 0 && colon + 1 < path.length() && path.charAt(colon + 1) == '/') {
+            path = path.substring(colon + 1);
+        }
+        return path.startsWith("/data/user/")
+                || path.startsWith("/data/data/")
+                || path.startsWith("/data/user_de/")
+                || path.startsWith("/storage/emulated/");
+    }
+
     private File canonicalParent(File parent) {
         try {
             File value = parent.getCanonicalFile();
-            String rootPath = root.getPath();
-            String valuePath = value.getPath();
-            if (!valuePath.equals(rootPath) && !valuePath.startsWith(rootPath + File.separator)) {
-                throw new SecurityException("GUEST_STORAGE_PARENT_OUTSIDE_INSTANCE");
-            }
+            File lexical = parent.getAbsoluteFile().toPath().normalize().toFile();
+            File chosen = resolveCanonicalParent(root, value, lexical);
             // The isolated process receives the instance root as a directory capability.  Its
             // UID is intentionally not allowed to mkdir below the host package label, so the
             // host-side storage transport owns directory creation in this mode.
-            if (capabilityBacked) return value;
-            if (!value.isDirectory() && !value.mkdirs() && !value.isDirectory()) {
-                throw new IllegalStateException("Cannot create directory " + value);
+            if (capabilityBacked) return chosen;
+            if (!chosen.isDirectory() && !chosen.mkdirs() && !chosen.isDirectory()) {
+                throw new IllegalStateException("Cannot create directory " + chosen);
             }
-            return value;
+            return chosen;
         } catch (IOException error) {
             throw new IllegalStateException("GUEST_STORAGE_PARENT_INVALID", error);
         }

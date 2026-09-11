@@ -1,10 +1,10 @@
 # P2-03 reference decision — Quark Service/Provider and revision re-entry
 
-状态：`BLOCKED_QUARK_WEBVIEW_ANR`（2026-09-11，Asia/Shanghai；CAS Native 与 Service/Provider 定向回归通过，真实浏览闭环在夸克 U4/Chromium 原生路径发生 ANR）
+状态：`BLOCKED_QUARK_POST_CONSENT_SIGKILL`（2026-09-11 检查点；同意页/首帧已恢复，`libwebviewuc.so` 可按逻辑路径加载；点击“同意并继续”后 principal SIGKILL。历史 `BLOCKED_QUARK_WEBVIEW_ANR` 仍保留为更早证据。）
 
 ## 固定执行坐标
 
-- 当前源码基线：`70738f3cabf82f94019cf0dedba1431b5ab284e9`，另有本次 Debug 验收白名单修改待提交
+- 当前源码基线：本检查点待提交（其上为 `d6ddcb10` / 此前 `70738f3c`）
 - 设备：Xiaomi `25019PNF3C` / `xuanyuan`，Android 16 / API 36，`arm64-v8a`，4096 bytes
 - 夸克：`com.quark.browser` `10.15.5.1130` / `1130`，base-only，APK SHA-256
   `81bddb678f3918b683cdc48c0ccf8682137e0c1cbf23930df17b36120446206a`
@@ -121,3 +121,45 @@ Service/Provider owner、权限、Host fallback 或 retry policy，不加入 Qua
 
 验证顺序：源码编译 → 同设备、同样本、同 hash 的 import 定向回归 → `fstat64`/ashmem FD 定向回归 → Quark 首帧与首帧后 Service/Provider
 首错重放 → 业务闭环（网页导航、搜索/输入、标签、返回、前后台、一次文件选择/测试下载）。
+
+## 2026-09-11 同意页后 SIGKILL
+
+同意页可显示。点击“同意并继续”后 guest60 在约 1.5s 内被 SIGKILL，窗口回到 Host。crash buffer / tombstone / FATAL 均为空。
+
+已核对的执行方法：
+
+| 参考 | 方法 | 结论 |
+|---|---|---|
+| NBB | OSS 不 Hook `_exit`/`exit`/`abort`。`IOCore.proc` 只重定向 `cmdline`，不改 `/proc/self/stat` 的 PID。`getpid` 为内核 PID。 | 子进程 `_exit` 按 Linux 合同结束。 |
+| VA OSS | `IOUniformer` 的 `kill` 只记录并 `syscall(__NR_kill)`；`vfork` 转到 `fork`。不拦截 `_exit`。 | 同上。 |
+| CAS | `controlled_fork` 在 policy 配置后拒绝 libc `fork`；`SYS_clone` 为 Project，U4/Chromium 可用 raw clone 造出子进程。随后 `controlled_underscore_exit` 在 `process_exit_allowed=false` 时对**所有** PID 忽略 `_exit`。 | 保护 slot 进程是 CAS 约束；把它套到 fork 子进程违反 NBB/VA 和 Linux `_exit` 合同。 |
+
+设备日志（pid 17935，15:28:45）：
+
+1. U4 `ServiceSetting type:Render desire_proc_mode:1 real_proc_mode:-1`，renderer `pid: 0/0`。
+2. 四个 helper（18725/18739/18743/18756）记录 `CS_GUEST_LIFETIME: guest _exit(0) ignored`。
+3. HyperSentinel 记录 RSS `0kb -> 735972kb`。
+4. `libc: kill: send 9 to pid -17935`，随后 Zygote `signal 9`。
+
+`WebCoreManager` NPE 与 `nativeSetEnabledMremap` UnsatisfiedLinkError 在物理夸克 `quark-direct.log` 同样出现，不能当作 SIGKILL 根因。
+
+最小修复：
+
+1. `NativePolicy.configure` 记录 principal kernel pid；仅该进程继续拦截 `exit`/`_exit`/`abort`/`SYS_exit(_group)` 与自杀信号。fork 子进程按 NBB/VA 允许退出。
+2. `/proc/self/stat` 与 `/proc/self/status` 的 Pid/Tgid 改为与 `getpid()` 相同的内核 pid。NBB 只改 cmdline，不改 stat PID；CAS 原先把 stat 写成 virtual pid，U4 native 读到 pid=0/`real_proc_mode=-1`。cmdline 名称与 maps 脱敏保持不变。
+
+不放宽 Host fallback，不加 Quark 包名分支，不禁用 NativePolicy。
+
+## 2026-09-11 检查点（同意页已恢复，浏览闭环未关）
+
+状态改为：`BLOCKED_QUARK_POST_CONSENT_SIGKILL`。同意页 / `BrowserActivity` / 首帧已恢复；
+点击“同意并继续”后 principal guest SIGKILL。`QUARK_BASIC_SMOKE` 仍未关闭。
+
+| 参考 | 已核对方法 | CAS 落地 |
+|---|---|---|
+| NBB | `PackageManagerCompat` / `BPackageManager` 投影 `nativeLibraryDir`；`IOCore.enableRedirect` + `OsStub` 把 Java `Os` 路径改写到虚拟根；不把 Host 包名嵌进 Guest 可见 native 路径。 | `GuestApplicationInfoFactory` 发布 `/data/app/<pkg>/lib/<abi>`。`installSystemIoHooks` 覆盖 libjavacore/openjdk（普通 Guest，不再要求 isolated file capabilities）。`installNativeLoadRedirect` 把 `System.load(逻辑路径)` 映到 CAS revision。 |
+| VA OSS | `PackageParserEx.initApplicationInfoBase` 写入虚拟 `nativeLibraryDir`；`VClientImpl` bind 前 IO redirect。 | 同上，不把 CAS `files/packages/<host+guest>/...` 写进 `ApplicationInfo.nativeLibraryDir`。 |
+| CAS 实测 | 发布 Host-files alias 或 packaged CAS 目录 → U4 `why:11` / `real_proc_mode:-1` → SIGKILL。只发逻辑路径且不装 system IO → 首页活着但 `libwebviewuc.so` 不 load，百度白屏。逻辑路径 + system IO + nativeLoad → so 加载成功，同意页可进。 | 保持逻辑 `nativeLibraryDir`。`GuestNativeLibraryAlias` 只在 `prepareNativeBootstrap` 创建一次；禁止在 `GuestContext` 构造 / `createConfigurationContext` 再 `Files.createDirectories(Host files)`。`GuestStorageNameCodec` 在 hooked realpath 反映射后仍用实例词法父路径。 |
+
+同意后仍开放的首错：U4 `real_proc_mode:-1`、`pid: 0/0`，`bindServiceAsUser` 走
+`Context` 默认 stub，`sNormalHandler` ImageLoader `memoryCacheSize` 非法。不在本次提交关闭。
