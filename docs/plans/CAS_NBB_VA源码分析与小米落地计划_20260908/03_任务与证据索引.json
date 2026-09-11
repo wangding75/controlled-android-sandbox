@@ -1,0 +1,2260 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-08",
+  "cas_head": "40f629d03bbb0927f171a0e318c242398d8a141d",
+  "scope": "两阶段计划；未执行开发或设备测试",
+  "baselines": {
+    "cas": "D:\\github\\controlled-android-sandbox",
+    "nbb_commit": "89b59836c66f173756a4ae258cf379a957649820",
+    "va_commit": "802a82c2b9c15a1990e75eee1e9fe07168854772",
+    "reference_normalization": "CRLF/LF normalized: NBB no differences; VA README.md only"
+  },
+  "tasks": [
+    {
+      "id": "P1-01",
+      "phase": 1,
+      "title": "冻结当前源码与证据，修正执行基线",
+      "priority": "P0",
+      "dependencies": [],
+      "effort_person_days": [
+        0.5,
+        1
+      ],
+      "environment": "工作站；API35/36 AVD 的短基线",
+      "reference_ids": [
+        "N18",
+        "V10",
+        "V11",
+        "V12"
+      ],
+      "cas_ids": [
+        "T01",
+        "T02",
+        "E02",
+        "E03",
+        "E04",
+        "E05",
+        "E07",
+        "E09",
+        "E10",
+        "E11"
+      ],
+      "work": [
+        "冻结 CAS/NBB/VA 提交、工作区差异、APK SHA256、构建参数与设备环境；保留旧回执。",
+        "将 REALAPP-COMPAT-02 的 15 文件改动与实际 APK/运行记录对应；现有 run.json 的 parent HEAD 单独标注。",
+        "把旧能力表、OEM 表、下一任务、缺失脚本路径与最新源码对齐；本新计划采用两阶段排序，旧任务 ID 保留映射。"
+      ],
+      "acceptance": [
+        "每条已有 PASS 能追到源码状态、APK 哈希和运行元数据；无法绑定者标为历史证据。",
+        "Chrome 当前为启动 FAIL/NPE，Quark 为首帧 PASS、业务 smoke 待证；两个 capability FAIL 保留。",
+        "所有新任务引用的本地文件存在；先在一个可用 AVD 跑 S01–S04，失败定位后再往下。"
+      ],
+      "deliverable": "baseline.json、证据冲突清单、旧新任务映射、短基线回执",
+      "legacy_mapping": "C0/C6 事实源；REALAPP-COMPAT-02",
+      "condition": "",
+      "long_run": false,
+      "status": "已完成（2026-09-08；见 docs/plans/P1-01_*）",
+      "evidence": [
+        "docs/plans/P1-01_BASELINE.json",
+        "docs/plans/P1-01_EVIDENCE_CONFLICTS.md",
+        "docs/plans/P1-01_OLD_NEW_TASK_MAPPING.md",
+        "docs/plans/P1-01_SHORT_BASELINE_RECEIPT.md",
+        "out/verification/p1-01-api36-s01-s04-continuous-20260908"
+      ]
+    },
+    {
+      "id": "P1-02",
+      "phase": 1,
+      "title": "建立每次修改前的参考源码决策单与最小复现库",
+      "priority": "P0",
+      "dependencies": [
+        "P1-01"
+      ],
+      "effort_person_days": [
+        0.5,
+        1
+      ],
+      "environment": "源码研究；JVM/native fixture；AVD",
+      "reference_ids": [
+        "N01",
+        "N03",
+        "N04",
+        "N05",
+        "N08",
+        "V01",
+        "V02",
+        "V03",
+        "V04",
+        "V05",
+        "V08",
+        "V12"
+      ],
+      "cas_ids": [
+        "C01",
+        "C06",
+        "C10",
+        "C13",
+        "T01"
+      ],
+      "work": [
+        "每个修复先写“CAS 失败路径→NBB/VA 调用路径→可观察行为→Android 合同/独立复现→采用或不采用理由”。",
+        "优先搭建共享库提供包、可选缺失 Service/Provider、跨进程 Service、重入 Provider、动态加载的可移植 fixture；先原生直装确认期望。",
+        "VA PRO 只有日志的能力标为实现未知，先补可运行参考或独立复现再设计；不得由功能名臆造实现。"
+      ],
+      "acceptance": [
+        "每个产品修改提交都有决策单、至少一条已阅读的 NBB/VA 源码定位、差异说明及能失败的前置复现。",
+        "不得复制参考实现，不得以吞异常、伪造权限/账号/回调、增大超时或重复启动替代闭环。",
+        "与具体 App 无关的 fixture 可在 AVD 执行；只在 ARM/OEM 出现的差异明确转入对应 P2 任务。"
+      ],
+      "deliverable": "逐任务 reference-decision.md、fixture 规格与原生基准",
+      "legacy_mapping": "落实用户“所有改动先分析其他沙箱”要求",
+      "condition": "",
+      "long_run": false,
+      "status": "已完成（2026-09-09；API35/36 FIXTURE_PASS）",
+      "evidence": [
+        "docs/plans/P1-09_REFERENCE_DECISION.md",
+        "docs/plans/P1-09_ACTIVITY_TASK_REPORT.md",
+        "tools/verification/run_p1_09_activity_task.py",
+        "out/verification/p1-09-api35-attempt1-20260909/run.json",
+        "out/verification/p1-09-api36-attempt5-20260909/run.json"
+      ]
+    },
+    {
+      "id": "P1-03",
+      "phase": 1,
+      "title": "收敛共享库的包信息、文件与资源投影",
+      "priority": "P0",
+      "dependencies": [
+        "P1-02"
+      ],
+      "effort_person_days": [
+        1,
+        2
+      ],
+      "environment": "API35/36 AVD；提供包+消费包 fixture",
+      "reference_ids": [
+        "V02",
+        "N01",
+        "N02"
+      ],
+      "cas_ids": [
+        "C02",
+        "C03",
+        "C04",
+        "C05",
+        "C07"
+      ],
+      "work": [
+        "沿 VA dependSystem 的宿主 PMS 投影路径核对 CAS 已有实现；记录 NBB fixJar 不能覆盖 Trichrome 的限制。",
+        "验证库名/版本/证书、provider 包与 base/splits 来源；让 PMS、ApplicationInfo、dex、资源与 native 候选路径保持同一依赖版本。",
+        "覆盖缺失、版本不符、更新失效、多个版本、必选/可选依赖；只修改复现失败的分支。"
+      ],
+      "acceptance": [
+        "fixture 原生与 CAS 均能读取提供包的类、资源和测试资产；共享库升级后旧路径不能继续被使用。",
+        "不匹配版本/证书或不存在的提供包得到明确安装/依赖错误；普通宿主私有目录不可被引入。",
+        "已有 sharedLibraryFiles/providerSourceFiles 不重复建设；真实 Chrome/ARM64 通过留给 P2-02。"
+      ],
+      "deliverable": "共享库用例矩阵、路径/版本对照、修复与回归证据",
+      "legacy_mapping": "REALAPP-COMPAT-01/02 Chrome 依赖链",
+      "condition": "",
+      "long_run": false,
+      "status": "已完成（2026-09-08；见 docs/plans/P1-03_*）"
+    },
+    {
+      "id": "P1-04",
+      "phase": 1,
+      "title": "定位并修复启动期 Application/LoadedApk/Context 断点",
+      "priority": "P0",
+      "dependencies": [
+        "P1-03"
+      ],
+      "effort_person_days": [
+        1,
+        3
+      ],
+      "environment": "API35/36 AVD；AppComponentFactory 与 Provider bootstrap fixture",
+      "reference_ids": [
+        "N01",
+        "V01"
+      ],
+      "cas_ids": [
+        "C06",
+        "C07",
+        "C08",
+        "C09",
+        "E02"
+      ],
+      "work": [
+        "按 NBB/VA 的初始化先后顺序核对 CAS 的 factory、defining loader、LoadedApk、attachBaseContext、Provider 和 Application.onCreate。",
+        "补齐首次异常完整栈与阶段快照；最新 Chrome 的 Object.getClass() NPE 在没有栈前保持“根因未知”。",
+        "复现 Application 内启动组件、Provider 重入、空字段与多 Context；可移植问题在 AVD 修复，ARM/OEM 专有栈移交 P2-02。"
+      ],
+      "acceptance": [
+        "每进程每代 Application attach/onCreate 各一次，Provider 初始化次序可核对；无重复 Application。",
+        "构造异常保留原始 cause/阶段，清理后再次显式启动可恢复；不能补一个 null guard 就判完成。",
+        "factory/资源/native loader fixture 完成 3 冷+3 热；不能在 AVD 复现的 Chrome 栈有明确 P2 移交项。"
+      ],
+      "deliverable": "bootstrap 时序、NPE 首错栈、复现 fixture、阶段验收记录",
+      "legacy_mapping": "REALAPP-COMPAT-02；C1-T01/ClassLoader",
+      "condition": "",
+      "long_run": false,
+      "status": "已完成（2026-09-08；FIXTURE_PASS；证据 docs/plans/P1-04_BOOTSTRAP_RECEIPT.md）"
+    },
+    {
+      "id": "P1-05",
+      "phase": 1,
+      "title": "统一 Service 查询、所属进程和未找到的返回语义",
+      "priority": "P0",
+      "dependencies": [
+        "P1-02"
+      ],
+      "effort_person_days": [
+        1,
+        2
+      ],
+      "environment": "API32/35/36 AVD；虚拟与外部 Service fixture",
+      "reference_ids": [
+        "N03",
+        "N04",
+        "V03",
+        "V04"
+      ],
+      "cas_ids": [
+        "C10",
+        "C12",
+        "C14",
+        "C29"
+      ],
+      "work": [
+        "研究虚拟 PMS 命中和宿主系统 Service 分流；对齐 queryIntentServices、resolveService、getServiceInfo 和实际 bind/start。",
+        "将“确实不存在/合法可选服务”“被策略拒绝”“权限不足”“解析或签名错误”分别编码；按具体 Context API 合同返回。",
+        "覆盖显式/包约束/隐式 Intent、MIME null、enabled/exported、processName、回调 executor、unbind 与进程死亡。"
+      ],
+      "acceptance": [
+        "合法缺失 Service 的 bindService 按平台返回 false，且不会产生 NO_GUEST_SERVICE_MATCH 导致的未捕获异常。",
+        "越权目标仍拒绝；查到的同名虚拟包不得误绑到宿主安装；真实 onServiceConnected/onNullBinding/disconnect 和清理可观察。",
+        "3 个 API 的正例/负例一致；夸克最新系统服务绑定由 P2-03 检验。"
+      ],
+      "deliverable": "Service owner/返回语义矩阵、回调证据、相关修复",
+      "legacy_mapping": "REALAPP-COMPAT-01/02 Quark；C1-T02",
+      "condition": "",
+      "long_run": false,
+      "status": "待执行"
+    },
+    {
+      "id": "P1-06",
+      "phase": 1,
+      "title": "收敛 Provider 外部路由、空结果与授权生命周期",
+      "priority": "P0",
+      "dependencies": [
+        "P1-02"
+      ],
+      "effort_person_days": [
+        1,
+        3
+      ],
+      "environment": "API35/36 AVD；同包/跨包/缺失 Provider fixture",
+      "reference_ids": [
+        "N03",
+        "V03",
+        "V04"
+      ],
+      "cas_ids": [
+        "C13",
+        "C15",
+        "C31"
+      ],
+      "work": [
+        "沿 VA/NBB 的 resolve authority→启动 owner→holder→IContentProvider 路径区分虚拟、系统和不可见目标。",
+        "核对当前 HOST_SYSTEM 直通的身份/权限/用户边界；缺失 provider 的 acquire 返回应与平台空结果一致。",
+        "验证 stable/unstable client、双 authority、递归访问、Cursor/FD、URI grant、observer 和死亡后的重新获取。"
+      ],
+      "acceptance": [
+        "正例 query/call/openFile 的真实内容可核验；缺失 authority 允许 SDK 正常处理 null；未导出/越权访问不被放开。",
+        "重入不同 provider 不死锁，同一 provider 不重复创建；关闭/换代后不能复活旧 holder、grant 或 observer。",
+        "两虚拟用户的数据不串；执行 10 次 acquire/use/release 后受管 Cursor/FD/observer 租约回到基线。"
+      ],
+      "deliverable": "Provider 类型与权限矩阵、重入/资源回收用例、修改依据",
+      "legacy_mapping": "REALAPP-COMPAT-02；C1-T04；KI-T57-013",
+      "condition": "",
+      "long_run": false,
+      "status": "已完成（2026-09-08；API35/36 CAS Provider campaign PASS）",
+      "evidence": [
+        "docs/plans/P1-06_REFERENCE_DECISION.md",
+        "docs/plans/P1-06_PROVIDER_OWNER_MATRIX.md",
+        "out/verification/p1-06-api35-cas-20260908/run.json",
+        "out/verification/p1-06-api36-cas-20260908/run.json"
+      ]
+    },
+    {
+      "id": "P1-07",
+      "phase": 1,
+      "title": "替换按方法名猜参数的 PMS 反射适配",
+      "priority": "P0",
+      "dependencies": [
+        "P1-05",
+        "P1-06"
+      ],
+      "effort_person_days": [
+        0.5,
+        2
+      ],
+      "environment": "源码签名审计；API32–36 AVD 定向调用",
+      "reference_ids": [
+        "N04",
+        "V04",
+        "V09"
+      ],
+      "cas_ids": [
+        "C11",
+        "C14"
+      ],
+      "work": [
+        "审计 HostPackageManagerBridge.invoke 当前“第一个同名方法+参数类型推导”逻辑。",
+        "对实际支持 API 的 IPackageManager 记录完整方法签名、flags 位宽、userId、resolvedType 与返回形态；根据已核对的合同适配。",
+        "将方法缺失、调用异常和正常空结果分离，保存选中签名；小米新增签名留 P2-07。"
+      ],
+      "acceptance": [
+        "同名重载、int/long flags、null MIME、ParceledListSlice 和至少两个 userId 的测试不串参数。",
+        "不支持的签名给出结构化诊断，不静默当作“目标不存在”。",
+        "AVD 每个声明支持的 API 实测 query/resolve Provider/Service；未执行 API 不标 PASS。"
+      ],
+      "deliverable": "PMS 签名表、适配与回归、未知签名处理合同",
+      "legacy_mapping": "REALAPP-COMPAT-02 新桥接审计",
+      "condition": "",
+      "long_run": false,
+      "status": "已完成（2026-09-08；PMS 显式签名表与 API32/35/36 定向验证）",
+      "evidence": [
+        "docs/plans/P1-07_REFERENCE_DECISION.md",
+        "docs/plans/P1-07_PMS_SIGNATURE_MATRIX.md",
+        "out/verification/p1-07-api32-service-intflags-20260908/run.json",
+        "out/verification/p1-07-api32-provider-campaign-20260908/run.json",
+        "out/verification/p1-07-api35-finalapk-20260908/run.json",
+        "out/verification/p1-07-api36-finalapk-20260908/run.json",
+        "build/static-android-compile/verification/static-android-test-execution.json"
+      ]
+    },
+    {
+      "id": "P1-08",
+      "phase": 1,
+      "title": "验证系统调用中的包名、UID、权限和 Attribution",
+      "priority": "P1",
+      "dependencies": [
+        "P1-07"
+      ],
+      "effort_person_days": [
+        1,
+        2
+      ],
+      "environment": "API33/35/36 AVD，平台权限正反例",
+      "reference_ids": [
+        "N04",
+        "N10",
+        "V09",
+        "V12"
+      ],
+      "cas_ids": [
+        "C14",
+        "C15",
+        "C16",
+        "C31"
+      ],
+      "work": [
+        "以参考代理中的调用方身份修正为线索，逐方法记录 Guest 身份、物理调用身份及回包投影。",
+        "覆盖 public manager/隐藏 Binder 两条入口，Permission/AppOps/Attribution chain、权限撤销与缓存刷新。",
+        "以真实服务返回验证支持状态；区分 Hook 已注册、已注入、被实际调用、业务结果成功。"
+      ],
+      "acceptance": [
+        "允许路径取得真实数据/回调，拒绝路径无数据且错误符合合同；不存在全局“权限已授予”默认值。",
+        "两虚拟用户的虚拟值隔离；送系统服务的 UID/包名与调用者一致，返回 Guest 的身份符合策略。",
+        "关键 Hook 故障可识别并不会伪报 PASS；小米特有参数继续 P2-07。"
+      ],
+      "deliverable": "方法/参数/结果四列对照表、权限正反例结果",
+      "legacy_mapping": "C2-T02/C2-T07；VA 日志 653/669",
+      "condition": "",
+      "long_run": false,
+      "status": "已完成（2026-09-08；API33/35/36 PASS）",
+      "evidence": [
+        "docs/plans/P1-08_REFERENCE_DECISION.md",
+        "docs/plans/P1-08_IDENTITY_PERMISSION_MATRIX.md",
+        "out/verification/p1-08-api33-final-contract-v1-20260908/run.json",
+        "out/verification/p1-08-api35-final-contract-v8-20260908/run.json",
+        "out/verification/p1-08-api36-final-contract-v2-20260908/run.json"
+      ]
+    },
+    {
+      "id": "P1-09",
+      "phase": 1,
+      "title": "收敛首帧、嵌套 Activity 和终态结果",
+      "priority": "P1",
+      "dependencies": [
+        "P1-04"
+      ],
+      "effort_person_days": [
+        1,
+        2
+      ],
+      "environment": "API35/36 AVD；任务栈 fixture",
+      "reference_ids": [
+        "N06",
+        "V06",
+        "N01",
+        "V01"
+      ],
+      "cas_ids": [
+        "C06",
+        "C07",
+        "C27",
+        "E08"
+      ],
+      "work": [
+        "按参考 ActivityRecord 与真实任务栈流程核对嵌套 Activity handoff、结果回传和宿主窗口。",
+        "将 requestId/session/generation 与最终可见 Guest 窗口、首帧和持久终态关联，识别旧窗口假通过。",
+        "先复现旧 KI-052/053/062/063/065，对已修复状态补证，不重新套用历史 patch。"
+      ],
+      "acceptance": [
+        "单次启动有唯一终态；嵌套跳转、singleTask、Back、横竖屏和 Activity result 各 3 次通过。",
+        "无新帧/黑屏/旧窗口/缺失终态的负例必须 FAIL；仅 resumed 或存在进程不能 PASS。",
+        "3 冷+3 热均有真实首帧及对应 requestId；未增大 SLO、未自动重试。"
+      ],
+      "deliverable": "首帧与任务栈定向报告、遗留 KI 状态依据",
+      "legacy_mapping": "C1-T01；C4-R03；KI-R03-052/053/062/063/065",
+      "condition": "",
+      "long_run": false,
+      "status": "已完成（2026-09-09；API35/36 FIXTURE_PASS）",
+      "evidence": [
+        "docs/plans/P1-09_REFERENCE_DECISION.md",
+        "docs/plans/P1-09_ACTIVITY_TASK_REPORT.md",
+        "tools/verification/run_p1_09_activity_task.py",
+        "out/verification/p1-09-api35-attempt1-20260909/run.json",
+        "out/verification/p1-09-api36-attempt5-20260909/run.json"
+      ]
+    },
+    {
+      "id": "P1-10",
+      "phase": 1,
+      "title": "验证大 Intent 的受控传输和 Binder 载荷边界",
+      "priority": "P1",
+      "dependencies": [
+        "P1-09"
+      ],
+      "effort_person_days": [
+        0.5,
+        1.5
+      ],
+      "environment": "AVD；大 Bundle/自定义 Parcelable fixture",
+      "reference_ids": [
+        "N06",
+        "V06"
+      ],
+      "cas_ids": [
+        "C27",
+        "C25",
+        "E08"
+      ],
+      "work": [
+        "对照 NBB/VA 服务端 ActivityRecord 与代理 Intent 的边界，核查 CAS 当前已有路由 payload 能力。",
+        "使用历史 270–309 KB 量级及边界值复现，检查 extras 不被重复附加到 Binder envelope。",
+        "验证接近/超过当前 1 MiB 路由上限、错误 classloader、过期/跨代 handle 与清理。"
+      ],
+      "acceptance": [
+        "可接受载荷 round-trip 内容/Parcelable 等价，无 TransactionTooLargeException 和静默截断。",
+        "超限明确拒绝；跨用户/跨代/重复使用受限句柄失败；结束后载荷与 FD 不泄漏。",
+        "仅复现确认的缺口产生产品改动，当前已支持的路径只补验收。"
+      ],
+      "deliverable": "载荷边界测试、旧 KI-057 当前结论",
+      "legacy_mapping": "KI-R03-057；C4-R03",
+      "condition": "",
+      "long_run": false,
+      "status": "已完成（2026-09-09；API35/36 FIXTURE_PASS）",
+      "evidence": [
+        "docs/plans/P1-10_REFERENCE_DECISION.md",
+        "docs/plans/P1-10_PAYLOAD_BOUNDARY_REPORT.md",
+        "tools/verification/run_p1_10_payload_boundary.py",
+        "out/verification/p1-10-api35-after-wire-fix-attempt1-20260909/run.json",
+        "out/verification/p1-10-api36-after-wire-fix-attempt1-20260909/run.json"
+      ]
+    },
+    {
+      "id": "P1-11",
+      "phase": 1,
+      "title": "修复或补证进程 owner、失败清理与短恢复",
+      "priority": "P1",
+      "dependencies": [
+        "P1-05",
+        "P1-06",
+        "P1-09"
+      ],
+      "effort_person_days": [
+        1,
+        2
+      ],
+      "environment": "API35/36 AVD；少量故障注入",
+      "reference_ids": [
+        "N05",
+        "V05"
+      ],
+      "cas_ids": [
+        "C24",
+        "C25",
+        "C26",
+        "C28",
+        "C32",
+        "E08"
+      ],
+      "work": [
+        "从参考 ProcessRecord/client/death 流程核对 retained Binder、PREPARING→READY/FAILED 与 generation fencing。",
+        "分别注入 Guest Java crash、native abort、Broker death、prepare 失败、晚到连接；不要把 killProcess 等同 LMK。",
+        "用短场景验证恢复与终态持久化；MuMu host LOW_MEMORY 的系统行为留末尾专项，不先跑全天矩阵。"
+      ],
+      "acceptance": [
+        "每类故障 3 次，旧 PID/代次被回收，下一次显式恢复产生新代次；无永久 PREPARING、旧回调或孤儿 lease。",
+        "原始失败与恢复是两条结果；恢复成功不能覆盖第一次失败。",
+        "保留普通 64+isolated16 合同；高槽位边界小用例现在做，完整耗尽/压力留 P2-90。"
+      ],
+      "deliverable": "短恢复矩阵、资源/终态对照、KI 状态更新",
+      "legacy_mapping": "C1-T07；KI-R03-058/064/066–069",
+      "condition": "",
+      "long_run": false,
+      "status": "已完成（2026-09-09；API35/36 FIXTURE_PASS；证据 docs/plans/P1-11_PROCESS_RECOVERY_REPORT.md）"
+    },
+    {
+      "id": "P1-12",
+      "phase": 1,
+      "title": "定位调度链路的缺失回调与 PendingIntent 行为",
+      "priority": "P1",
+      "dependencies": [
+        "P1-08",
+        "P1-11"
+      ],
+      "effort_person_days": [
+        1,
+        2
+      ],
+      "environment": "API35/36 AVD；Alarm/Job/FGS/Notification fixture",
+      "reference_ids": [
+        "N07",
+        "N15",
+        "N16",
+        "V03",
+        "V05",
+        "V12"
+      ],
+      "cas_ids": [
+        "C29",
+        "C30",
+        "C31",
+        "T02",
+        "E05"
+      ],
+      "work": [
+        "复查最新能力矩阵缺失的 ALARM、JOB_CALLBACK、FGS_STOP、CAMPAIGN marker，逐层区分未调度、未回调和采集遗漏。",
+        "参考 Service/Job 与系统持有者路由，验证通知点击/取消、PendingIntent creator、更新/取消标志和代次。",
+        "短定时、FGS 起停、Job completion/cancel、权限拒绝先在 AVD 完成；熄屏 Doze 与 HyperOS 留 P2-08。"
+      ],
+      "acceptance": [
+        "同轮 5 次真实 Alarm/Job/FGS 回调及停止确认，不能以 schedule 返回值代替。",
+        "Notification/SystemUI 点击命中正确用户和包；注销/换代不再触发旧回调。",
+        "缺 marker 的 run 保留 FAIL；修复后对应 case errors 为空，再跑受影响的 S05/S08/S10。"
+      ],
+      "deliverable": "调度缺失 marker 根因与真实回调记录",
+      "legacy_mapping": "CAP-SCHEDULING-NOTIFICATION-ALARM-JOB-FGS；C1-T05/C2-T05",
+      "condition": "",
+      "long_run": false,
+      "status": "已完成（2026-09-09；API35/36 FIXTURE_PASS；证据 docs/plans/P1-12_SCHEDULING_PENDING_INTENT_REPORT.md）"
+    },
+    {
+      "id": "P1-13",
+      "phase": 1,
+      "title": "补齐分包、动态加载和包升级的短回归",
+      "priority": "P1",
+      "dependencies": [
+        "P1-03",
+        "P1-10",
+        "P1-11"
+      ],
+      "effort_person_days": [
+        1,
+        2
+      ],
+      "environment": "API34/35/36 AVD；split/插件 fixture",
+      "reference_ids": [
+        "N02",
+        "N08",
+        "V02",
+        "V07",
+        "V12"
+      ],
+      "cas_ids": [
+        "C01",
+        "C02",
+        "C08",
+        "C20",
+        "C23"
+      ],
+      "work": [
+        "根据参考包投影/路径处理和 VA 商业日志 splitNames/只读 DEX 线索核查 CAS 现有路径。",
+        "覆盖 base+config+feature splits、资源限定、更新/回滚/清理/重装、签名连续性、动态 dex 与非标准 so 容器。",
+        "动态加载失败按 API 合同和原生直装结果复现，不把所有 lib/*.so 都强制当 ELF，也不猜测加固算法。"
+      ],
+      "acceptance": [
+        "每类包生命周期 3 轮：代码、资源、类加载器、native ABI 与版本一致；双用户数据按操作合同处理。",
+        "API34+ 动态代码只读要求的正反例正确；篡改/版本/签名/缺 split 被明确拒绝。",
+        "既有 split fixture 基线不退化；只在 ARM 加固 App 上存在的问题有 P2-04/05 的复现坐标。"
+      ],
+      "deliverable": "包/分包/加载生命周期矩阵",
+      "legacy_mapping": "C1-T06；KI-R03-051；VA 日志 557/671",
+      "condition": "",
+      "long_run": false,
+      "status": "待执行"
+    },
+    {
+      "id": "P1-14",
+      "phase": 1,
+      "title": "验证 WebView 多进程和 GMS 的现有边界",
+      "priority": "P1",
+      "dependencies": [
+        "P1-04",
+        "P1-06",
+        "P1-08"
+      ],
+      "effort_person_days": [
+        1,
+        2
+      ],
+      "environment": "API35/36 AVD；含 WebView 的 fixture",
+      "reference_ids": [
+        "N01",
+        "N14",
+        "N17",
+        "V01",
+        "V12"
+      ],
+      "cas_ids": [
+        "C09",
+        "C17",
+        "C18",
+        "C19"
+      ],
+      "work": [
+        "参考在 Application 之前配置 WebView suffix 和提供包路径；验证 CAS 资源、renderer 服务与 profile 生命周期。",
+        "执行 HTML/JS、输入、文件选择、页面导航、renderer 退出恢复与两用户 Cookie/localStorage。",
+        "GMS 仅验证当前 BASIC_BOUNDARY 的真实能力；无运行时或登录证据时保持 DEFERRED，不生成成功结果。"
+      ],
+      "acceptance": [
+        "页面 JS 回传指定值，输入/导航可操作；两个用户 Cookie/localStorage 隔离，renderer 恢复不重复 Application。",
+        "API36 提供包资产可读；加载失败返回实际阶段，未初始化 WebView 的 App 不被误报成功。",
+        "明确区分 Chrome 自身浏览器引擎与嵌入 WebView；完整 GMS 按 P2-10 条件处理。"
+      ],
+      "deliverable": "WebView 页面/renderer/profile 矩阵；GMS 支持边界",
+      "legacy_mapping": "C2/C6 WebView；REALAPP-COMPAT-02",
+      "condition": "",
+      "long_run": false,
+      "status": "待执行"
+    },
+    {
+      "id": "P1-15",
+      "phase": 1,
+      "title": "验证 Native 路径、JNI、FD 和 16 KB 的通用部分",
+      "priority": "P1",
+      "dependencies": [
+        "P1-13"
+      ],
+      "effort_person_days": [
+        1,
+        2
+      ],
+      "environment": "原生 x86_64 AVD 4 KB；已有 x86_64 16 KB 环境短测",
+      "reference_ids": [
+        "N08",
+        "N09",
+        "V07",
+        "V08",
+        "V12"
+      ],
+      "cas_ids": [
+        "C20",
+        "C21",
+        "C22",
+        "C23",
+        "E05"
+      ],
+      "work": [
+        "比较 CAS PLT/GOT、NBB JNI/IO、VA 旧 libc/linker Hook 的拦截范围，记录 API 和 ABI 前提。",
+        "跑真实 file/proc/FD、late dlopen/android_dlopen_ext/JNI 的正常路径；保留 raw SVC 与 custom loader 的边界。",
+        "单独复现 NATIVE-ADV-010 done 缺失：未完成用例与已知绕过是不同结果；不直接重分类为 limitation。"
+      ],
+      "acceptance": [
+        "正常路径 JNI 回值、文件内容、动态库来源和 FD 回收一致；ELF/ZIP 对齐审核通过。",
+        "16 KB 短测记录实际 page size；x86_64 或 MuMu 翻译结果不外推为 ARM64。",
+        "EXPLICITLY_TRUSTED/BEST_EFFORT 限制保留；debug seccomp POC 和 raw SVC 边界没有伪报生产隔离。"
+      ],
+      "deliverable": "native 正常路径矩阵、adversarial 缺失 marker 定位、ABI 边界清单",
+      "legacy_mapping": "C3/C6-T02A/B；CAP-NATIVE-ADVERSARIAL-BOUNDARY",
+      "condition": "",
+      "long_run": false,
+      "status": "待执行"
+    },
+    {
+      "id": "P1-16",
+      "phase": 1,
+      "title": "关闭模拟器阶段，产出小米候选版本",
+      "priority": "GATE",
+      "dependencies": [
+        "P1-03",
+        "P1-04",
+        "P1-05",
+        "P1-06",
+        "P1-07",
+        "P1-08",
+        "P1-09",
+        "P1-10",
+        "P1-11",
+        "P1-12",
+        "P1-13",
+        "P1-14",
+        "P1-15"
+      ],
+      "effort_person_days": [
+        0.5,
+        1
+      ],
+      "environment": "API35/36 主 AVD；API32/33/34 受影响用例",
+      "reference_ids": [
+        "N01",
+        "N03",
+        "V01",
+        "V03"
+      ],
+      "cas_ids": [
+        "T01",
+        "T02",
+        "E07",
+        "E11"
+      ],
+      "work": [
+        "先完成精简现有 build/unit/source/harness checks，再在 API35/36 跑 S01–S10 和受影响 capability。",
+        "API32/33/34 只跑本轮修改涉及的入口；完整重复矩阵放 P2-90。",
+        "不能原生运行 ARM 商业包的 AVD 只验等价 fixture；形成剩余“必须真机”列表与固定 APK 哈希。"
+      ],
+      "acceptance": [
+        "API35/36 核心 20/20、必需 capability 无未解释 FAIL，全部通用复现已闭环。",
+        "若标记转交真机，必须说明不可替代的 ARM/OEM 条件、已完成 AVD 子用例和 P2 任务 ID。",
+        "API37 环境问题不阻塞当前 API36 小米目标，仍登记为未验证；未执行完整压力/8 小时测试。"
+      ],
+      "deliverable": "P1-GATE 回执、候选 APK manifest、P2 移交清单",
+      "legacy_mapping": "新阶段一门禁；不等于 VA PRO 等价",
+      "condition": "",
+      "long_run": false,
+      "status": "待执行"
+    },
+    {
+      "id": "P2-01",
+      "phase": 2,
+      "title": "建立小米真机与首批商业样本的可复现基线",
+      "priority": "P0",
+      "dependencies": [
+        "P1-16"
+      ],
+      "effort_person_days": [
+        0.5,
+        1
+      ],
+      "environment": "目标小米真机；默认沿用已记录的 25019PNF3C",
+      "reference_ids": [
+        "N18",
+        "V10",
+        "V12"
+      ],
+      "cas_ids": [
+        "C23",
+        "T01",
+        "E06"
+      ],
+      "work": [
+        "动态发现当前 adb serial，读取 model/fingerprint/API/ABI/page size/WebView provider/系统依赖版本和设置。",
+        "冻结 Chrome、Trichrome、夸克及扩展样本的合法来源、版本、base/splits、签名与哈希；先直装或用已安装原版验证同一操作。",
+        "安装 P1 候选 Host 与 ARM64 fixture，先跑 S01–S04；系统安装授权、锁屏、网络与产品失败分别记录。"
+      ],
+      "acceptance": [
+        "新证据对应真实 Xiaomi/ARM64/API 与实际 page size；不复用历史无线 serial。",
+        "首批 Chrome/Quark 的原生基准可操作，CAS build/APK 哈希与 P1 候选一致。",
+        "ARM64-only 设备不安装 32 位 companion；设备条件变化时先修正 lane，不伪报产品缺陷。"
+      ],
+      "deliverable": "xiaomi-baseline.json、样本清单、原生基准视频/截图与日志",
+      "legacy_mapping": "C6-T02C 已有工作复用；进入新商业 App 阶段",
+      "condition": "",
+      "long_run": false,
+      "status": "待执行"
+    },
+    {
+      "id": "P2-02",
+      "phase": 2,
+      "title": "完成 Chrome/Trichrome 的 ARM64 启动与浏览闭环",
+      "priority": "P0",
+      "dependencies": [
+        "P2-01"
+      ],
+      "effort_person_days": [
+        1,
+        4
+      ],
+      "environment": "目标小米 ARM64；冻结 Chrome+Trichrome 同版本组合",
+      "reference_ids": [
+        "V01",
+        "V02",
+        "V08",
+        "N01",
+        "N02"
+      ],
+      "cas_ids": [
+        "C02",
+        "C03",
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C09",
+        "C20",
+        "C22",
+        "E02"
+      ],
+      "work": [
+        "采集最新 NPE 完整 Java/native 栈，识别最后成功阶段；把 AVD 未复现的断点在原生与 CAS 同设备对照。",
+        "沿提供包 metadata→sharedLibraryFiles→资源→平台 loader→android_dlopen_ext/RELRO→JNI→renderer 逐段验证。",
+        "若出现新缺陷，重新填参考决策单，并回到最小 fixture；不把增加宿主全目录白名单作为通用解法。"
+      ],
+      "acceptance": [
+        "3 冷+3 热启动有唯一 Application、可见首帧，随后连续 10 分钟可操作。",
+        "完成启动页、输入 URL、打开两张测试网页、新建/切换/关闭标签、返回与重新前台；网页 JS/内容校验成功。",
+        "当前 NPE 与共享库错误消失，renderer/native 库来源明确；无未捕获异常/ANR/静默崩溃重启。"
+      ],
+      "deliverable": "CHROME_BASIC_SMOKE=PASS 回执、真实栈闭环、路径与操作证据",
+      "legacy_mapping": "REALAPP-COMPAT-02 的最高优先续接",
+      "condition": "",
+      "long_run": false,
+      "status": "待执行"
+    },
+    {
+      "id": "P2-03",
+      "phase": 2,
+      "title": "完成夸克首帧之后的 Service/Provider 与浏览闭环",
+      "priority": "P0",
+      "dependencies": [
+        "P2-01"
+      ],
+      "effort_person_days": [
+        1,
+        3
+      ],
+      "environment": "目标小米；夸克冻结版本，先沿用 10.15.5.1130/1130 若仍有原包",
+      "reference_ids": [
+        "N03",
+        "N04",
+        "V03",
+        "V04",
+        "V12"
+      ],
+      "cas_ids": [
+        "C10",
+        "C11",
+        "C12",
+        "C13",
+        "C15",
+        "E03"
+      ],
+      "work": [
+        "根据真实 Intent/action/component 和 authority 核对三类 owner；重放已出现的 OneTrack/idprovider 与后台服务调用。",
+        "记录厂商服务存在/缺失、权限和 returned binder/callback，验证合法缺失路径不会再导致 SDK 线程未捕获异常。",
+        "执行网页导航、搜索/输入、标签、返回、前后台和一次文件选择/测试文件下载；每个新问题先回参考源码分析。"
+      ],
+      "acceptance": [
+        "3 冷+3 热，首帧后至少 10 分钟；操作期间及结束采集窗口都无崩溃/ANR。",
+        "对应存在的系统服务完成真实连接；不存在服务和 provider 得到平台允许的缺省结果而不放宽越权访问。",
+        "QUARK_FIRST_FRAME 与 QUARK_BASIC_SMOKE 分开为 PASS；不能只引用 3013 ms 首帧。"
+      ],
+      "deliverable": "QUARK_BASIC_SMOKE=PASS、owner/回调/权限矩阵",
+      "legacy_mapping": "REALAPP-COMPAT-01/02",
+      "condition": "",
+      "long_run": false,
+      "status": "待执行"
+    },
+    {
+      "id": "P2-04",
+      "phase": 2,
+      "title": "用钉钉验证复杂 SDK、WebView 与多进程调用",
+      "priority": "P1",
+      "dependencies": [
+        "P2-02",
+        "P2-03"
+      ],
+      "effort_person_days": [
+        1,
+        3
+      ],
+      "environment": "目标小米；仓库旧样本钉钉 7.8.10/1178 或重新冻结的版本",
+      "reference_ids": [
+        "N01",
+        "N05",
+        "N07",
+        "V01",
+        "V03",
+        "V05",
+        "V12"
+      ],
+      "cas_ids": [
+        "C06",
+        "C08",
+        "C12",
+        "C13",
+        "C17",
+        "C25",
+        "C29"
+      ],
+      "work": [
+        "沿现有钉钉样本链路核对类加载、Service/Receiver、内置 WebView、文件/媒体入口；版本变化先更新样本基准。",
+        "使用测试账号时只执行冻结的非破坏性路径；无需账号的首屏和输入路径先完成。",
+        "对每个通用缺陷回补 AVD fixture；不用某版本包名触发的默认成功绕过。"
+      ],
+      "acceptance": [
+        "3 冷+3 热，10 分钟操作无崩溃/ANR；登录界面可输入、隐私/权限页面可交互、WebView 页面可展示。",
+        "测试账号可用时再验登录后页面、测试文件选择和拍摄预览；未执行登录必须保留 NOT_TESTED，不称业务登录通过。",
+        "后台组件/退出恢复可追踪；旧 KI-061 Receiver 锁问题若未复现，标为本样本未观察而非旧矩阵全关闭。"
+      ],
+      "deliverable": "DINGTALK 分功能回执、版本范围和可用级别",
+      "legacy_mapping": "C4 历史样本；KI-R03-060/061",
+      "condition": "",
+      "long_run": false,
+      "status": "待执行"
+    },
+    {
+      "id": "P2-05",
+      "phase": 2,
+      "title": "用红果与番茄验证资源、播放器和页面生命周期",
+      "priority": "P1",
+      "dependencies": [
+        "P2-02",
+        "P2-03"
+      ],
+      "effort_person_days": [
+        1,
+        3
+      ],
+      "environment": "目标小米；各自冻结 APK，沿用已有 corpus 获取来源",
+      "reference_ids": [
+        "N01",
+        "N06",
+        "N08",
+        "V01",
+        "V06",
+        "V07",
+        "V12"
+      ],
+      "cas_ids": [
+        "C01",
+        "C06",
+        "C08",
+        "C09",
+        "C13",
+        "C20"
+      ],
+      "work": [
+        "红果与番茄分别建 case，复查历史加包、类加载、Provider readiness 与页面切换问题。",
+        "红果执行首页、详情、可公开访问的视频播放/暂停/前后台；番茄执行首页、书页、翻页、返回、重新打开。",
+        "原生同样无法访问的内容/账号/网络问题单列，仍完成不依赖该服务的 UI 路径；不替换为随机低版本获得通过。"
+      ],
+      "acceptance": [
+        "两 App 各 3 冷+3 热、10 分钟；每 App 单独报告全部冻结操作结果。",
+        "无未捕获异常、黑屏、重复 Application、资源找不到和不可恢复的播放/页面错误。",
+        "未完成的媒体/内容步骤保留受阻状态；两 App 的成功不能互相替代。"
+      ],
+      "deliverable": "HONGGUO 与 FANQIE 独立 smoke 报告",
+      "legacy_mapping": "C4-R03/R05；KI-R03-055/059/062",
+      "condition": "",
+      "long_run": false,
+      "status": "待执行"
+    },
+    {
+      "id": "P2-06",
+      "phase": 2,
+      "title": "完成相机、音频、定位、文件与媒体的真机功能验证",
+      "priority": "P1",
+      "dependencies": [
+        "P2-02",
+        "P2-03"
+      ],
+      "effort_person_days": [
+        1,
+        3
+      ],
+      "environment": "目标小米真实摄像头/麦克风/定位与系统文件选择器",
+      "reference_ids": [
+        "N10",
+        "N16",
+        "V09",
+        "V12"
+      ],
+      "cas_ids": [
+        "C13",
+        "C15",
+        "C16",
+        "C31"
+      ],
+      "work": [
+        "先按样本实际调用对照 NBB/VA 对应服务代理，再执行 Camera1/2、AudioRecord/MediaRecorder、Location、MediaStore/SAF。",
+        "分别验授权、拒绝、运行中撤销、前后台切换和释放；真实传感器数据与虚拟策略数据按当前配置判断。",
+        "将 OEM binder 签名/厂商 manager 差异归入 P2-07；不要用 fixture 的日志替代 App 内预览/录制结果。"
+      ],
+      "acceptance": [
+        "每种已纳入产品范围的硬件能力至少 3 次成功，文件/图像/音频可读回；授权拒绝后无越权数据。",
+        "停止或权限撤销后摄像头/麦克风指示状态及资源按系统合同释放；下一 App 可重新使用。",
+        "商业 App 的相关入口可以返回主流程；暂不支持的硬件能力明确标记，不能掩盖为零值成功。"
+      ],
+      "deliverable": "硬件/媒体权限矩阵、真实输出文件与资源释放证据",
+      "legacy_mapping": "C2-T03/04/06；C3-T03",
+      "condition": "",
+      "long_run": false,
+      "status": "待执行"
+    },
+    {
+      "id": "P2-07",
+      "phase": 2,
+      "title": "只修复实测触发的 HyperOS 身份与组件差异",
+      "priority": "P1",
+      "dependencies": [
+        "P2-01"
+      ],
+      "effort_person_days": [
+        1,
+        3
+      ],
+      "environment": "目标 HyperOS fingerprint；AVD 作为通用回归",
+      "reference_ids": [
+        "N03",
+        "N10",
+        "N11",
+        "N12",
+        "N13",
+        "V03",
+        "V09",
+        "V12"
+      ],
+      "cas_ids": [
+        "C10",
+        "C11",
+        "C12",
+        "C13",
+        "C15",
+        "C16"
+      ],
+      "work": [
+        "从 P2-02/03/04/05/06 的首错证据收集 OEM 签名、calling package/UID、Attribution 子类、provider holder 和系统可见性差异。",
+        "明确 NBB null-base 小米代理未注入，研究真正有目标对象的代理路径；结合实测平台合同决定最小适配。",
+        "能按 API/签名适配的做通用逻辑；只在证据要求时限定 OEM 条件，不捕获全部异常后返回成功。"
+      ],
+      "acceptance": [
+        "每个补丁有原生/原 CAS/修复 CAS 三列结果、真实被调用的 hook 证据和受影响 App 步骤复测。",
+        "UID/权限真实校验仍生效；AVD 对应入口不回退；没有未说明的包名特判。",
+        "未出现 OEM-specific defect 时本任务以“研究完成、无需代码修改”关闭，不能为凑任务添加 Hook。"
+      ],
+      "deliverable": "HyperOS 差异表、最小修复或无需修改的证据",
+      "legacy_mapping": "C7-T01/02 的 Xiaomi 子集",
+      "condition": "",
+      "long_run": false,
+      "status": "待执行"
+    },
+    {
+      "id": "P2-08",
+      "phase": 2,
+      "title": "完成短时前后台、通知点击和进程恢复",
+      "priority": "P1",
+      "dependencies": [
+        "P2-03",
+        "P2-06",
+        "P2-07"
+      ],
+      "effort_person_days": [
+        1,
+        2
+      ],
+      "environment": "小米默认系统设置；短时锁屏/网络切换/一次重启",
+      "reference_ids": [
+        "N05",
+        "N07",
+        "N15",
+        "N16",
+        "V03",
+        "V05",
+        "V12"
+      ],
+      "cas_ids": [
+        "C25",
+        "C26",
+        "C28",
+        "C29",
+        "C30",
+        "C31",
+        "C32"
+      ],
+      "work": [
+        "记录 HyperOS 电池/自启动/通知权限条件，先用默认设置测试；额外设置组合单独记录，不修改后抹去基线。",
+        "执行 Home/最近任务返回、通知点击、5 分钟熄屏后恢复、Wi-Fi 切换、Host/Guest 单独死亡和一次设备重启后启动。",
+        "按 Job/Alarm/FGS 真实平台约束判断回调；系统不保证的后台任务不承诺常驻或固定时刻触发。"
+      ],
+      "acceptance": [
+        "每类短恢复至少 3 次（整机重启 1 次），有明确退出原因、新代次、可交互首帧和正确用户。",
+        "通知点击回到正确实例，不能串用户/旧代次；无永久 PREPARING、残留录音/相机或持久失联。",
+        "默认设置下受限的功能明确写入支持范围；8 小时驻留留 P2-91。"
+      ],
+      "deliverable": "小米短恢复/通知/后台矩阵与设置快照",
+      "legacy_mapping": "C1-T05/07；C7 Xiaomi；不复用 MuMu LMK 结论",
+      "condition": "",
+      "long_run": false,
+      "status": "待执行"
+    },
+    {
+      "id": "P2-09",
+      "phase": 2,
+      "title": "按硬件与目标需求验收 32 位伴生和跨宽度",
+      "priority": "P2",
+      "dependencies": [
+        "P2-01"
+      ],
+      "effort_person_days": [
+        1,
+        3
+      ],
+      "environment": "实际支持相应 32 位 ABI 的独立设备；当前 ARM64-only 小米仅验拒绝路径",
+      "reference_ids": [
+        "N18",
+        "V10",
+        "V12"
+      ],
+      "cas_ids": [
+        "C23",
+        "C24",
+        "C33"
+      ],
+      "work": [
+        "按参考主包/扩展包进程分工核对 CAS 32 位 companion 的安装、身份、artifact 与 Binder 通道。",
+        "触发前确认目标 APK 仅 32 位且设备支持该 ABI；不从 nativeAbi 名字推断硬件能力。",
+        "支持设备上验证跨包 Binder/Intent/FD、退出恢复和签名匹配；当前小米做早期可解释拒绝。"
+      ],
+      "acceptance": [
+        "当前只报告 arm64-v8a 的小米遇到 32 位独占 APK，明确 UNSUPPORTED_ABI，不尝试装 companion 来制造失败。",
+        "若条件触发，32 位代码必须在匹配 ABI 设备实际执行，JNI/回调/跨宽度功能各 3 次；无 pointer-width 截断。",
+        "条件不成立时保留 NOT_APPLICABLE，不计为跨宽度 PASS，也不阻塞首批 64 位 App。"
+      ],
+      "deliverable": "ABI 分流与 companion 条件回执",
+      "legacy_mapping": "C6-T02D/跨宽度",
+      "condition": "仅当首批目标包含 32 位独占 APK 且有支持该 ABI 的设备；否则保留为条件项",
+      "long_run": false,
+      "status": "条件触发"
+    },
+    {
+      "id": "P2-10",
+      "phase": 2,
+      "title": "按目标需求完成真实 GMS/账号依赖",
+      "priority": "P2",
+      "dependencies": [
+        "P2-03",
+        "P2-07"
+      ],
+      "effort_person_days": [
+        2,
+        5
+      ],
+      "environment": "具有匹配 GMS/GSF/商店运行时的设备或 AVD，最终必须复核目标小米",
+      "reference_ids": [
+        "N14",
+        "N04",
+        "V09",
+        "V12"
+      ],
+      "cas_ids": [
+        "C19",
+        "C14",
+        "C15",
+        "C31"
+      ],
+      "work": [
+        "目标流程确实依赖 GMS 时再启用；先研究参考 Account/GMS 包集合和真实服务依赖，冻结版本与安装形态。",
+        "明确选择支持的调用范围（例如服务可用性检查、测试账号登录、目标推送路径），不把全部 GMS 作为单一通过项。",
+        "对返回值、签名/包身份、后台连接和实际服务响应建最小用例；当前 BASIC_BOUNDARY 不能当成 GMS 运行时。"
+      ],
+      "acceptance": [
+        "所选 GMS API 有真实服务响应；测试账号登录成功时才能声明登录支持。",
+        "没有运行时/网络/账号时如实受阻，不能构造 token 或 Play PackageInfo 替代结果。",
+        "若首批业务不依赖 GMS，此项延期且在功能范围中说明，不阻塞国内浏览器基础路径。"
+      ],
+      "deliverable": "GMS 命名用例与范围回执",
+      "legacy_mapping": "VA PRO 谷歌能力差距",
+      "condition": "仅在首批 App 的必需业务流程依赖 GMS 时触发",
+      "long_run": false,
+      "status": "条件触发"
+    },
+    {
+      "id": "P2-11",
+      "phase": 2,
+      "title": "按声明范围补 ARM64 16 KB 与 API37 环境",
+      "priority": "P2",
+      "dependencies": [
+        "P2-01",
+        "P1-15"
+      ],
+      "effort_person_days": [
+        1,
+        3
+      ],
+      "environment": "真实 ARM64 16 KB 设备/受支持环境；独立稳定 API37 AVD",
+      "reference_ids": [
+        "N18",
+        "V08",
+        "V10",
+        "V12"
+      ],
+      "cas_ids": [
+        "C20",
+        "C22",
+        "C23",
+        "E06",
+        "E07"
+      ],
+      "work": [
+        "把 ABI、page size、API 分成独立坐标；不要从 API35/36/37 版本推断 page size。",
+        "仅在本次支持声明要求时补环境；API37 先解决记录中的 emulator graphics 环境，环境未完成前不改 CAS 凑通过。",
+        "分别验证 native ELF/zip、加载/RELRO、页面/媒体和被新增 API 影响的服务；不要刷目标小米 ROM 来满足矩阵。"
+      ],
+      "acceptance": [
+        "每个新增支持坐标都有实际 metadata、核心用例和目标调用路径记录。",
+        "x86_64 16 KB PASS 不外推 ARM64 16 KB；VA PRO README 的 Android17 声明不是 CAS 证据。",
+        "当前 API36/4KB 小米需求不要求该组合时，保留 DEFERRED，不阻塞该设备可用结论。"
+      ],
+      "deliverable": "额外平台组合支持表或明确延期记录",
+      "legacy_mapping": "C6-T01F/G、C6-T02B 的剩余组合",
+      "condition": "只在发布范围要求 ARM64 16 KB 或 API37 时触发",
+      "long_run": false,
+      "status": "条件触发"
+    },
+    {
+      "id": "P2-12",
+      "phase": 2,
+      "title": "冻结可用版本与短验收，准备最终长测",
+      "priority": "GATE",
+      "dependencies": [
+        "P2-02",
+        "P2-03",
+        "P2-04",
+        "P2-05",
+        "P2-06",
+        "P2-07",
+        "P2-08"
+      ],
+      "effort_person_days": [
+        0.5,
+        1
+      ],
+      "environment": "目标小米；相同 APK 哈希；debug 与拟交付构建",
+      "reference_ids": [
+        "N01",
+        "N15",
+        "V01",
+        "V12"
+      ],
+      "cas_ids": [
+        "T01",
+        "T02",
+        "C16",
+        "C23",
+        "E08"
+      ],
+      "work": [
+        "固定首批与扩展样本、通过级别、设备与必需功能；逐项关闭前面的功能缺陷，条件任务决定是否触发并登记。",
+        "拟交付构建跑每 App 1 冷+1 热和关键路径，检查 native 打包、反射/回调类保留；不以 debug PASS 代表所有构建。",
+        "预登记长测脚本、固定 case 坐标、性能门槛、缺失记录处理和恢复规则；不在结果出来后调整通过线。"
+      ],
+      "acceptance": [
+        "首批 Chrome/Quark 均 BASIC_SMOKE PASS，扩展样本逐个标注实际通过功能；选为必需的流程不得留 FAIL/NOT_TESTED。",
+        "无目标范围内 P0/P1 开放缺陷；候选版本和 APK 哈希锁定，测试矩阵/恢复规则审定并可自动校验。",
+        "已触发的 P2-09/10/11 同样必须完成；未触发者有明确范围说明。此处仍不宣称长稳已通过。"
+      ],
+      "deliverable": "候选版本清单、支持范围、短验收回执、长测配置",
+      "legacy_mapping": "首批小米可用门禁；C6-T03/C7 子集",
+      "condition": "",
+      "long_run": false,
+      "status": "待执行"
+    },
+    {
+      "id": "P2-90",
+      "phase": 2,
+      "title": "末尾执行大批量回归、压力与同设备比较",
+      "priority": "TAIL",
+      "dependencies": [
+        "P2-12"
+      ],
+      "effort_person_days": [
+        0.5,
+        1.5
+      ],
+      "environment": "小米 + 已支持 AVD；预计数小时，按任务坐标断点续接",
+      "reference_ids": [
+        "N05",
+        "N06",
+        "V05",
+        "V06",
+        "V12"
+      ],
+      "cas_ids": [
+        "T01",
+        "T02",
+        "C24",
+        "C25",
+        "C26",
+        "C27",
+        "E08",
+        "E09"
+      ],
+      "work": [
+        "功能开发完成后才跑大矩阵：默认 5 App×2虚拟用户×冷/热各50次×2轮，合计2000次启动；只对已冻结且必需的样本计算。",
+        "完成 API32–36 完整回归、C4 旧待关门矩阵映射、槽位高位/耗尽及 Provider/FD 压力；顺序执行，避免环境互相挤压。",
+        "同设备直装作主要基准；有可运行且版本已冻结的 NBB/授权 VA PRO 时再加 A/B。旧 VA2017 不作为 API36 通过基准。",
+        "统计原始失败率、恢复率、冷/热 p50/p95、PSS、FD 与 Binder；phase 超时终止本次子进程树，再按未执行坐标续跑。"
+      ],
+      "acceptance": [
+        "必需矩阵所有坐标有唯一记录，无缺失、覆盖原始失败或事后补造 PASS；支持范围内目标用例全通过。",
+        "系统杀进程要保留原因和独立恢复结果；恢复不改原始成功率；明确产品失败/环境受阻，环境受阻不计 PASS。",
+        "默认性能目标：冷热首帧 p95 ≤ max(直装同场景p95×3, 5秒)，且不放宽旧任务已冻结的更严格 SLO；未达标则优化后重测受影响项。",
+        "负载卸除后租约归零，FD/进程数回到允许基线；没有可用 VA PRO 时只声明本机矩阵通过，不声明等价。"
+      ],
+      "deliverable": "完整回归/压力/A-B 回执与指标表；C4 历史欠账逐项关闭或保留原因",
+      "legacy_mapping": "C4-R05；完整 C1/C2/C4 回归；C6/C7 末尾验收",
+      "condition": "",
+      "long_run": true,
+      "status": "待执行"
+    },
+    {
+      "id": "P2-91",
+      "phase": 2,
+      "title": "最后执行 8 小时稳定性测试并交付总回执",
+      "priority": "TAIL_LAST",
+      "dependencies": [
+        "P2-90"
+      ],
+      "effort_person_days": [
+        0.5,
+        1
+      ],
+      "environment": "已锁定候选 APK 的小米真机；8 小时净执行，另留准备/归档时间",
+      "reference_ids": [
+        "N05",
+        "V05",
+        "V12"
+      ],
+      "cas_ids": [
+        "T01",
+        "T02",
+        "C25",
+        "C26",
+        "E08",
+        "E09"
+      ],
+      "work": [
+        "所有功能开发与前置矩阵完成后，按固定场景混合浏览、视频/阅读、前后台、通知回到 App 和空闲；覆盖已声明支持的 App。",
+        "稳定负载下每分钟采集时间戳、PID/代次、进程存活、CPU/PSS、FD、热状态和错误；每 15 分钟完成一次可验证交互检查点。",
+        "中断、掉线、温控/网络环境阻断与实际执行时长分开，不能以墙钟过了 8 小时当 PASS；补跑规则在 P2-12 冻结。",
+        "出现产品缺陷立即保留首错，修复后从相应短回归重新进入，最终候选版本要有完整同版本 8 小时证据；归档并输出最终支持范围。"
+      ],
+      "acceptance": [
+        "净运行≥8小时；每15分钟检查点全部完成，分钟级采样覆盖率≥99%，缺口可解释。",
+        "无非预期 Java/native crash、ANR、不可恢复黑屏/会话失联、数据串用户或损坏；不依靠自动重启掩盖故障。",
+        "按同负载空闲 checkpoint 对比：末小时 PSS p95 ≤ max(首个稳定小时PSS p95×1.2, 首个稳定小时+50MiB)；释放后受管租约归零、FD 较基线增加≤5且无持续增长。",
+        "最终回执同时列出商业操作通过范围、原始失败/恢复、性能/资源曲线、未覆盖条件项和准确 APK/源码哈希；无证据的 VA PRO 能力不写等价。"
+      ],
+      "deliverable": "SOAK_8H 回执、最终支持矩阵与全部证据索引；此任务为最后执行项",
+      "legacy_mapping": "KI-R03-032 长稳债务；按本次用户要求恢复到最终尾部",
+      "condition": "",
+      "long_run": true,
+      "status": "待执行"
+    }
+  ],
+  "sources": {
+    "C01": {
+      "id": "C01",
+      "path": "D:/github/controlled-android-sandbox/app/src/main/java/com/warden/controlledsandbox/ApkImportManager.java",
+      "line": 39,
+      "anchor": "class ApkImportManager",
+      "note": "APK 导入、修订目录和解析入口；研究包安装行为的 CAS 定位点。",
+      "sha256": "dba95da0b0439060fd952c2c476e0b91b6cd04cb66fb2a963cb4708788a148da"
+    },
+    "C02": {
+      "id": "C02",
+      "path": "D:/github/controlled-android-sandbox/app/src/main/java/com/warden/controlledsandbox/VirtualPackageStateBuilder.java",
+      "line": 425,
+      "anchor": "private static void appendHostSharedLibraries(",
+      "note": "读取宿主 SharedLibraryInfo，供安装依赖解析。",
+      "sha256": "0fee78cf4e2a5d47800eb2248e4508a224a604dec88024696ea093790fef4a1f"
+    },
+    "C03": {
+      "id": "C03",
+      "path": "D:/github/controlled-android-sandbox/app/src/main/java/com/warden/controlledsandbox/VirtualPackageStateBuilder.java",
+      "line": 553,
+      "anchor": "private Map<String, HostSharedLibraryProjection> hostSharedLibraryProjections(",
+      "note": "当前 HEAD 新增的共享库提供包与文件投影。",
+      "sha256": "0fee78cf4e2a5d47800eb2248e4508a224a604dec88024696ea093790fef4a1f"
+    },
+    "C04": {
+      "id": "C04",
+      "path": "D:/github/controlled-android-sandbox/sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestSharedLibraryPathResolver.java",
+      "line": 56,
+      "anchor": "static List<String> resolvedSharedLibraryFiles(",
+      "note": "合并虚拟提供包和 authority 批准的宿主提供包路径；不是尚未实现。",
+      "sha256": "6957de21c3c55181b8960a781ad8b8a5aef68bfe21be4eb7f4b202e58c4919d3"
+    },
+    "C05": {
+      "id": "C05",
+      "path": "D:/github/controlled-android-sandbox/sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestApplicationInfoFactory.java",
+      "line": 56,
+      "anchor": "setOptionalField(info, \"sharedLibraryFiles\"",
+      "note": "把同一依赖集合投影到 ApplicationInfo。",
+      "sha256": "597b54c5242ef81c723b8f238869902baceac39108ee25c07e54d6e9a67f666b"
+    },
+    "C06": {
+      "id": "C06",
+      "path": "D:/github/controlled-android-sandbox/sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java",
+      "line": 603,
+      "anchor": "ClassLoader frameworkLoader = loader.definingLoader();",
+      "note": "平台 defining loader → AppComponentFactory → LoadedApk → Application → Provider → onCreate。",
+      "sha256": "ce3b201b77a2727ccf036fdf094351f0fd08c8b9902347a10c27522c6298063c"
+    },
+    "C07": {
+      "id": "C07",
+      "path": "D:/github/controlled-android-sandbox/sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestLoadedApkBridge.java",
+      "line": 50,
+      "anchor": "static GuestLoadedApkBridge install(",
+      "note": "安装真实 LoadedApk 的 loader、资源与 Application 投影。",
+      "sha256": "f5dfb8217d6cb3bd2a9a50d6a04526ea2226f2d290284e51dd9a9f06b2601c3a"
+    },
+    "C08": {
+      "id": "C08",
+      "path": "D:/github/controlled-android-sandbox/sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestClassLoader.java",
+      "line": 31,
+      "anchor": "public final class GuestClassLoader",
+      "note": "普通 PathClassLoader 包装与 isolated InMemoryDexClassLoader 路径。",
+      "sha256": "8bdffb2889715bd9f1821905081f8a037fc1488095ec2a556223cbeb5bb8d3c6"
+    },
+    "C09": {
+      "id": "C09",
+      "path": "D:/github/controlled-android-sandbox/sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestContext.java",
+      "line": 881,
+      "anchor": "private void appendApi36WebViewAssets(",
+      "note": "API36 WebView 提供包资源路径补充；需要真实 provider 资源验证。",
+      "sha256": "5a835ff0538b40db751dfcdaaf0b3cb26dde5ea75a8f690a1cf6997b400eb71e"
+    },
+    "C10": {
+      "id": "C10",
+      "path": "D:/github/controlled-android-sandbox/sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestIntentResolver.java",
+      "line": 59,
+      "anchor": "Target resolveOne(",
+      "note": "先虚拟 PMS，再允许的宿主系统 Service；剩余 miss 仍抛 NO_GUEST_*_MATCH。",
+      "sha256": "8f5b1e272e256f8ba76ec84a9809996b1553a1954611dd208b2ba8b802a0fa8e"
+    },
+    "C11": {
+      "id": "C11",
+      "path": "D:/github/controlled-android-sandbox/sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/HostPackageManagerBridge.java",
+      "line": 93,
+      "anchor": "private static Object invoke(",
+      "note": "当前按方法名选首个反射方法，并按参数类型推导 flags/userId；需签名审计。",
+      "sha256": "8efe986b222b5113cda01f1eb7b87b1039f4ff34d4432b92567ee4d19c125a74"
+    },
+    "C12": {
+      "id": "C12",
+      "path": "D:/github/controlled-android-sandbox/sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestContextComponentRouter.java",
+      "line": 148,
+      "anchor": "synchronized boolean bindService(",
+      "note": "当前新增宿主 ServiceConnection relay；与虚拟 Service 生命周期分流。",
+      "sha256": "c9308a794b7c972eef4e5d03afdc2d06095a773cc395836ca35183d54c8a6020"
+    },
+    "C13": {
+      "id": "C13",
+      "path": "D:/github/controlled-android-sandbox/sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestContentProviderFrameworkInterceptor.java",
+      "line": 111,
+      "anchor": "ProviderInfo hostProvider = HostPackageManagerBridge.resolveContentProvider(",
+      "note": "当前新增 exported system Provider 分流；未匹配 authority 仍统一抛异常。",
+      "sha256": "0a38e00ce16af637c48c359fd0c9d1a5b75ff50922dc01a88656e53a45cce81d"
+    },
+    "C14": {
+      "id": "C14",
+      "path": "D:/github/controlled-android-sandbox/sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/packagemanager/PackageManagerInvocationHandler.java",
+      "line": 39,
+      "anchor": "class PackageManagerInvocationHandler",
+      "note": "包可见性和查询返回投影，与实际启动/绑定需一致。",
+      "sha256": "2b315fbf4beac68a824c80fda0f1a56bcfddc4a8d291d881ad9ce7fa0affd206"
+    },
+    "C15": {
+      "id": "C15",
+      "path": "D:/github/controlled-android-sandbox/sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/FrameworkIdentityInvocationHandler.java",
+      "line": 17,
+      "anchor": "class FrameworkIdentityInvocationHandler",
+      "note": "系统调用身份重写与框架拦截入口。",
+      "sha256": "5218b92ba90802993a7e4954d5bcb1074beb97ae79fe52c0630400e5df8a2033"
+    },
+    "C16": {
+      "id": "C16",
+      "path": "D:/github/controlled-android-sandbox/sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/FrameworkHooks.java",
+      "line": 81,
+      "anchor": "class FrameworkHooks",
+      "note": "系统服务代理安装与恢复入口；不是以类数衡量兼容性。",
+      "sha256": "8d4c990a8aa97142b8411d15e9abb1f091eb0b9b8addf3bd534a3802464df120"
+    },
+    "C17": {
+      "id": "C17",
+      "path": "D:/github/controlled-android-sandbox/sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/WebViewProfileManager.java",
+      "line": 19,
+      "anchor": "static synchronized Profile install(",
+      "note": "WebView 首次初始化前设置进程级 dataDirectorySuffix。",
+      "sha256": "65c9b0597f1c0c833ffb206a1dbfc5858628c1e834dc6f4b69f539e02c9d149c"
+    },
+    "C18": {
+      "id": "C18",
+      "path": "D:/github/controlled-android-sandbox/sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestWebViewProviderServiceBridge.java",
+      "line": 22,
+      "anchor": "class GuestWebViewProviderServiceBridge",
+      "note": "WebView 提供包的系统 Service 路由。",
+      "sha256": "25144917fe10378a6172c5f78be391d39e3373f714b0398b225b79957dda7e75"
+    },
+    "C19": {
+      "id": "C19",
+      "path": "D:/github/controlled-android-sandbox/sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/GmsCompatibilityBoundary.java",
+      "line": 13,
+      "anchor": "public enum Status",
+      "note": "明确只给出 BASIC_BOUNDARY / DEFERRED_GMS_RUNTIME，不是完整 GMS。",
+      "sha256": "cfee97289b4d56bab6114faa83dac080c9bfe406defef64c1f6f0f0979cc1781"
+    },
+    "C20": {
+      "id": "C20",
+      "path": "D:/github/controlled-android-sandbox/sandbox-native/src/main/cpp/native_hook.cpp",
+      "line": 319,
+      "anchor": "bool NativeHookRuntime::refresh()",
+      "note": "按已加载 ELF 遍历与 PLT/GOT 重定位刷新；区分翻译 ABI。",
+      "sha256": "458284fb86de6bef42ed563812c93c4fd68e5c7d82f3326329ec55fb2f04dff6"
+    },
+    "C21": {
+      "id": "C21",
+      "path": "D:/github/controlled-android-sandbox/sandbox-native/src/main/cpp/native_interceptors.cpp",
+      "line": 1347,
+      "anchor": "extern \"C\" long controlled_syscall(",
+      "note": "libc syscall 入口也有代理；inline SVC 不受同一 PLT 改写约束。",
+      "sha256": "d2b3f6dbafb431f760c4a87a3123a22905d29dd988e7222b2a012c28dc391985"
+    },
+    "C22": {
+      "id": "C22",
+      "path": "D:/github/controlled-android-sandbox/sandbox-native/src/main/cpp/native_loader.cpp",
+      "line": 216,
+      "anchor": "DLEXT_RELRO_FLAGS_CONFLICT",
+      "note": "Native loader 对 DLEXT/RELRO 的有界支持，须验证目标实际加载路径。",
+      "sha256": "96549a44e6920a6fa95aceacca434cd1c40101c919cd5f6056a402d3b0fd39e3"
+    },
+    "C23": {
+      "id": "C23",
+      "path": "D:/github/controlled-android-sandbox/app/src/main/java/com/warden/controlledsandbox/NativeAbiRoutePlanner.java",
+      "line": 9,
+      "anchor": "static Route route(",
+      "note": "64 位主包、32 位 companion 分流；不提供 CPU 指令翻译。",
+      "sha256": "2c4cc9258e64588334f263c4314eb57b858fb4787cc52523121464f0bb9e6bd3"
+    },
+    "C24": {
+      "id": "C24",
+      "path": "D:/github/controlled-android-sandbox/sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/ProcessSlotContract.java",
+      "line": 5,
+      "anchor": "ORDINARY_SLOT_COUNT",
+      "note": "普通 64 槽 + isolated 16 槽。",
+      "sha256": "11e4cabbb3281c4f796ea85b72b318821ec56ada375883268954ad72a2a8262c"
+    },
+    "C25": {
+      "id": "C25",
+      "path": "D:/github/controlled-android-sandbox/sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeGuestConnectionPool.java",
+      "line": 23,
+      "anchor": "class RuntimeGuestConnectionPool",
+      "note": "Guest Binder 保持与进程 owner。",
+      "sha256": "b834459e0d573067044a31dee9e7796d8dd982ae74f69712caaa9cb6131a20b4"
+    },
+    "C26": {
+      "id": "C26",
+      "path": "D:/github/controlled-android-sandbox/sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/session/SessionRegistry.java",
+      "line": 14,
+      "anchor": "class SessionRegistry",
+      "note": "session/generation/回收状态的权威记录。",
+      "sha256": "19050b5c66945b51a56353145a76ff80003885a30dcdc49bbdc655e6ac5c8957"
+    },
+    "C27": {
+      "id": "C27",
+      "path": "D:/github/controlled-android-sandbox/sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/protocol/RuntimeIntentWireCodec.java",
+      "line": 21,
+      "anchor": "MAX_ROUTED_INTENT_PAYLOAD_BYTES",
+      "note": "当前已有有界大 Intent 路由传输；旧超大事务问题应先复现，不从零重做。",
+      "sha256": "6d069a37cda7eb25cd51e0127d6104c9a8149584f959e964f6c6c6510ff70482"
+    },
+    "C28": {
+      "id": "C28",
+      "path": "D:/github/controlled-android-sandbox/sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/protocol/RebindableServiceConnector.java",
+      "line": 18,
+      "anchor": "class RebindableServiceConnector",
+      "note": "连接 epoch、超时、晚到回调和回收。",
+      "sha256": "f5c648b4db12e334ec547d7b4ed94ae4edf17f0672871f1208ef46b9de0aa9ef"
+    },
+    "C29": {
+      "id": "C29",
+      "path": "D:/github/controlled-android-sandbox/sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestActivityThreadServiceBridge.java",
+      "line": 54,
+      "anchor": "class GuestActivityThreadServiceBridge",
+      "note": "普通 Service 使用 ActivityThread 消息与真实 token。",
+      "sha256": "6bd35c5d96ea981bfe51d975fa3836b2ce567903138cf88f90eedbd64d5abca3"
+    },
+    "C30": {
+      "id": "C30",
+      "path": "D:/github/controlled-android-sandbox/sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/routing/VirtualPendingIntentRegistry.java",
+      "line": 10,
+      "anchor": "class VirtualPendingIntentRegistry",
+      "note": "虚拟 PendingIntent 身份、代次和发送路由。",
+      "sha256": "be73bb439a4f798d6b5514d55b4f644d9f27677d21018e1d90323605f8ac00d1"
+    },
+    "C31": {
+      "id": "C31",
+      "path": "D:/github/controlled-android-sandbox/sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceAuthority.java",
+      "line": 20,
+      "anchor": "interface VirtualSystemServiceAuthority",
+      "note": "Account/Alarm/Job/通知命名空间等有界权威合同。",
+      "sha256": "c54eba5bb6b30495af2f9edf925b39b3b06f0de6ada34f2512b3823de1d56765"
+    },
+    "C32": {
+      "id": "C32",
+      "path": "D:/github/controlled-android-sandbox/sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/GuestRecoveryPrewarmCoordinator.java",
+      "line": 19,
+      "anchor": "class GuestRecoveryPrewarmCoordinator",
+      "note": "PREPARING 与预热失败恢复边界。",
+      "sha256": "9c04bf45c4e09bf442540e2996930f3da81a47f6a55989e2ffa2b1c70e09223c"
+    },
+    "C33": {
+      "id": "C33",
+      "path": "D:/github/controlled-android-sandbox/sandbox-companion32/src/main/java/com/warden/controlledsandbox/companion32/NativeCompanionService.java",
+      "line": 15,
+      "anchor": "class NativeCompanionService",
+      "note": "32 位伴生运行入口，只在设备 ABI 与本轮范围允许时验收。",
+      "sha256": "75b5438f8eb728d2d36e89397765caaa8bafffaeb08a72ac6051e8743e16f97f"
+    },
+    "T01": {
+      "id": "T01",
+      "path": "D:/github/controlled-android-sandbox/tools/verification/run_rd_smoke.py",
+      "line": 539,
+      "anchor": "def _parser()",
+      "note": "现存验证入口，支持 --only-case / --no-diagnostic-retry / --arm64-physical。",
+      "sha256": "1163c58b27b0423b3d41aa0ae3d5eb30518149bf54d5f044bb447a9ce9ba0478"
+    },
+    "T02": {
+      "id": "T02",
+      "path": "D:/github/controlled-android-sandbox/tools/verification/run_api33_capabilities.py",
+      "line": 920,
+      "anchor": "def _parser()",
+      "note": "跨 API 能力矩阵入口，须读取每 case 的 errors 与缺失 marker。",
+      "sha256": "7d2f30c26393188728a0fbeaf4f72caa71ed6512a041667a98f39932ef36d0f4"
+    },
+    "T03": {
+      "id": "T03",
+      "path": "D:/github/controlled-android-sandbox/tools/verification/test_harness.py",
+      "line": 8,
+      "anchor": "import",
+      "note": "现存 harness 自检入口；本轮没有运行设备测试。",
+      "sha256": "11e9c40883fd29395f6a1ab08f0143eb1c4da09ac19aa6a45947535a1e976a54"
+    },
+    "N01": {
+      "id": "N01",
+      "path": "D:/github/t57-reference-sources/NewBlackbox/Bcore/src/main/java/top/niunaijun/blackbox/app/BActivityThread.java",
+      "line": 358,
+      "anchor": "public synchronized void handleBindApplication(",
+      "note": "从虚拟 PMS 取 ApplicationInfo，创建 Context/LoadedApk、初始化 native/IO、构造 Application。",
+      "sha256": "d1ccd6da4e7118cd8a89e7703c34c9c5ea585aea1049de13df3b721415690afd"
+    },
+    "N02": {
+      "id": "N02",
+      "path": "D:/github/t57-reference-sources/NewBlackbox/Bcore/src/main/java/top/niunaijun/blackbox/core/system/pm/PackageManagerCompat.java",
+      "line": 346,
+      "anchor": "private static void fixJar(",
+      "note": "这里将 sharedLibraryFiles 设置为 Apache legacy 路径集合，不是完整 Trichrome 通用解法。",
+      "sha256": "e872f3d66d7d1a8a53cf9fc10e9ebcc67ee6d82d3bb7d624185e2a1ff8237aed"
+    },
+    "N03": {
+      "id": "N03",
+      "path": "D:/github/t57-reference-sources/NewBlackbox/Bcore/src/main/java/top/niunaijun/blackbox/fake/service/IActivityManagerProxy.java",
+      "line": 132,
+      "anchor": "public static class GetContentProvider",
+      "note": "系统 authority 分流、虚拟 provider 进程和 holder 替换；Service 有虚拟/宿主两条路径。",
+      "sha256": "9a81ec2218849d1fde52ad4851902cefe538d85b5dd10aa1b3a62b095e34f861"
+    },
+    "N04": {
+      "id": "N04",
+      "path": "D:/github/t57-reference-sources/NewBlackbox/Bcore/src/main/java/top/niunaijun/blackbox/fake/service/IPackageManagerProxy.java",
+      "line": 107,
+      "anchor": "public static class ResolveService",
+      "note": "虚拟 PMS 无结果时回真实 PMS；另有构造 Play 商店结果与权限默认值的分支，不能视为业务成功。",
+      "sha256": "f79c8616b35407e3082ff563d7a24e6f0a4dca2fa284f3a35f38317b5c8cc20f"
+    },
+    "N05": {
+      "id": "N05",
+      "path": "D:/github/t57-reference-sources/NewBlackbox/Bcore/src/main/java/top/niunaijun/blackbox/core/system/BProcessManagerService.java",
+      "line": 49,
+      "anchor": "public ProcessRecord startProcessLocked(",
+      "note": "按虚拟 uid/process 管理 ProcessRecord，初始化 client 并监听 Binder death。",
+      "sha256": "540e0eab9b248ee53e328ced80299211ef3a19769559373d786363f982d51f72"
+    },
+    "N06": {
+      "id": "N06",
+      "path": "D:/github/t57-reference-sources/NewBlackbox/Bcore/src/main/java/top/niunaijun/blackbox/core/system/am/ActivityStack.java",
+      "line": 48,
+      "anchor": "class ActivityStack",
+      "note": "ActivityRecord/系统任务和代理 Intent 路由。",
+      "sha256": "84ced0b483985f00d58fd0e829aaa8cf239f6f738c01129a206823626361aac9"
+    },
+    "N07": {
+      "id": "N07",
+      "path": "D:/github/t57-reference-sources/NewBlackbox/Bcore/src/main/java/top/niunaijun/blackbox/core/system/am/ActiveServices.java",
+      "line": 33,
+      "anchor": "class ActiveServices",
+      "note": "已启动和绑定 Service 记录与宿主代理服务。",
+      "sha256": "89cbc0d8a71efaeca6e7aac18acfb1f15ae6e2778079eed177b149d1fc6e9870"
+    },
+    "N08": {
+      "id": "N08",
+      "path": "D:/github/t57-reference-sources/NewBlackbox/Bcore/src/main/java/top/niunaijun/blackbox/core/IOCore.java",
+      "line": 107,
+      "anchor": "public void enableRedirect(",
+      "note": "在 Guest 启动前配置私有目录、外部目录和 proc 路径重定向。",
+      "sha256": "f88070c780613a08e15618f0f48ba950d3a153f31d22fa05afed3d099e7b5835"
+    },
+    "N09": {
+      "id": "N09",
+      "path": "D:/github/t57-reference-sources/NewBlackbox/Bcore/src/main/cpp/Hook/UnixFileSystemHook.cpp",
+      "line": 71,
+      "anchor": "void UnixFileSystemHook::init(",
+      "note": "JNI UnixFileSystem 方法替换；个别 Hook 失败继续，不构成全部 IO 通过证据。",
+      "sha256": "a2795b63adfdaa79e0a69e546b503424a90ed7298d2e0cc1455cd7aefbbba02c"
+    },
+    "N10": {
+      "id": "N10",
+      "path": "D:/github/t57-reference-sources/NewBlackbox/Bcore/src/main/java/top/niunaijun/blackbox/fake/hook/HookManager.java",
+      "line": 107,
+      "anchor": "public void init()",
+      "note": "注册系统服务和厂商代理，仅注册数量不能证明注入。",
+      "sha256": "438c02864f8aaa4afaf2eec8c7338ec4a2282dc3d4b92b7a02de189f9c236c0d"
+    },
+    "N11": {
+      "id": "N11",
+      "path": "D:/github/t57-reference-sources/NewBlackbox/Bcore/src/main/java/top/niunaijun/blackbox/fake/hook/ClassInvocationStub.java",
+      "line": 44,
+      "anchor": "public void injectHook()",
+      "note": "getWho() 返回 null 即提前退出，不创建 Proxy、不绑定方法。",
+      "sha256": "c91bc924603896b6ba6c3f09453c3782bafb23774e166642058d635b2ed42341"
+    },
+    "N12": {
+      "id": "N12",
+      "path": "D:/github/t57-reference-sources/NewBlackbox/Bcore/src/main/java/top/niunaijun/blackbox/fake/service/IXiaomiAttributionSourceProxy.java",
+      "line": 21,
+      "anchor": "protected Object getWho()",
+      "note": "该类 getWho() 返回 null；其命名和内部方法不等于实际 Hook 到小米对象。",
+      "sha256": "49fe1ce6a4295c2019aa2c56c6170c614acc3239f1bc8a3dbfa791543ae05139"
+    },
+    "N13": {
+      "id": "N13",
+      "path": "D:/github/t57-reference-sources/NewBlackbox/Bcore/src/main/java/top/niunaijun/blackbox/fake/service/IXiaomiMiuiServicesProxy.java",
+      "line": 21,
+      "anchor": "protected Object getWho()",
+      "note": "同样返回 null；不能据此宣称小米兼容已完成。",
+      "sha256": "3f786215cd0fb7fe01e6f693c4e1095211de7835369836e469b68cb3fee68fa8"
+    },
+    "N14": {
+      "id": "N14",
+      "path": "D:/github/t57-reference-sources/NewBlackbox/Bcore/src/main/java/top/niunaijun/blackbox/core/GmsCore.java",
+      "line": 12,
+      "anchor": "class GmsCore",
+      "note": "GMS/GSF/商店组件集合与安装管理参考，不证明账号或网络业务通过。",
+      "sha256": "1add3a883e2df1f78885254ffba58a990f330732cb864287fce5296f22b4856c"
+    },
+    "N15": {
+      "id": "N15",
+      "path": "D:/github/t57-reference-sources/NewBlackbox/Bcore/src/main/java/top/niunaijun/blackbox/fake/service/IJobServiceProxy.java",
+      "line": 20,
+      "anchor": "class IJobServiceProxy",
+      "note": "Job 系统边界参考。",
+      "sha256": "befa63bb064f1fcbc8d4244300d2e748ca519be3ba58beeddee82250dcdaf7e8"
+    },
+    "N16": {
+      "id": "N16",
+      "path": "D:/github/t57-reference-sources/NewBlackbox/Bcore/src/main/java/top/niunaijun/blackbox/fake/service/INotificationManagerProxy.java",
+      "line": 26,
+      "anchor": "class INotificationManagerProxy",
+      "note": "Notification 系统边界参考。",
+      "sha256": "a73dfc38a345d120d3daa3c5db9b1e13a4577ad7d05bf8dd331d8bed4f7f7523"
+    },
+    "N17": {
+      "id": "N17",
+      "path": "D:/github/t57-reference-sources/NewBlackbox/Bcore/src/main/java/top/niunaijun/blackbox/core/env/AppSystemEnv.java",
+      "line": 58,
+      "anchor": "public static boolean isOpenPackage(String packageName)",
+      "note": "显式外部包可见集合，包括若干 WebView 提供包。",
+      "sha256": "9d57fb14d9a22df0e30f7dce339379f6f04c3a2057f207a93b7569a8ef5ef2df"
+    },
+    "N18": {
+      "id": "N18",
+      "path": "D:/github/t57-reference-sources/NewBlackbox/Bcore/build.gradle",
+      "line": 23,
+      "anchor": "abiFilters 'arm64-v8a'",
+      "note": "当前 Gradle 构建 ABI 只有 ARM64/ARMv7；README 的 x86 与构建配置不能混为一谈。",
+      "sha256": "e9c4ba16ba5c146a5b011ae3dd75fdca58a47a25cf44580ec9183baddadf9931"
+    },
+    "N19": {
+      "id": "N19",
+      "path": "D:/github/t57-reference-sources/NewBlackbox/Bcore/src/main/cpp/Hook/FileSystemHook.cpp",
+      "line": 66,
+      "anchor": "void FileSystemHook::init()",
+      "note": "这里只解析 open/open64 原函数并打日志，没有安装 new_open/new_open64 的代码。",
+      "sha256": "77679cb03fe4fe7bc6cdc87fbc44f581159342e1b6c5c8aa2f3b89621c09d71d"
+    },
+    "N20": {
+      "id": "N20",
+      "path": "D:/github/t57-reference-sources/NewBlackbox/Bcore/src/main/cpp/Hook/RuntimeHook.cpp",
+      "line": 26,
+      "anchor": "void RuntimeHook::init(",
+      "note": "按 API 区分 nativeLoad JNI 签名；函数体记录日志后调用原加载函数。",
+      "sha256": "737f8f2e0c22744303f229f972f2a0f9d99d14067bda9ef76f2c1e8d63c98374"
+    },
+    "V01": {
+      "id": "V01",
+      "path": "D:/github/t57-reference-sources/VirtualApp/VirtualApp/lib/src/main/java/com/lody/virtual/client/VClientImpl.java",
+      "line": 316,
+      "anchor": "mInitialApplication = LoadedApk.makeApplication.call",
+      "note": "LoadedApk 创建 Application，安装 providers，再调用 Application.onCreate。",
+      "sha256": "6b2a412db45e8b7548267f12804218e800991ff3def64552d94e98bdfe1a73e4"
+    },
+    "V02": {
+      "id": "V02",
+      "path": "D:/github/t57-reference-sources/VirtualApp/VirtualApp/lib/src/main/java/com/lody/virtual/server/pm/parser/PackageParserEx.java",
+      "line": 212,
+      "anchor": "if (ps.dependSystem)",
+      "note": "dependSystem 分支从未 Hook 的宿主 PMS 投影 sharedLibraryFiles。",
+      "sha256": "af858d10e73f78ea61cab696c90d4b50af438e2eb690c40f7b26d0a08b101210"
+    },
+    "V03": {
+      "id": "V03",
+      "path": "D:/github/t57-reference-sources/VirtualApp/VirtualApp/lib/src/main/java/com/lody/virtual/client/hook/proxies/am/MethodProxies.java",
+      "line": 850,
+      "anchor": "static class BindService extends",
+      "note": "Service 按虚拟解析结果分流；provider holder/Binder 调用见同文件 GetContentProvider。",
+      "sha256": "fd4787f830fd99538abca89af82a69d33a2171738d9f68643765e767a616e1e6"
+    },
+    "V04": {
+      "id": "V04",
+      "path": "D:/github/t57-reference-sources/VirtualApp/VirtualApp/lib/src/main/java/com/lody/virtual/client/hook/proxies/pm/MethodProxies.java",
+      "line": 439,
+      "anchor": "return \"queryIntentServices\";",
+      "note": "虚拟结果与符合可见性条件的外部服务查询组合。",
+      "sha256": "3e7734022871481f6f2030b3cebbb0d0bf61710d4df605fda7dc5b588f7cc07c"
+    },
+    "V05": {
+      "id": "V05",
+      "path": "D:/github/t57-reference-sources/VirtualApp/VirtualApp/lib/src/main/java/com/lody/virtual/server/am/VActivityManagerService.java",
+      "line": 750,
+      "anchor": "ProcessRecord startProcessIfNeedLocked(",
+      "note": "进程记录、真实 client 连接、四大组件调度。",
+      "sha256": "0fcbf644ecb10e15cc82648330192a6943f97768bc0bb4084f42f7edb038fb77"
+    },
+    "V06": {
+      "id": "V06",
+      "path": "D:/github/t57-reference-sources/VirtualApp/VirtualApp/lib/src/main/java/com/lody/virtual/server/am/ActivityStack.java",
+      "line": 43,
+      "anchor": "class ActivityStack",
+      "note": "服务端 ActivityRecord、任务栈和代理启动。",
+      "sha256": "0b5bebca4b93d80f792dcea1da38fe72e9dbf811b9ba00957a0e8031c90db222"
+    },
+    "V07": {
+      "id": "V07",
+      "path": "D:/github/t57-reference-sources/VirtualApp/VirtualApp/lib/src/main/java/com/lody/virtual/client/NativeEngine.java",
+      "line": 26,
+      "anchor": "class NativeEngine",
+      "note": "Java/native 重定向与运行时初始化入口。",
+      "sha256": "be5f327bea822f7bb09714011b3975b7848b4b44ee1a94eaa0fe647c30ba6bb5"
+    },
+    "V08": {
+      "id": "V08",
+      "path": "D:/github/t57-reference-sources/VirtualApp/VirtualApp/lib/src/main/jni/Foundation/IOUniformer.cpp",
+      "line": 639,
+      "anchor": "void hook_dlopen(",
+      "note": "旧版 libc/内部 linker 符号 Hook；不是现代 Android 的原样实现模板。",
+      "sha256": "1d9dd1fe122b23f7302a481c6cfea435eb56950f213cb031decfb0ced26d354f"
+    },
+    "V09": {
+      "id": "V09",
+      "path": "D:/github/t57-reference-sources/VirtualApp/VirtualApp/lib/src/main/java/com/lody/virtual/client/core/InvocationStubManager.java",
+      "line": 71,
+      "anchor": "class InvocationStubManager",
+      "note": "旧版系统服务代理注册参考。",
+      "sha256": "a4c262a4f2cc7d2fe6a3e4efc123eaba456daf5caaf1b6a1f1852c001c9bcd9b"
+    },
+    "V10": {
+      "id": "V10",
+      "path": "D:/github/t57-reference-sources/VirtualApp/VirtualApp/lib/build.gradle",
+      "line": 4,
+      "anchor": "compileSdkVersion 26",
+      "note": "开源源码时代与默认构建 ABI：SDK26、ARMv7/x86，不能当作现代 VA PRO。",
+      "sha256": "b50ae110fb5eb18395a745689caf870a466cef5f8466893d1329c9e305ea0e1d"
+    },
+    "V11": {
+      "id": "V11",
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 7,
+      "anchor": "2017年12月份停止更新",
+      "note": "明确开源代码截止 2017；商业更新历史是公开声明。",
+      "sha256": "8ecb1e612d80ed60d49a01093aa43b849c1b76af9b816621b7cff05606747fcc"
+    },
+    "V12": {
+      "id": "V12",
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 261,
+      "anchor": "2026年7月17号",
+      "note": "用户指定外部目录的商业日志更新至 2026-08-04，条目 713。",
+      "sha256": "8ecb1e612d80ed60d49a01093aa43b849c1b76af9b816621b7cff05606747fcc"
+    },
+    "E01": {
+      "id": "E01",
+      "path": "D:/github/controlled-android-sandbox/reports/t57-r03/c6/REALAPP_COMPAT_01_CHROME_QUARK_REPORT.md",
+      "line": 253,
+      "anchor": "REAL_APP_COMPAT_01",
+      "note": "历史商业报告：导入修复、Chrome projection 失败、Quark 首帧后 smoke 失败。",
+      "sha256": "03e84274b53a8208bbcae4b562dd210da7ab9a070fa992b5069260e0e73b27f3"
+    },
+    "E02": {
+      "id": "E02",
+      "path": "D:/github/controlled-android-sandbox/out/verification/realapp-compat-02-realapps-final-20260907/chrome-launch/debug-command-result.json",
+      "line": 368,
+      "anchor": "\"status\": \"FAIL\"",
+      "note": "最新留存 Chrome 启动结果：NPE；没有精确栈不能定根因。",
+      "sha256": "9e3c1ca619b606228d96064c515030b07dbb9eb8dcc23bb5c1ae6dc83675ab09"
+    },
+    "E03": {
+      "id": "E03",
+      "path": "D:/github/controlled-android-sandbox/out/verification/realapp-compat-02-realapps-final-20260907/quark-launch/debug-command-result.json",
+      "line": 30,
+      "anchor": "\"firstFrameDrawn\": true",
+      "note": "最新留存 Quark 3013 ms 首帧；没有长于首帧的业务闭环证明。",
+      "sha256": "147ca735823729d0181e22e8c7656b029a522dec79facfcb8caf5991309e7b96"
+    },
+    "E04": {
+      "id": "E04",
+      "path": "D:/github/controlled-android-sandbox/out/verification/realapp-compat-02-s01s10-20260907/run.json",
+      "line": 3,
+      "anchor": "\"start_head\"",
+      "note": "10/10 核心用例；头信息仍为 51c53726，不能单靠目录名绑定 40f629d0。",
+      "sha256": "26f8473e8ba92b37f0f0fd52b5b32e4dae73e34d59f20884086b918ded20b2f8"
+    },
+    "E05": {
+      "id": "E05",
+      "path": "D:/github/controlled-android-sandbox/out/verification/realapp-compat-01-capability-final-20260907/capability-matrix.json",
+      "line": 2,
+      "anchor": "\"run_id\"",
+      "note": "12 项中 8 PASS/2 FAIL/1 limitation/1 out-of-scope；两个 FAIL 是必需 marker 缺失。",
+      "sha256": "586d4dd38963ce6a25fe6a71d23b6495efe3aca22c4999ebcab5106fd54f8c39"
+    },
+    "E06": {
+      "id": "E06",
+      "path": "D:/github/controlled-android-sandbox/reports/t57-r03/c6/C6_T02C_ARM64_PHYSICAL_DYNAMIC_VALIDATION_REPORT.md",
+      "line": 29,
+      "anchor": "MODEL=25019PNF3C",
+      "note": "已留存小米 Android16/API36、ARM64-only、4KB、HyperOS OS3.0.306 报告。",
+      "sha256": "ee31af17005ad1d1cb1e33915103ab55b591a52bb32851860ad9f60059f049c7"
+    },
+    "E07": {
+      "id": "E07",
+      "path": "D:/github/controlled-android-sandbox/reports/t57-r03/c6/C6_T01G_CROSS_API_CLOSURE_REPORT.md",
+      "line": 450,
+      "anchor": "C6-T01G-R02",
+      "note": "API32–36 历史 50/50；API37 最终图形环境 BLOCKED_ENV，不把早期结论当最终结论。",
+      "sha256": "1a878de0b2a5643cb1cb39b761bcb9b2686dd1912840978d6e62a62a14371c72"
+    },
+    "E08": {
+      "id": "E08",
+      "path": "D:/github/controlled-android-sandbox/docs/review/KNOWN_ISSUES.yaml",
+      "line": 1506,
+      "anchor": "issue_id: KI-R03-057",
+      "note": "大 Intent/进程 ownership/窗口与恢复历史问题，含已改代码但未完整收口项目。",
+      "sha256": "9b2b8cb87e0a2b759258241bbd672cac6a95b5802caaaa82d44aa0488e1d90a8"
+    },
+    "E09": {
+      "id": "E09",
+      "path": "D:/github/controlled-android-sandbox/docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md",
+      "line": 10,
+      "anchor": "下一任务：",
+      "note": "旧账本首页未跟随 REALAPP-COMPAT-02 更新；本计划要求迁移而不是静默覆盖历史。",
+      "sha256": "9bbf6deb5b5d73bcb40910122c702f07bbd89b427121850ed8b861b6f6410614"
+    },
+    "E10": {
+      "id": "E10",
+      "path": "D:/github/controlled-android-sandbox/docs/compat/T57_R03_ANDROID_OEM_MATRIX.yaml",
+      "line": 67,
+      "anchor": "environment_id: OEM_XIAOMI_HYPEROS",
+      "note": "仍写环境不可用，与新真机报告不同步。",
+      "sha256": "c14b4a656e5ccfc7d8b22bb4e13a98bc87d05a90da1a76a867cbdfafeae0e03a"
+    },
+    "E11": {
+      "id": "E11",
+      "path": "D:/github/controlled-android-sandbox/docs/capability/CAPABILITY_REGISTRY.yaml",
+      "line": 25,
+      "anchor": "baseline_commit:",
+      "note": "能力登记基线与 HEAD/新矩阵不同步，必须保留分环境状态。",
+      "sha256": "c0db80e5c6ab3f8238cf253ebbdb3550fffc130ed0f5b61cd63a58525496499a"
+    }
+  },
+  "va_pro_changelog": [
+    {
+      "number": 713,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 263
+    },
+    {
+      "number": 711,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 265
+    },
+    {
+      "number": 710,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 266
+    },
+    {
+      "number": 709,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 267
+    },
+    {
+      "number": 708,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 271
+    },
+    {
+      "number": 707,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 272
+    },
+    {
+      "number": 706,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 273
+    },
+    {
+      "number": 705,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 282
+    },
+    {
+      "number": 704,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 283
+    },
+    {
+      "number": 700,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 290
+    },
+    {
+      "number": 686,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 311
+    },
+    {
+      "number": 677,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 324
+    },
+    {
+      "number": 676,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 325
+    },
+    {
+      "number": 671,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 330
+    },
+    {
+      "number": 669,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 335
+    },
+    {
+      "number": 653,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 371
+    },
+    {
+      "number": 648,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 379
+    },
+    {
+      "number": 637,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 402
+    },
+    {
+      "number": 627,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 422
+    },
+    {
+      "number": 600,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 467
+    },
+    {
+      "number": 596,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 471
+    },
+    {
+      "number": 572,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 521
+    },
+    {
+      "number": 566,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 535
+    },
+    {
+      "number": 557,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 547
+    },
+    {
+      "number": 555,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 553
+    },
+    {
+      "number": 539,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 588
+    },
+    {
+      "number": 522,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 616
+    },
+    {
+      "number": 510,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 649
+    },
+    {
+      "number": 482,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 702
+    },
+    {
+      "number": 449,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 762
+    },
+    {
+      "number": 448,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 763
+    },
+    {
+      "number": 443,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 777
+    },
+    {
+      "number": 442,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 778
+    },
+    {
+      "number": 441,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 779
+    },
+    {
+      "number": 440,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 780
+    },
+    {
+      "number": 396,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 865
+    },
+    {
+      "number": 388,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 877
+    },
+    {
+      "number": 386,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 879
+    },
+    {
+      "number": 296,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 996
+    },
+    {
+      "number": 283,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 1009
+    },
+    {
+      "number": 200,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 1147
+    },
+    {
+      "number": 185,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 1162
+    },
+    {
+      "number": 182,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 1165
+    },
+    {
+      "number": 69,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 1278
+    },
+    {
+      "number": 59,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 1288
+    },
+    {
+      "number": 50,
+      "path": "D:/github/t57-reference-sources/VirtualApp/README.md",
+      "line": 1297
+    }
+  ],
+  "mandatory_effort_person_days": {
+    "1": [
+      13.5,
+      30.5
+    ],
+    "2": [
+      8.0,
+      23
+    ]
+  },
+  "long_tests_order": [
+    "P2-90",
+    "P2-91"
+  ]
+}
