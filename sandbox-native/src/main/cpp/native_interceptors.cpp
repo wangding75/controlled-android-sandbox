@@ -1316,10 +1316,16 @@ extern "C" void* controlled_dlopen(const char* name, int flags) {
         return refresh_loaded_handle(handle) ? handle : nullptr;
     } catch (const PathPolicyError& error) {
         NativeLibraryLoaderPolicy::record_denial(error.what());
+        __android_log_print(ANDROID_LOG_WARN, "CS_NATIVE_BIND",
+                "SO denied api=dlopen requested=%s reason=%s errno=%d",
+                name == nullptr ? "" : name, error.what(), error.error_number());
         errno = error.error_number();
         return nullptr;
     } catch (...) {
         NativeLibraryLoaderPolicy::record_denial("DLOPEN_UNEXPECTED_FAILURE");
+        __android_log_print(ANDROID_LOG_WARN, "CS_NATIVE_BIND",
+                "SO denied api=dlopen requested=%s reason=DLOPEN_UNEXPECTED_FAILURE",
+                name == nullptr ? "" : name);
         errno = EACCES;
         return nullptr;
     }
@@ -1358,10 +1364,16 @@ extern "C" void* controlled_android_dlopen_ext(const char* name, int flags,
         return refresh_loaded_handle(handle) ? handle : nullptr;
     } catch (const PathPolicyError& error) {
         NativeLibraryLoaderPolicy::record_denial(error.what());
+        __android_log_print(ANDROID_LOG_WARN, "CS_NATIVE_BIND",
+                "SO denied api=android_dlopen_ext requested=%s reason=%s errno=%d",
+                name == nullptr ? "" : name, error.what(), error.error_number());
         errno = error.error_number();
         return nullptr;
     } catch (...) {
         NativeLibraryLoaderPolicy::record_denial("ANDROID_DLOPEN_EXT_UNEXPECTED_FAILURE");
+        __android_log_print(ANDROID_LOG_WARN, "CS_NATIVE_BIND",
+                "SO denied api=android_dlopen_ext requested=%s reason=ANDROID_DLOPEN_EXT_UNEXPECTED_FAILURE",
+                name == nullptr ? "" : name);
         errno = EACCES;
         return nullptr;
     }

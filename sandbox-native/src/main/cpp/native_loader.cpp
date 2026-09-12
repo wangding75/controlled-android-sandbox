@@ -240,12 +240,13 @@ void NativeLibraryLoaderPolicy::reset_status() noexcept {
 }
 
 bool NativeLibraryLoaderPolicy::is_allowed_system_soname(std::string_view name) noexcept {
-    static constexpr std::array<std::string_view, 22> allowed{
+    static constexpr std::array<std::string_view, 23> allowed{
             "libandroid.so", "libaaudio.so", "libc.so", "libcamera2ndk.so", "libdl.so",
             "libEGL.so", "libGLESv2.so", "libGLESv3.so", "libjnigraphics.so", "liblog.so",
             "libm.so", "libmediandk.so", "libnativewindow.so", "libOpenMAXAL.so",
             "libOpenSLES.so", "libstdc++.so", "libsync.so", "libvulkan.so", "libz.so",
-            "libbinder_ndk.so", "libandroid_runtime.so", "libneuralnetworks.so"};
+            "libbinder_ndk.so", "libandroid_runtime.so", "libneuralnetworks.so",
+            "libhwui.so"};
     for (const auto value : allowed) if (value == name) return true;
     return false;
 }

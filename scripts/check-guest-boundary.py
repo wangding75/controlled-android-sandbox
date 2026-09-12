@@ -145,6 +145,32 @@ if not errors:
         if compiler.count("'" + class_name + "'") != 1:
             errors.append(f'static compiler must execute {class_name} exactly once')
 
+hidden_api_path = ROOT / 'sandbox-native/src/main/cpp/native_policy_jni.cpp'
+if not hidden_api_path.is_file():
+    errors.append('missing native hidden-API exemption table')
+else:
+    hidden_api = hidden_api_path.read_text(encoding='utf-8')
+    start = hidden_api.find('constexpr const char* prefixes[] = {')
+    end = hidden_api.find('};', start) if start >= 0 else -1
+    table = hidden_api[start:end] if start >= 0 and end > start else ''
+    # NBB disables hidden API with the "L" wildcard. CAS keeps a curated prefix
+    # list; Chromium/U4 still needs widget scrollbar and HWUI graphics functors
+    # or Guest WebView native hits a null function table / SIGSEGV.
+    for prefix in ('"Landroid/graphics/"', '"Landroid/widget/"'):
+        if prefix not in table:
+            errors.append('hidden-API exemptions omit ' + prefix
+                    + ' required by Guest WebView/HWUI')
+
+loader_path = ROOT / 'sandbox-native/src/main/cpp/native_loader.cpp'
+if not loader_path.is_file():
+    errors.append('missing native loader policy')
+else:
+    loader = loader_path.read_text(encoding='utf-8')
+    start = loader.find('bool NativeLibraryLoaderPolicy::is_allowed_system_soname')
+    table = loader[start:start + 1200] if start >= 0 else ''
+    if '"libhwui.so"' not in table:
+        errors.append('system dlopen allowlist omits libhwui.so required by WebView DrawFunctor')
+
 if errors:
     print('FAIL Guest boundary checks', file=sys.stderr)
     for error in errors:

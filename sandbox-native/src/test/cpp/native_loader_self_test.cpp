@@ -82,6 +82,13 @@ int main() {
     auto system = controlled_sandbox::NativeLibraryLoaderPolicy::resolve("libc.so");
     require(system.system_library && system.resolved_name == "libc.so", "system soname allowlist");
     controlled_sandbox::NativeLibraryLoaderPolicy::validate_library(system);
+    // Chromium/U4 DrawFunctor dlopen("libhwui.so") then dlsym WebViewFunctor_create.
+    // NBB does not soname-filter system renderer libs; CAS must admit this NDK-adjacent
+    // platform library or AwDrawFnImpl.getFunctorTable stays 0 and SIGSEGVs.
+    require(controlled_sandbox::NativeLibraryLoaderPolicy::is_allowed_system_soname("libhwui.so"),
+            "WebView draw functor system library");
+    auto hwui = controlled_sandbox::NativeLibraryLoaderPolicy::resolve("libhwui.so");
+    require(hwui.system_library && hwui.resolved_name == "libhwui.so", "libhwui soname allowlist");
     require(controlled_sandbox::NativeLibraryLoaderPolicy::is_allowed_system_path(
             "/apex/com.android.runtime/lib64/bionic/libc.so"), "system path allowlist");
 

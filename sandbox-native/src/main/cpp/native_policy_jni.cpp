@@ -267,6 +267,13 @@ bool install_hidden_api_bridge(JNIEnv* env) {
             "Landroid/telephony/",
             "Landroid/view/",
             "Landroid/webkit/",
+            // Chromium/U4 WebView uses hidden HWUI draw functors and
+            // ScrollBarDrawable.setVerticalThumbDrawable. NBB disables hidden
+            // API with the "L" wildcard; CAS stays curated. Omitting these
+            // prefixes left Guest WebView native with a null functor table
+            // and a denied widget method immediately before SIGSEGV.
+            "Landroid/graphics/",
+            "Landroid/widget/",
             // Android 12's IShortcutService exposes AndroidFuture directly in its Binder
             // contract. Keep this exemption class-exact; never open com/android/internal/.
             "Lcom/android/internal/infra/AndroidFuture;",
