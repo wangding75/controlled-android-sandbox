@@ -67,6 +67,15 @@ public final class GuestContextBoundarySelfTest {
             GuestContext context = new GuestContext(host, spec,
                     GuestContextBoundarySelfTest.class.getClassLoader(), resources,
                     resources.getAssets(), processPackageManager);
+            ApplicationInfo published = context.getApplicationInfo();
+            require("/data/app/com.example.guest/base.apk".equals(published.sourceDir),
+                    "ApplicationInfo.sourceDir is the logical APK path");
+            require("/data/app/com.example.guest/base.apk".equals(published.publicSourceDir),
+                    "ApplicationInfo.publicSourceDir is the logical APK path");
+            require(!published.sourceDir.contains(root.getName()),
+                    "ApplicationInfo.sourceDir must not leak the Host files path");
+            require("/data/app/com.example.guest/lib/x86_64".equals(published.nativeLibraryDir),
+                    "ApplicationInfo.nativeLibraryDir stays the logical library path");
 
             Context boundary = context.getBaseContext();
             require(boundary != context && boundary != host,

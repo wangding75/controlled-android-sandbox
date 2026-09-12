@@ -177,8 +177,8 @@ public final class GuestPackageMetadataMapper {
         if (applicationInfo == null) applicationInfo = new ApplicationInfo();
         applicationInfo.packageName = state.packageName();
         applicationInfo.name = state.applicationClass().isEmpty() ? null : state.applicationClass();
-        applicationInfo.sourceDir = projection.apkPath();
-        applicationInfo.publicSourceDir = projection.apkPath();
+        applicationInfo.sourceDir = "/data/app/" + state.packageName() + "/base.apk";
+        applicationInfo.publicSourceDir = applicationInfo.sourceDir;
         if (applicationInfo.nativeLibraryDir == null || applicationInfo.nativeLibraryDir.trim().isEmpty()) {
             applicationInfo.nativeLibraryDir = projection.nativeLibraryDir();
         }

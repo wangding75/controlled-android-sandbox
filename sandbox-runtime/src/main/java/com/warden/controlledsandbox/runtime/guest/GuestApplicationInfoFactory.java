@@ -37,14 +37,15 @@ public final class GuestApplicationInfoFactory {
         info.name = emptyToNull(spec.applicationClass);
         info.className = emptyToNull(spec.applicationClass);
         info.processName = spec.processName;
-        info.sourceDir = spec.apkPath;
-        info.publicSourceDir = spec.apkPath;
+        // Logical APK/library paths. NativePolicy maps /data/app/<pkg>/... onto the CAS
+        // revision. Publishing spec.apkPath (Host files/packages/.../base.apk) in
+        // ApplicationInfo is the same mixed-identity leak that made U4 classify a
+        // "multi open env" and SIGKILL when nativeLibraryDir was a Host path.
+        info.sourceDir = logicalApkPath(spec);
+        info.publicSourceDir = info.sourceDir;
         setOptionalField(info, "splitNames", spec.splitNames.toArray(new String[0]));
         info.splitSourceDirs = spec.splitPathArray();
         info.splitPublicSourceDirs = spec.splitPathArray();
-        // Logical Android library path. NBB OsStub + native IO make File.exists and
-        // System.load observe the CAS directory; publishing the Host-files alias or the
-        // nested packages/... path makes U4 classify a "multi open env" and SIGKILL.
         info.nativeLibraryDir = logicalNativeLibraryDir(spec);
         setOptionalField(info, "primaryCpuAbi", emptyToNull(spec.nativeAbi));
         setOptionalField(info, "secondaryCpuAbi", null);
@@ -68,6 +69,11 @@ public final class GuestApplicationInfoFactory {
 
     private static String logicalDataDir(GuestPackageSpec spec) {
         return "/data/user/" + spec.virtualUserId + "/" + spec.packageName;
+    }
+
+    private static String logicalApkPath(GuestPackageSpec spec) {
+        if (spec.apkPath == null || spec.apkPath.trim().isEmpty()) return "";
+        return "/data/app/" + spec.packageName + "/base.apk";
     }
 
     private static String logicalNativeLibraryDir(GuestPackageSpec spec) {

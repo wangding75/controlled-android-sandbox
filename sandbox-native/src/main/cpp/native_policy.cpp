@@ -104,6 +104,22 @@ bool path_has_prefix(std::string_view path, std::string_view prefix) {
             && path[prefix.size()] == '/');
 }
 
+// Kernel maps often spell the same inode as /data/data/<pkg>/... while CAS
+// policy roots are configured with /data/user/0/<pkg>/... Treat them as one
+// path so Guest ELF mappings reverse-map instead of becoming [anon:sandbox-runtime].
+std::string canonical_android_data_path(std::string_view path) {
+    constexpr std::string_view from = "/data/data/";
+    constexpr std::string_view to = "/data/user/0/";
+    if (path.size() >= from.size() && path.compare(0, from.size(), from) == 0) {
+        std::string out;
+        out.reserve(path.size() - from.size() + to.size());
+        out.append(to);
+        out.append(path.substr(from.size()));
+        return out;
+    }
+    return std::string(path);
+}
+
 std::string trim_root(std::string value, const char* label) {
     if (value.empty() || value.front() != '/') {
         throw std::invalid_argument(std::string(label) + " must be absolute");
@@ -253,6 +269,16 @@ bool is_data_app_library_root(std::string_view path, std::string_view package_na
 bool is_sensitive_proc_path(std::string_view path) {
     return path == "/proc/self/mem" || path == "/proc/self/pagemap"
             || path == "/proc/self/clear_refs" || path == "/proc/self/syscall";
+}
+
+bool is_public_kernel_proc_file(std::string_view path) {
+    // NBB's IOCore.proc() only remaps /proc/self/cmdline and /proc/<pid>/cmdline.
+    // Public, non-pid kernel nodes stay on the real filesystem. CAS previously
+    // fail-closed every remaining /proc path, so U4/Chromium open("/proc/cpuinfo")
+    // and "/proc/meminfo" got EACCES and engine init aborted. Keep pid-relative
+    // /proc/<pid> and /proc/self/* on the virtualized/denied path.
+    return path == "/proc/cpuinfo" || path == "/proc/meminfo" || path == "/proc/stat"
+            || path == "/proc/version" || path == "/proc/uptime" || path == "/proc/loadavg";
 }
 
 bool is_private_android_root(std::string_view path) {
@@ -600,7 +626,9 @@ NativePathDecision NativePolicyEngine::resolve_path(std::string_view guest_path)
     std::shared_lock lock(mutex_);
     if (!configured_) throw PathPolicyError(EACCES, "NATIVE_POLICY_NOT_CONFIGURED");
     if (is_sensitive_proc_path(normalized)) throw PathPolicyError(EACCES, "PROC_SELF_PATH_DENIED");
-    if (path_has_prefix(normalized, "/proc")) throw PathPolicyError(EACCES, "PROC_PATH_DENIED");
+    if (path_has_prefix(normalized, "/proc") && !is_public_kernel_proc_file(normalized)) {
+        throw PathPolicyError(EACCES, "PROC_PATH_DENIED");
+    }
 
     const std::string data_data = "/data/data/" + package_name_;
     const std::string data_user = "/data/user/" + std::to_string(virtual_user_id_) + "/" + package_name_;
@@ -735,26 +763,34 @@ std::string NativePolicyEngine::reverse_map_path(std::string_view host_path) con
     const std::string normalized = normalize_absolute(host_path);
     std::shared_lock lock(mutex_);
     if (!configured_) return normalized;
-    if (normalized == apk_path_) return "/data/app/" + package_name_ + "/base.apk";
-    if (!native_library_alias_target_root_.empty()
-            && path_has_prefix(normalized, native_library_alias_target_root_)) {
-        const std::string suffix = suffix_after(normalized, native_library_alias_target_root_);
-        return append_relative("/data/app/" + package_name_ + "/lib/" + abi_name_, suffix);
+    const std::string canonical = canonical_android_data_path(normalized);
+    const std::string canonical_apk = canonical_android_data_path(apk_path_);
+    if (canonical == canonical_apk) return "/data/app/" + package_name_ + "/base.apk";
+    if (!native_library_alias_target_root_.empty()) {
+        const std::string canonical_alias_target =
+                canonical_android_data_path(native_library_alias_target_root_);
+        if (path_has_prefix(canonical, canonical_alias_target)) {
+            const std::string suffix = suffix_after(canonical, canonical_alias_target);
+            return append_relative("/data/app/" + package_name_ + "/lib/" + abi_name_, suffix);
+        }
     }
-    if (!native_library_root_.empty() && path_has_prefix(normalized, native_library_root_)) {
-        const std::string suffix = suffix_after(normalized, native_library_root_);
-        return append_relative("/data/app/" + package_name_ + "/lib/" + abi_name_, suffix);
+    if (!native_library_root_.empty()) {
+        const std::string canonical_lib = canonical_android_data_path(native_library_root_);
+        if (path_has_prefix(canonical, canonical_lib)) {
+            const std::string suffix = suffix_after(canonical, canonical_lib);
+            return append_relative("/data/app/" + package_name_ + "/lib/" + abi_name_, suffix);
+        }
     }
-    const std::string data_target = instance_root_ + "/data";
-    if (path_has_prefix(normalized, data_target)) {
+    const std::string data_target = canonical_android_data_path(instance_root_ + "/data");
+    if (path_has_prefix(canonical, data_target)) {
         const std::string virtual_root = "/data/user/" + std::to_string(virtual_user_id_) + "/" + package_name_;
-        return append_relative(virtual_root, suffix_after(normalized, data_target));
+        return append_relative(virtual_root, suffix_after(canonical, data_target));
     }
-    const std::string external_target = instance_root_ + "/external";
-    if (path_has_prefix(normalized, external_target)) {
+    const std::string external_target = canonical_android_data_path(instance_root_ + "/external");
+    if (path_has_prefix(canonical, external_target)) {
         const std::string virtual_root = "/storage/emulated/" + std::to_string(virtual_user_id_)
                 + "/Android/data/" + package_name_;
-        return append_relative(virtual_root, suffix_after(normalized, external_target));
+        return append_relative(virtual_root, suffix_after(canonical, external_target));
     }
     return normalized;
 }

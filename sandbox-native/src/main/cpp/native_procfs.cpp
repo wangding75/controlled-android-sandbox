@@ -51,6 +51,27 @@ bool path_has_prefix(std::string_view path, std::string_view prefix) {
             && path[prefix.size()] == '/');
 }
 
+std::string canonical_android_data_path(std::string_view path) {
+    constexpr std::string_view from = "/data/data/";
+    constexpr std::string_view to = "/data/user/0/";
+    if (path.size() >= from.size() && path.compare(0, from.size(), from) == 0) {
+        std::string out;
+        out.reserve(path.size() - from.size() + to.size());
+        out.append(to);
+        out.append(path.substr(from.size()));
+        return out;
+    }
+    return std::string(path);
+}
+
+bool path_matches_root(std::string_view path, std::string_view root) {
+    if (root.empty()) return false;
+    if (path == root || path_has_prefix(path, root)) return true;
+    const std::string canonical_path = canonical_android_data_path(path);
+    const std::string canonical_root = canonical_android_data_path(root);
+    return canonical_path == canonical_root || path_has_prefix(canonical_path, canonical_root);
+}
+
 bool decimal(std::string_view value) {
     if (value.empty()) return false;
     for (const char character : value) {
@@ -194,13 +215,11 @@ std::string read_raw_file(std::string_view path) {
 
 std::string sanitize_map_path(std::string_view path, const NativePolicySnapshot& policy) {
     if (path.empty() || path.front() == '[') return std::string(path);
-    if (path == policy.apk_path || path_has_prefix(path, policy.instance_root)
-            || (!policy.native_library_root.empty()
-                && path_has_prefix(path, policy.native_library_root))
-            || (!policy.native_library_alias_root.empty()
-                && path_has_prefix(path, policy.native_library_alias_root))
-            || (!policy.native_library_alias_target_root.empty()
-                && path_has_prefix(path, policy.native_library_alias_target_root))) {
+    if (path_matches_root(path, policy.apk_path)
+            || path_matches_root(path, policy.instance_root)
+            || path_matches_root(path, policy.native_library_root)
+            || path_matches_root(path, policy.native_library_alias_root)
+            || path_matches_root(path, policy.native_library_alias_target_root)) {
         return global_policy().reverse_map_path(path);
     }
     for (const std::string_view root : {"/system", "/apex", "/vendor", "/product", "/odm"}) {

@@ -92,6 +92,48 @@ int main() {
             "task status alias");
     require(!NativeProcFileSystem::is_virtual_path("/proc/999999/maps"),
             "foreign proc pid denied");
+    // NBB IOCore.proc() only remaps cmdline. Public kernel proc files stay on the real
+    // node; CAS must not fail-close the files U4/Chromium opens at engine init.
+    for (const char* public_proc : {"/proc/cpuinfo", "/proc/meminfo", "/proc/stat",
+                                    "/proc/version", "/proc/uptime", "/proc/loadavg"}) {
+        const auto decision = policy.resolve_path(public_proc);
+        require(decision.path == public_proc, std::string(public_proc) + " stays the kernel path");
+        require(!decision.rewritten, std::string(public_proc) + " is not a virtual snapshot");
+    }
+    bool foreign_proc_denied = false;
+    try {
+        policy.resolve_path("/proc/1/maps");
+    } catch (const controlled_sandbox::PathPolicyError& error) {
+        foreign_proc_denied = std::string(error.what()).find("PROC_PATH_DENIED") != std::string::npos;
+    }
+    require(foreign_proc_denied, "other-pid proc paths stay denied");
+
+    policy.reset();
+    const std::string user0_instance =
+            "/data/user/0/com.host.app/files/instances/u0/com.example.guest";
+    const std::string user0_apk =
+            "/data/user/0/com.host.app/files/packages/com.example.guest/base.apk";
+    const std::string user0_lib =
+            "/data/user/0/com.host.app/files/packages/com.example.guest/lib/x86_64";
+    policy.configure("proc-session", 5, "com.example.guest", "com.example.guest:worker",
+            3, 103000, 20304, "x86_64", user0_instance, user0_apk, user0_lib,
+            true, {}, {}, {}, {});
+    const std::string alias_maps =
+            "1000-2000 r-xp 00000000 00:00 0 /data/data/com.host.app/files/packages/"
+            "com.example.guest/lib/x86_64/libwebviewuc.so\n"
+            "2000-3000 r--p 00000000 00:00 0 /data/data/com.host.app/files/packages/"
+            "com.example.guest/base.apk\n";
+    const std::string alias_sanitized =
+            NativeProcFileSystem::sanitize_maps(alias_maps, policy.snapshot());
+    require(alias_sanitized.find("/data/app/com.example.guest/lib/x86_64/libwebviewuc.so")
+                    != std::string::npos,
+            "data/data alias of native library is reverse-mapped");
+    require(alias_sanitized.find("/data/app/com.example.guest/base.apk") != std::string::npos,
+            "data/data alias of apk is reverse-mapped");
+    require(alias_sanitized.find("[anon:sandbox-runtime]") == std::string::npos,
+            "guest payload must not be anonymized via data/data alias");
+    require(alias_sanitized.find("com.host.app") == std::string::npos,
+            "host path stripped after data/data alias reverse-map");
 
     policy.reset();
     std::filesystem::remove_all(root);
