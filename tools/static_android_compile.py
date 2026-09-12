@@ -303,7 +303,7 @@ context_stub.write_text(context_stub.read_text(encoding='utf-8').replace(
 context_source = context_stub.read_text(encoding='utf-8')
 context_source = context_source.replace(
     'public boolean bindIsolatedService(Intent i,int f,String n,java.util.concurrent.Executor e,ServiceConnection c){return true;}',
-    'public boolean bindIsolatedService(Intent i,int f,String n,java.util.concurrent.Executor e,ServiceConnection c){return true;} public boolean bindServiceAsUser(Intent i,ServiceConnection c,int f,android.os.UserHandle u){return true;}')
+    'public boolean bindIsolatedService(Intent i,int f,String n,java.util.concurrent.Executor e,ServiceConnection c){return true;} public boolean bindServiceAsUser(Intent i,ServiceConnection c,int f,android.os.UserHandle u){return true;} public boolean bindServiceAsUser(Intent i,ServiceConnection c,int f,android.os.Handler h,android.os.UserHandle u){throw new RuntimeException("Not implemented. Must override in a concrete implementation.");}')
 context_source = context_source.replace(
     'TELEPHONY_SERVICE="phone"',
     'TELEPHONY_SERVICE="phone", TELEPHONY_SUBSCRIPTION_SERVICE="telephony_subscription", LAYOUT_INFLATER_SERVICE="layout_inflater"')

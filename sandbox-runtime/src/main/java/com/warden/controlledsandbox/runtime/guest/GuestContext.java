@@ -502,11 +502,21 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     }
     @Override public boolean bindServiceAsUser(Intent service, ServiceConnection connection,
             int flags, UserHandle user) {
-        // U4's API-24+ child-process helper unwraps every ContextWrapper and then invokes this
-        // exact API reflectively. NBB/VA send the same call back through their ordinary virtual
-        // bind-service path; keep the Guest virtual user/session authoritative instead of
-        // delegating the unwrapped boundary to the physical ActivityManager.
-        return componentRouter.bindService(service, connection, flags, null);
+        return bindServiceAsUser(service, connection, flags, null, user);
+    }
+    /**
+     * Chromium/U4 {@code BindService.bindServiceByReflection} looks up this hidden
+     * {@code Context} overload, unwraps every {@code ContextWrapper}, and invokes it on the
+     * terminal. NBB/VA never need the Context method because they hook
+     * {@code IActivityManager.bindService}; CAS's unwrap terminal is not {@code ContextImpl},
+     * so the same virtual bind path has to be exposed here. The Guest session remains the
+     * user/session authority.
+     */
+    public boolean bindServiceAsUser(Intent service, ServiceConnection connection,
+            int flags, Handler handler, UserHandle user) {
+        Executor executor = handler == null ? null : handler::post;
+        if (webViewProviderServices.bind(service, connection, flags, executor)) return true;
+        return componentRouter.bindService(service, connection, flags, executor);
     }
     @Override public void updateServiceGroup(ServiceConnection connection, int group,
             int importance) {

@@ -92,6 +92,34 @@ public final class GuestContextBoundarySelfTest {
                                 @Override public void onServiceDisconnected(
                                         android.content.ComponentName name) { }
                             }), "missing Service executor bind returns false rather than a routing exception");
+            android.content.ServiceConnection chromiumConnection = new android.content.ServiceConnection() {
+                @Override public void onServiceConnected(
+                        android.content.ComponentName name, android.os.IBinder binder) { }
+                @Override public void onServiceDisconnected(
+                        android.content.ComponentName name) { }
+            };
+            Context chromiumTerminal = context;
+            while (chromiumTerminal instanceof ContextWrapper) {
+                chromiumTerminal = ((ContextWrapper) chromiumTerminal).getBaseContext();
+            }
+            require(!(chromiumTerminal instanceof ContextWrapper),
+                    "U4 unwrap terminates at a non-wrapper Guest boundary");
+            java.lang.reflect.Method bindServiceAsUser = Context.class.getDeclaredMethod(
+                    "bindServiceAsUser",
+                    android.content.Intent.class,
+                    android.content.ServiceConnection.class,
+                    int.class,
+                    android.os.Handler.class,
+                    android.os.UserHandle.class);
+            Object accepted = bindServiceAsUser.invoke(
+                    chromiumTerminal,
+                    new android.content.Intent(),
+                    chromiumConnection,
+                    Context.BIND_AUTO_CREATE,
+                    new android.os.Handler(android.os.Looper.getMainLooper()),
+                    android.os.Process.myUserHandle());
+            require(Boolean.FALSE.equals(accepted),
+                    "U4 unwrap bindServiceAsUser(Handler) routes missing Service as false, not Context stub");
             boolean unboundServiceGroupRejected = false;
             try {
                 context.updateServiceGroup(new android.content.ServiceConnection() {

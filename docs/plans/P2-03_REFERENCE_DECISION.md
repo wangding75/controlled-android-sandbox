@@ -163,3 +163,14 @@ Service/Provider owner、权限、Host fallback 或 retry policy，不加入 Qua
 
 同意后仍开放的首错：U4 `real_proc_mode:-1`、`pid: 0/0`，`bindServiceAsUser` 走
 `Context` 默认 stub，`sNormalHandler` ImageLoader `memoryCacheSize` 非法。不在本次提交关闭。
+
+## 2026-09-12：Chromium `bindServiceAsUser(Handler)` 路由
+
+| 参考 | 已核对方法 | CAS 落地 |
+|---|---|---|
+| Chromium | `BindService.bindServiceByReflection` 用 `Context.getDeclaredMethod("bindServiceAsUser", Intent, ServiceConnection, int, Handler, UserHandle)`，解开每个 `ContextWrapper` 后 `invoke`。 | unwrap 终点必须实现该 hidden overload。 |
+| NBB | `IActivityManagerProxy.BindService` / `BindIsolatedService` 在 AMS Binder 上走 `BindServiceCommon`；Guest 用真实 `ContextImpl`，不必覆盖 Context 方法。 | 不改 AMS 合同；CAS unwrap 终点不是 `ContextImpl`，所以要在 Context 侧接到同一条虚拟 bind。 |
+| VA OSS | `MethodProxies.BindService` 命中虚拟 PMS 后进 `VActivityManager.bindService`。 | 同上。 |
+| CAS | `GuestContextUnwrapBoundary` 只覆盖了 4 参数 `bindServiceAsUser`。5 参数 Handler 版落到 `Context` stub「Not implemented」。 | `GuestContext` / unwrap 终点把 Handler 版接到 `componentRouter.bindService`；`GuestHostOperationDenyContext` 对未覆盖派生类 fail-closed。 |
+
+2026-09-12 设备 `192.168.0.102:36689`（同一 `25019PNF3C` / `xuanyuan`）定向回归：logcat 不再出现 `bindServiceAsUser` Context stub；`SandboxedPrivilegedProcessService0` `onBind` / `HOST_CONNECTED` 成立。`ImageLoader memoryCacheSize` FATAL 本轮未再出现。principal 仍被 `libc: kill: send 9 to pid -<principal>` SIGKILL，U4 仍报 `desire_proc_mode:1 real_proc_mode:-1`。该项已关；SIGKILL 下一档单独处理。
