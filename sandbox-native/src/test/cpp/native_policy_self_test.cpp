@@ -64,6 +64,29 @@ int main() {
     catch (const PathPolicyError& error) { other_apk = error.error_number() == EACCES; }
     require(other_apk, "cross package apk alias rejected");
 
+    NativePolicyEngine host_container;
+    host_container.configure("session-host-apk", 1, "com.example.guest", "com.example.guest:main",
+            0, 103000, 20300, "arm64-v8a",
+            "/data/user/0/com.warden.host/files/instances/u0/com.example.guest",
+            "/sandbox/packages/com.example.guest/base.apk",
+            "/sandbox/packages/com.example.guest/lib/arm64",
+            false, {}, {}, {}, {});
+    require(host_container.map_path(
+                    "/data/app/~~hash/com.warden.host-random/base.apk")
+                    == "/data/app/~~hash/com.warden.host-random/base.apk",
+            "host container apk pass through");
+    require(host_container.map_path(
+                    "/data/app/~~hash/com.warden.host-random/lib/arm64")
+                    == "/data/app/~~hash/com.warden.host-random/lib/arm64",
+            "host container native dir pass through");
+    bool other_host_apk = false;
+    try {
+        (void) host_container.map_path("/data/app/~~hash/com.other.app-random/base.apk");
+    } catch (const PathPolicyError& error) {
+        other_host_apk = error.error_number() == EACCES;
+    }
+    require(other_host_apk, "non-host container apk rejected");
+
     bool traversal = false;
     try { (void) policy.map_path("/data/data/com.example.guest/../../escape"); }
     catch (const PathPolicyError& error) { traversal = error.error_number() == EACCES; }

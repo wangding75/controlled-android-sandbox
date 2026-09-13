@@ -68,6 +68,9 @@ int main() {
             "status pid matches kernel getpid");
     require(status.find("Uid:\t103000\t103000\t103000\t103000") != std::string::npos,
             "virtual status uid");
+    const std::string stat = NativeProcFileSystem::render_stat(snapshot);
+    require(stat.rfind(std::to_string(getpid()) + " (", 0) == 0,
+            "stat pid matches kernel getpid");
 
     for (const std::string path : {"/proc/self/maps", "/proc/self/cmdline", "/proc/self/status",
                                    "/proc/self/mountinfo", "/proc/self/stat", "/proc/self/statm",

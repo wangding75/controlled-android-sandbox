@@ -1236,6 +1236,130 @@ public final class GuestRuntimeEnvironment {
                 privateDns, dns);
     }
 
+    /**
+     * Load libhwui into the Guest defining-loader namespace so Chromium/U4 can
+     * {@code dlsym(WebViewFunctor_create)}. The ClassLoader search path includes
+     * {@code /system/lib64} so libhwui's DT_NEEDED (libimage_io.so) resolves.
+     */
+    static void bindGuestSystemRendererNamespace(ClassLoader definingLoader) {
+        if (definingLoader == null) return;
+        boolean sixtyFour = false;
+        String[] abis = Build.SUPPORTED_ABIS;
+        if (abis != null) {
+            for (String abi : abis) {
+                if (abi != null && abi.contains("64")) {
+                    sixtyFour = true;
+                    break;
+                }
+            }
+        }
+        String path = sixtyFour ? "/system/lib64/libhwui.so" : "/system/lib/libhwui.so";
+        String error = nativeLoadInto(definingLoader, path);
+        android.util.Log.i("CS_NATIVE_BIND", "SYSTEM_RENDERER_NS path=" + path
+                + " loader=" + definingLoader.getClass().getName()
+                + " error=" + (error == null ? "ok" : error));
+    }
+
+    /**
+     * AOSP WebView publishes {@code AwDrawFnFunctionTable} from Java via
+     * {@code AwDrawFnImpl.setDrawFnFunctionTable}. UC exposes an obfuscated
+     * one-argument accessor instead. Install the table lazily at renderer
+     * startup, after the Guest class loader is ready and immediately before
+     * Chromium native init, so preparation cannot depend on renderer classes.
+     */
+    static void installGuestDrawFnFunctionTable(ClassLoader definingLoader) {
+        if (definingLoader == null) return;
+        try {
+            Class<?> aw = Class.forName("org.chromium.android_webview.gfx.AwDrawFnImpl",
+                    true, definingLoader);
+            try {
+                java.lang.reflect.Method set = aw.getDeclaredMethod(
+                        "setDrawFnFunctionTable", long.class);
+                set.setAccessible(true);
+                long table = guestDrawFnFunctionTable(definingLoader);
+                set.invoke(null, table);
+                android.util.Log.i("CS_NATIVE_BIND", "DRAW_FN_TABLE aosp table=" + table);
+                return;
+            } catch (NoSuchMethodException ignored) {
+                // UC exposes an obfuscated one-argument accessor instead of the AOSP setter.
+            }
+            for (java.lang.reflect.Method method : aw.getDeclaredMethods()) {
+                if (!java.lang.reflect.Modifier.isStatic(method.getModifiers())) continue;
+                Class<?>[] params = method.getParameterTypes();
+                if (params.length != 1 || params[0].isPrimitive()) continue;
+                if (!"a".equals(method.getName()) && !method.getName().toLowerCase(java.util.Locale.ROOT)
+                        .contains("drawfn")) continue;
+                Object accessor;
+                try {
+                    java.lang.reflect.Constructor<?> ctor = params[0].getDeclaredConstructor();
+                    ctor.setAccessible(true);
+                    accessor = ctor.newInstance();
+                } catch (ReflectiveOperationException ignored) {
+                    continue;
+                }
+                method.setAccessible(true);
+                method.invoke(null, accessor);
+                android.util.Log.i("CS_NATIVE_BIND", "DRAW_FN_TABLE accessor="
+                        + params[0].getName());
+                return;
+            }
+            android.util.Log.w("CS_NATIVE_BIND", "DRAW_FN_TABLE accessor unavailable");
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            android.util.Log.w("CS_NATIVE_BIND", "DRAW_FN_TABLE skipped", error);
+        }
+    }
+
+    private static long guestDrawFnFunctionTable(ClassLoader definingLoader) throws Exception {
+        Class<?> helper = Class.forName("org.chromium.base.helper.DrawFunctorHelper",
+                true, definingLoader);
+        java.lang.reflect.Method get = helper.getDeclaredMethod("getFunctionTable");
+        get.setAccessible(true);
+        Object value = get.invoke(null);
+        return value instanceof Long table ? table : 0L;
+    }
+
+    private static String nativeLoadInto(ClassLoader loader, String path) {
+        try {
+            java.lang.reflect.Method method = runtimeNativeLoad();
+            if (method == null) return "NATIVE_LOAD_SIGNATURE_UNAVAILABLE";
+            method.setAccessible(true);
+            Object target = java.lang.reflect.Modifier.isStatic(method.getModifiers())
+                    ? null : Runtime.getRuntime();
+            Object result;
+            Class<?>[] types = method.getParameterTypes();
+            if (types.length == 2) {
+                result = method.invoke(target, path, loader);
+            } else if (types.length == 3 && types[2] == Class.class) {
+                result = method.invoke(target, path, loader, null);
+            } else if (types.length == 3 && types[2] == String.class) {
+                result = method.invoke(target, path, loader, "");
+            } else {
+                return "NATIVE_LOAD_SIGNATURE_UNAVAILABLE";
+            }
+            return result instanceof String err ? err : null;
+        } catch (Throwable error) {
+            return error.getClass().getName() + ":" + String.valueOf(error.getMessage());
+        }
+    }
+
+    private static java.lang.reflect.Method runtimeNativeLoad() {
+        Class<?> runtime = Runtime.class;
+        Class<?>[][] signatures = {
+                {String.class, ClassLoader.class, Class.class},
+                {String.class, ClassLoader.class, String.class},
+                {String.class, ClassLoader.class}
+        };
+        for (Class<?>[] signature : signatures) {
+            try {
+                return runtime.getDeclaredMethod("nativeLoad", signature);
+            } catch (NoSuchMethodException ignored) {
+                // Try the next historically shipped Runtime.nativeLoad shape.
+            }
+        }
+        return null;
+    }
+
     private static void configureCamera1NativeProfile(File guestFilesRoot, GuestPackageSpec spec,
                                                        Context host,
                                                        VirtualCameraProfileSnapshot profile)

@@ -189,6 +189,13 @@ final class GuestContextComponentRouter {
             logServiceAbsence("bindService", intent);
             return false;
         }
+        if (target.className().contains("SandboxedPrivilegedProcessService")
+                || target.className().contains("SandboxedProcessService")) {
+            android.util.Log.i("CS_RENDERER_BIND", "resolved package=" + target.packageName()
+                    + " component=" + target.className() + " process=" + target.processName()
+                    + " hostOwned=" + target.hostOwned()
+                    + " isolatedFallback=" + isolatedServiceFallback);
+        }
         if (target.hostOwned()) {
             Executor callbackExecutor = executor == null ? context.getMainExecutor() : executor;
             ComponentName component = new ComponentName(target.packageName(), target.className());
@@ -234,6 +241,13 @@ final class GuestContextComponentRouter {
             }
             return accepted;
         }
+        android.util.Log.i("CS_PREPARE_COMPONENT_FALLBACK", "operation="
+                + request.getString(ComponentOperations.OPERATION, "")
+                + " component=" + target.className()
+                + " package=" + target.packageName()
+                + " process=" + target.processName()
+                + " session=" + spec.sessionId
+                + " generation=" + spec.generation);
         request.putString(ComponentOperations.OPERATION, ComponentOperations.BIND_SERVICE);
         request.putString(RuntimeKeys.CONNECTION_ID, connectionId);
         request.putInt(RuntimeKeys.SERVICE_BIND_FLAGS, flags);

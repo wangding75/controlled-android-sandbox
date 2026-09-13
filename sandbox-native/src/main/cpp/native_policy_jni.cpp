@@ -274,6 +274,10 @@ bool install_hidden_api_bridge(JNIEnv* env) {
             // and a denied widget method immediately before SIGSEGV.
             "Landroid/graphics/",
             "Landroid/widget/",
+            // Guest PathClassLoader is created through ClassLoaderFactory so the
+            // nativeloader namespace is shared and /system is permitted; otherwise
+            // libhwui is not accessible in clns-N and WebView DrawFunctor SIGSEGVs.
+            "Lcom/android/internal/os/ClassLoaderFactory;",
             // Android 12's IShortcutService exposes AndroidFuture directly in its Binder
             // contract. Keep this exemption class-exact; never open com/android/internal/.
             "Lcom/android/internal/infra/AndroidFuture;",

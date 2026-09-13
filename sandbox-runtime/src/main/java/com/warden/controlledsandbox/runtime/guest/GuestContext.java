@@ -313,6 +313,46 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         sharedState.mainThread.installFrameworkClassLoader(processLoader);
         GuestNativeBindingDiagnostic.recordLoader("process.install", processLoader);
     }
+
+    /**
+     * Renderer native bindings are first-use state, not Guest preparation state.  WebView's
+     * factory can run during ordinary application setup, while the DrawFn accessor only has to
+     * exist when Chromium's sandboxed renderer service is about to bind.  Keeping this trigger
+     * on the exact renderer component also makes parent and renderer processes converge on the
+     * same lazy initialization point.
+     */
+    void ensureRendererNativeBindings(String componentClass) {
+        if (!isChromiumRendererService(componentClass) || isTranslatedGuestAbi()) return;
+        synchronized (sharedState) {
+            if (sharedState.rendererNativeBindingsInstalled) return;
+            GuestRuntimeEnvironment.bindGuestSystemRendererNamespace(classLoader);
+            GuestRuntimeEnvironment.installGuestDrawFnFunctionTable(classLoader);
+            sharedState.rendererNativeBindingsInstalled = true;
+        }
+    }
+
+    private void ensureRendererNativeBindings(Intent service) {
+        if (service == null || service.getComponent() == null) return;
+        ensureRendererNativeBindings(service.getComponent().getClassName());
+    }
+
+    private static boolean isChromiumRendererService(String componentClass) {
+        if (componentClass == null || componentClass.trim().isEmpty()) return false;
+        return componentClass.contains("SandboxedPrivilegedProcessService")
+                || componentClass.contains("SandboxedProcessService");
+    }
+
+    private boolean isTranslatedGuestAbi() {
+        if (!spec.containsNativeCode) return false;
+        String guestAbi = spec.nativeAbi == null ? "" : spec.nativeAbi.trim();
+        if (guestAbi.isEmpty()) return false;
+        String[] supportedAbis = Build.SUPPORTED_ABIS;
+        if (supportedAbis == null) return true;
+        for (String supportedAbi : supportedAbis) {
+            if (guestAbi.equals(supportedAbi)) return false;
+        }
+        return true;
+    }
     @Override public Resources getResources() { return resources; }
     @Override public AssetManager getAssets() { return assets; }
     @Override public Resources.Theme getTheme() { return frameworkTheme; }
@@ -480,16 +520,21 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     }
     @Override public boolean stopService(Intent service) { return componentRouter.stopService(service); }
     @Override public boolean bindService(Intent service, ServiceConnection connection, int flags) {
+        ensureRendererNativeBindings(service);
+        logRendererBind("bindService", service);
         if (webViewProviderServices.bind(service, connection, flags, null)) return true;
         return componentRouter.bindService(service, connection, flags, null);
     }
     @Override public boolean bindService(Intent service, int flags, Executor executor,
             ServiceConnection connection) {
+        ensureRendererNativeBindings(service);
         if (webViewProviderServices.bind(service, connection, flags, executor)) return true;
         return componentRouter.bindService(service, connection, flags, executor);
     }
     @Override public boolean bindIsolatedService(Intent service, int flags, String instanceName,
             Executor executor, ServiceConnection connection) {
+        ensureRendererNativeBindings(service);
+        logRendererBind("bindIsolatedService", service);
         if (webViewProviderServices.bindIsolated(service, flags, instanceName, executor, connection)) {
             return true;
         }
@@ -514,9 +559,20 @@ public final class GuestContext extends GuestHostOperationDenyContext {
      */
     public boolean bindServiceAsUser(Intent service, ServiceConnection connection,
             int flags, Handler handler, UserHandle user) {
+        ensureRendererNativeBindings(service);
+        logRendererBind("bindServiceAsUser", service);
         Executor executor = handler == null ? null : handler::post;
         if (webViewProviderServices.bind(service, connection, flags, executor)) return true;
         return componentRouter.bindService(service, connection, flags, executor);
+    }
+
+    private static void logRendererBind(String api, Intent service) {
+        if (service == null || service.getComponent() == null
+                || !isChromiumRendererService(service.getComponent().getClassName())) return;
+        android.util.Log.i("CS_RENDERER_BIND", "api=" + api
+                + " component=" + service.getComponent().flattenToShortString()
+                + " package=" + service.getPackage()
+                + " flags=0x" + Integer.toHexString(service.getFlags()));
     }
     @Override public void updateServiceGroup(ServiceConnection connection, int group,
             int importance) {
@@ -1181,6 +1237,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         volatile Object hostPackageManagerService;
         volatile Application application;
         volatile GuestActivityThreadServiceBridge serviceFrameworkBridge;
+        volatile boolean rendererNativeBindingsInstalled;
         SharedState(GuestCapabilityGate capabilityGate, ClassLoader classLoader) {
             this.capabilityGate = capabilityGate;
             this.mainThread = new GuestMainThreadDispatcher(classLoader);

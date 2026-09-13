@@ -155,6 +155,7 @@ final class GuestProcessIdentityBridge implements AutoCloseable {
         } catch (Throwable ignored) {
             frameworkProcessName = "unavailable:" + ignored.getClass().getSimpleName();
         }
+        publishGuestPidIndex(spec.dataRoot, android.os.Process.myPid(), spec.processName);
         android.util.Log.i("CS_GUEST_PROCESS_IDENTITY", "installed package=" + spec.packageName
                 + " process=" + spec.processName + " frameworkProcess=" + frameworkProcessName
                 + " osProcess=" + readOsProcessName() + " argv0Published=" + osProcessNamePublished);
@@ -186,6 +187,37 @@ final class GuestProcessIdentityBridge implements AutoCloseable {
         } catch (Throwable error) {
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             android.util.Log.e("CS_GUEST_PROCESS_IDENTITY", "restore failed", error);
+        }
+    }
+
+    /**
+     * Sibling Guest slots (renderer/GPU) are Host processes named {@code :guestN}.
+     * ActivityManager still reports that stub name. Index pid→Guest process name so
+     * {@code getRunningAppProcesses} can project the Chromium-visible name instead of
+     * hiding the slot (NBB lists every process of the caller package).
+     */
+    static void publishGuestPidIndex(String dataRoot, int pid, String guestProcessName) {
+        if (dataRoot == null || dataRoot.isEmpty() || pid <= 0
+                || guestProcessName == null || guestProcessName.isEmpty()) return;
+        try {
+            java.io.File dir = new java.io.File(dataRoot, "data/files/guest-pid");
+            if (!dir.isDirectory() && !dir.mkdirs()) {
+                dir = new java.io.File(dataRoot, "files/guest-pid");
+            }
+            if (!dir.isDirectory() && !dir.mkdirs()) {
+                android.util.Log.w("CS_GUEST_PROCESS_IDENTITY",
+                        "pid index mkdir failed path=" + dir.getAbsolutePath());
+                return;
+            }
+            java.io.File file = new java.io.File(dir, Integer.toString(pid));
+            try (java.io.FileOutputStream output = new java.io.FileOutputStream(file)) {
+                output.write(guestProcessName.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            }
+            android.util.Log.i("CS_GUEST_PROCESS_IDENTITY",
+                    "pid index wrote pid=" + pid + " process=" + guestProcessName
+                            + " path=" + file.getAbsolutePath());
+        } catch (Exception ignored) {
+            android.util.Log.w("CS_GUEST_PROCESS_IDENTITY", "pid index write failed pid=" + pid);
         }
     }
 

@@ -1607,6 +1607,10 @@ public final class VirtualPackageMetadata {
         info.processName = component.processName().isEmpty() ? packageName : component.processName();
         info.exported = component.exported();
         info.enabled = visible(component, 0L);
+        // Keep the virtual ProcessRecord identity on ServiceInfo.processName only. NBB's
+        // generateServiceInfo() copies the package ApplicationInfo unchanged; projecting the
+        // renderer process into the nested ApplicationInfo makes U4 treat the service metadata
+        // as a different process record and prevents its launcher from advancing past pre-setup.
         info.applicationInfo = applicationInfo();
         // PackageParser attaches component <meta-data> to every ComponentInfo subtype,
         // not only ProviderInfo.  Keeping this projection here makes PackageManager queries

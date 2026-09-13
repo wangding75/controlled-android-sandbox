@@ -44,25 +44,21 @@ public final class PrivilegedServicesVirtualizationSelfTest {
     }
 
     private static void testGraphics(GuestIdentity identity) {
-        GraphicsApi api = proxy(GraphicsApi.class, new GraphicsDelegate(), identity, "graphicsstats");
+        GraphicsDelegate delegate = new GraphicsDelegate();
+        GraphicsApi api = proxy(GraphicsApi.class, delegate, identity, "graphicsstats");
         Bundle stats = api.getStats();
         require(stats.getLong("total_frames", -1L) == 100L,
                 "graphics counters projected");
         Object first = new Object();
         api.requestBufferForProcess(first);
-        boolean quota = false;
-        try {
-            api.requestBufferForProcess(new Object());
-        } catch (IllegalStateException expected) {
-            quota = expected.getMessage().contains("LIMIT");
-        }
-        require(quota, "graphics buffer quota enforced");
+        api.requestBufferForProcess(new Object());
+        require(delegate.requestCalls == 2,
+                "requestBufferForProcess passes through to Host graphicsstats");
         boolean saveMutationDenied = false;
         try { api.addToSaveBuffer(first); }
         catch (SecurityException expected) { saveMutationDenied = true; }
         require(saveMutationDenied, "add-to-save-buffer must not be misclassified as cleanup");
         api.saveBufferForProcess(first);
-        api.requestBufferForProcess(new Object());
     }
 
     private static void testContextHub(GuestIdentity identity) {
@@ -236,8 +232,9 @@ public final class PrivilegedServicesVirtualizationSelfTest {
         public Map<String, Long> queryStatsForPackage() { return Map.of("host", 1L); }
     }
     static final class GraphicsDelegate implements GraphicsApi {
+        int requestCalls;
         public Bundle getStats() { return new Bundle(); }
-        public void requestBufferForProcess(Object token) { throw new AssertionError("delegate"); }
+        public void requestBufferForProcess(Object token) { requestCalls++; }
         public void addToSaveBuffer(Object token) { throw new AssertionError("delegate"); }
         public void saveBufferForProcess(Object token) { throw new AssertionError("delegate"); }
     }

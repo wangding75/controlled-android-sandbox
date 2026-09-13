@@ -254,9 +254,29 @@ public final class FrameworkProxySelfTest {
         original.add(otherSlot);
         @SuppressWarnings("unchecked")
         List<Object> rewritten = (List<Object>) rewriter.rewriteOutbound(original);
-        check(rewritten.size() == 1, "other host slots must not appear as guest processes");
+        check(rewritten.size() == 1, "host-internal sandbox_* slots must not appear as guest processes");
         ProcessRecord projected = (ProcessRecord) rewritten.get(0);
         check(projected != current, "process records must be copied");
+        ProcessRecord otherGuest = new ProcessRecord();
+        otherGuest.pid = current.pid + 2;
+        otherGuest.uid = 10001;
+        otherGuest.processName = "host.example:guest38";
+        otherGuest.pkgList = new String[] {"host.example"};
+        original.add(otherGuest);
+        rewritten = (List<Object>) rewriter.rewriteOutbound(original);
+        check(rewritten.size() == 2, "sibling guest slots must stay visible");
+        boolean sawSibling = false;
+        for (Object item : rewritten) {
+            ProcessRecord record = (ProcessRecord) item;
+            if (record.pid == otherGuest.pid) {
+                sawSibling = true;
+                check(record.processName.equals("guest.example:guest38")
+                                || record.processName.contains("guest38"),
+                        "sibling guest slot must project off the host package: "
+                                + record.processName);
+            }
+        }
+        check(sawSibling, "sibling :guestN slot must not be dropped");
         check(projected.processName.equals("guest.example:main"),
                 "current slot must project to the guest process name: " + projected.processName);
         check(projected.pkgList[0].equals("guest.example"), "pkgList must project to guest");
@@ -267,6 +287,14 @@ public final class FrameworkProxySelfTest {
         rewriter.rewriteOutboundInPlace(filled);
         check(filled.processName.equals("guest.example:main"),
                 "out-param process name must be overwritten in place");
+        ProcessRecord emptyName = new ProcessRecord();
+        emptyName.pid = android.os.Process.myPid();
+        emptyName.uid = 10001;
+        rewriter.rewriteOutboundInPlace(emptyName);
+        check(emptyName.processName.equals("guest.example:main"),
+                "current-process out-param with empty name must get the guest process name");
+        check(emptyName.uid == 12001,
+                "current-process out-param with empty name must get the guest UID");
     }
 
     private static final class ProcessRecord {

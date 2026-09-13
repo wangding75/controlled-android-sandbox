@@ -65,7 +65,7 @@ public final class GuestClassLoader extends ClassLoader {
     GuestClassLoader(String dexPath, String optimizedDirectory, String librarySearchPath,
                      ClassLoader parent, String guestPackageName,
                      List<String> declaredGuestClasses) {
-        this(new PathClassLoader(dexPath == null ? "" : dexPath, librarySearchPath, parent),
+        this(newSharedPathClassLoader(dexPath, librarySearchPath, parent),
                 parent, guestPackageName, declaredGuestClasses, List.of());
     }
 
@@ -103,8 +103,127 @@ public final class GuestClassLoader extends ClassLoader {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             throw new IllegalStateException("FD_BACKED_GUEST_DEX_REQUIRES_API_29");
         }
-        return new InMemoryDexClassLoader(dexBuffers.toArray(new ByteBuffer[0]),
-                librarySearchPath == null ? "" : librarySearchPath, parent);
+        String lib = withSystemRendererSearchPath(librarySearchPath);
+        InMemoryDexClassLoader created = new InMemoryDexClassLoader(
+                dexBuffers.toArray(new ByteBuffer[0]), lib, parent);
+        shareLinkerNamespace(created, "", lib);
+        return created;
+    }
+
+    /**
+     * NBB/VA load guest dex on the process ClassLoader, so libhwui is already in that
+     * nativeloader namespace. A raw {@link PathClassLoader} gets an isolated namespace whose
+     * permitted paths are only {@code /data:/mnt/expand}; {@code /system/lib64/libhwui.so} is
+     * then inaccessible and Chromium/U4 DrawFunctor SIGSEGVs. ClassLoaderFactory is the
+     * platform constructor that creates a shared namespace with /system permitted.
+     */
+    private static ClassLoader newSharedPathClassLoader(String dexPath, String librarySearchPath,
+                                                        ClassLoader parent) {
+        String dex = dexPath == null ? "" : dexPath;
+        String lib = withSystemRendererSearchPath(librarySearchPath);
+        ClassLoader created = createSharedClassLoader(dex, lib, parent);
+        if (created != null) return created;
+        PathClassLoader fallback = new PathClassLoader(dex, lib, parent);
+        shareLinkerNamespace(fallback, dex, lib);
+        return fallback;
+    }
+
+    private static final String SYSTEM_RENDERER_PERMITTED_PATHS =
+            "/system:/system_ext:/apex:/vendor:/product:/odm:/data:/mnt/expand";
+
+    private static String withSystemRendererSearchPath(String librarySearchPath) {
+        boolean sixtyFour = false;
+        String[] abis = Build.SUPPORTED_ABIS;
+        if (abis != null) {
+            for (String abi : abis) {
+                if (abi != null && abi.contains("64")) {
+                    sixtyFour = true;
+                    break;
+                }
+            }
+        }
+        String suffix = sixtyFour ? "lib64" : "lib";
+        String extra = "/system/" + suffix
+                + ":/system_ext/" + suffix
+                + ":/vendor/" + suffix
+                + ":/product/" + suffix
+                + ":/apex/com.android.i18n/" + suffix
+                + ":/apex/com.android.runtime/" + suffix
+                + ":/apex/com.android.art/" + suffix
+                + ":/apex/com.android.media/" + suffix
+                + ":/apex/com.android.media.swcodec/" + suffix
+                + ":/apex/com.android.os.statsd/" + suffix;
+        String current = librarySearchPath == null ? "" : librarySearchPath;
+        if (current.isEmpty()) return extra;
+        if (current.contains("/system/" + suffix)) return current;
+        return current + ":" + extra;
+    }
+
+    private static ClassLoader createSharedClassLoader(String dexPath, String librarySearchPath,
+                                                       ClassLoader parent) {
+        try {
+            Class<?> factory = Class.forName("com.android.internal.os.ClassLoaderFactory");
+            int sdk = Build.VERSION.SDK_INT;
+            String loaderName = PathClassLoader.class.getName();
+            for (java.lang.reflect.Method method : factory.getDeclaredMethods()) {
+                if (!"createClassLoader".equals(method.getName())) continue;
+                Class<?>[] types = method.getParameterTypes();
+                if (types.length < 7 || types[0] != String.class || types[1] != String.class
+                        || types[2] != String.class || types[3] != ClassLoader.class
+                        || types[4] != int.class || types[5] != boolean.class
+                        || types[6] != String.class) {
+                    continue;
+                }
+                method.setAccessible(true);
+                Object[] args = new Object[types.length];
+                args[0] = dexPath;
+                args[1] = librarySearchPath;
+                args[2] = SYSTEM_RENDERER_PERMITTED_PATHS;
+                args[3] = parent;
+                args[4] = sdk;
+                args[5] = Boolean.TRUE;
+                args[6] = loaderName;
+                for (int i = 7; i < types.length; i++) {
+                    if (types[i] == List.class) {
+                        // nativeSharedLibraries is the String list after classLoaderName;
+                        // ClassLoader lists stay null.
+                        args[i] = (i == 8) ? List.of("libhwui.so") : null;
+                    } else if (types[i] == String.class) args[i] = "";
+                    else if (types[i] == boolean.class) args[i] = Boolean.FALSE;
+                    else args[i] = null;
+                }
+                Object created = method.invoke(null, args);
+                if (created instanceof ClassLoader loader) {
+                    android.util.Log.i("CS_NATIVE_BIND",
+                            "CLASSLOADER_NS shared=true permitted=" + SYSTEM_RENDERER_PERMITTED_PATHS
+                                    + " loader=" + loader.getClass().getName());
+                    return loader;
+                }
+            }
+        } catch (Throwable error) {
+            android.util.Log.w("CS_NATIVE_BIND", "CLASSLOADER_NS factory failed: "
+                    + error.getClass().getName() + ":" + error.getMessage());
+        }
+        return null;
+    }
+
+    private static void shareLinkerNamespace(ClassLoader loader, String dexPath,
+                                             String librarySearchPath) {
+        if (loader == null) return;
+        try {
+            Class<?> factory = Class.forName("com.android.internal.os.ClassLoaderFactory");
+            java.lang.reflect.Method method = factory.getDeclaredMethod(
+                    "createClassloaderNamespace", ClassLoader.class, int.class, String.class,
+                    String.class, boolean.class, String.class, String.class);
+            method.setAccessible(true);
+            Object error = method.invoke(null, loader, Build.VERSION.SDK_INT, librarySearchPath,
+                    SYSTEM_RENDERER_PERMITTED_PATHS, Boolean.TRUE, dexPath, "libhwui.so");
+            android.util.Log.i("CS_NATIVE_BIND", "CLASSLOADER_NS native shared=true error="
+                    + (error == null ? "ok" : error));
+        } catch (Throwable error) {
+            android.util.Log.w("CS_NATIVE_BIND", "CLASSLOADER_NS native failed: "
+                    + error.getClass().getName() + ":" + error.getMessage());
+        }
     }
 
     private static List<ByteBuffer> requireBuffers(List<ByteBuffer> values) {

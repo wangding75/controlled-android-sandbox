@@ -337,6 +337,7 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
         }
         Intent guestIntent = decodeGuestIntent(hostIntent);
         ClassLoader definingLoader = GuestDefiningLoader.of(session);
+        session.context.ensureRendererNativeBindings(guestClass);
         GuestDefiningLoader.loadComponent(session, guestClass);
         Service service = GuestComponentFactory.instantiateService(definingLoader,
                 GuestApplicationInfoFactory.readComponentFactory(
@@ -718,6 +719,22 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
                 + " projectedType=" + optionalIntField(info, "foregroundServiceType"));
         setOptional(info, "directBootAware", component.directBootAware());
         info.applicationInfo = new ApplicationInfo(session.context.getApplicationInfo());
+        // The Guest Context is process-scoped, so its ApplicationInfo.processName is the
+        // virtual renderer identity. ServiceInfo carries that identity separately; the nested
+        // ApplicationInfo must retain the package-level process from the immutable package
+        // record, matching NBB's generateServiceInfo() projection. Otherwise U4 classifies the
+        // service as a different ProcessRecord and stops at pre-setup (pid 0/0).
+        ApplicationInfo packageApplication = session.spec.packageState.applicationInfo();
+        if (packageApplication != null && packageApplication.processName != null
+                && !packageApplication.processName.trim().isEmpty()) {
+            info.applicationInfo.processName = packageApplication.processName;
+        }
+        android.util.Log.i("CS_RENDERER_BIND", "projected package=" + info.packageName
+                + " component=" + info.name + " process=" + info.processName
+                + " appProcess=" + (info.applicationInfo == null
+                        ? "null" : info.applicationInfo.processName)
+                + " uid=" + (info.applicationInfo == null ? -1 : info.applicationInfo.uid)
+                + " flags=0x" + Integer.toHexString(info.flags));
         return info;
     }
 

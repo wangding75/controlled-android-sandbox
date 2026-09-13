@@ -718,9 +718,12 @@ std::string NativeProcFileSystem::render_cmdline(const NativePolicySnapshot& pol
 std::string NativeProcFileSystem::render_status(const NativePolicySnapshot& policy) {
     const std::string raw = read_raw_file("/proc/self/status");
     const NativeSeccompSnapshot seccomp = NativeSeccompPolicy::snapshot();
-    const int kernel_pid = policy.principal_host_pid > 0
-            ? policy.principal_host_pid
-            : static_cast<int>(NativeProcessIdentity::host_pid());
+    // principal_host_pid belongs to the process that first configured the policy. Guest
+    // renderer/GPU services are separate host processes, so using it here makes their
+    // materialized /proc/self/status claim the browser PID. U4 matches the service back to
+    // ActivityManager by this PID; expose the current kernel PID, which is also what getpid()
+    // returns, while keeping the process name and parent virtualized below.
+    const int kernel_pid = static_cast<int>(NativeProcessIdentity::host_pid());
     std::ostringstream out;
     out << "Name:\t" << NativeProcessIdentity::sanitize_process_name(policy.process_name) << "\n";
     out << "Umask:\t0077\nState:\tS (sleeping)\n";
@@ -738,9 +741,9 @@ std::string NativeProcFileSystem::render_status(const NativePolicySnapshot& poli
 
 std::string NativeProcFileSystem::render_stat(const NativePolicySnapshot& policy) {
     const std::string name = NativeProcessIdentity::sanitize_process_name(policy.process_name);
-    const int kernel_pid = policy.principal_host_pid > 0
-            ? policy.principal_host_pid
-            : static_cast<int>(NativeProcessIdentity::host_pid());
+    // Keep /proc/self/stat consistent with status and controlled_getpid() for every Guest
+    // process. The principal PID is only a lifetime/security owner, never this process's PID.
+    const int kernel_pid = static_cast<int>(NativeProcessIdentity::host_pid());
     return std::to_string(kernel_pid) + " (" + name + ") S "
             + std::to_string(NativeProcessIdentity::guest_ppid())
             + " 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n";

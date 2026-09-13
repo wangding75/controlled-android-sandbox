@@ -36,6 +36,10 @@ public abstract class BaseGuestProcessService extends Service {
                     + " package=" + request.packageName()
                     + " session=" + request.sessionId()
                     + " generation=" + request.generation()
+                    + " component=" + request.payload().getString(
+                            com.warden.controlledsandbox.runtime.protocol.RuntimeKeys.COMPONENT_CLASS, "")
+                    + " op=" + request.payload().getString(
+                            com.warden.controlledsandbox.runtime.protocol.ComponentOperations.OPERATION, "")
                     + " pid=" + Process.myPid());
             try {
                 Bundle result = switch (request.operation()) {

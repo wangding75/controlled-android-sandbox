@@ -156,7 +156,8 @@ else:
     # NBB disables hidden API with the "L" wildcard. CAS keeps a curated prefix
     # list; Chromium/U4 still needs widget scrollbar and HWUI graphics functors
     # or Guest WebView native hits a null function table / SIGSEGV.
-    for prefix in ('"Landroid/graphics/"', '"Landroid/widget/"'):
+    for prefix in ('"Landroid/graphics/"', '"Landroid/widget/"',
+                   '"Lcom/android/internal/os/ClassLoaderFactory;"'):
         if prefix not in table:
             errors.append('hidden-API exemptions omit ' + prefix
                     + ' required by Guest WebView/HWUI')

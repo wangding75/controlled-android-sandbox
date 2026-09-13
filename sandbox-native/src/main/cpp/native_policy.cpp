@@ -281,6 +281,21 @@ bool is_public_kernel_proc_file(std::string_view path) {
             || path == "/proc/version" || path == "/proc/uptime" || path == "/proc/loadavg";
 }
 
+std::string host_package_from_instance_root(std::string_view instance_root) {
+    constexpr std::string_view marker = "/files/instances/";
+    const std::size_t pos = instance_root.find(marker);
+    if (pos == std::string_view::npos || pos == 0) return {};
+    const std::size_t slash = instance_root.rfind('/', pos - 1);
+    if (slash == std::string_view::npos || slash + 1 >= pos) return {};
+    return std::string(instance_root.substr(slash + 1, pos - slash - 1));
+}
+
+bool is_host_container_apk_path(std::string_view path, std::string_view instance_root) {
+    const std::string host = host_package_from_instance_root(instance_root);
+    if (host.empty() || !path_has_prefix(path, "/data/app")) return false;
+    return data_app_path_belongs_to_package(path, host, path.size());
+}
+
 bool is_private_android_root(std::string_view path) {
     if (path_has_prefix(path, "/data/data") || path_has_prefix(path, "/data/user")
             || path_has_prefix(path, "/data/user_de")) return true;
@@ -744,6 +759,12 @@ NativePathDecision NativePolicyEngine::resolve_path(std::string_view guest_path)
     }
 
     if (path_has_prefix(normalized, "/data/app")) {
+        // Vulkan/HWUI scan the process APK for layers. That path is the Host
+        // container APK (NBB/VA leave it on the real filesystem). Guest aliases
+        // are rewritten above; other packages stay fail-closed.
+        if (is_host_container_apk_path(normalized, instance_root_)) {
+            return NativePathDecision{normalized, {}, revision_, false};
+        }
         if (data_root_fd_ >= 0) return NativePathDecision{normalized, {}, revision_, false};
         throw PathPolicyError(EACCES, "CROSS_PACKAGE_APK_PATH_DENIED");
     }

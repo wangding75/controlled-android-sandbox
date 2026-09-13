@@ -144,18 +144,13 @@ final class PrivilegedServicesInvocationInterceptor {
         }
         if (blocked(profile.mode())) return Decision.handled(emptyValue(method.getReturnType()));
         if (containsAny(name, "requestbuffer")) {
-            if (!profile.allowBufferRequests()) {
-                throw new SecurityException("VIRTUAL_GRAPHICS_BUFFER_REQUEST_DENIED");
-            }
-            Object token = firstIdentity(arguments);
-            if (token == null) token = new SyntheticToken(++syntheticSequence);
-            addBounded(graphicsBuffers, token, profile.maximumBuffers(),
-                    "VIRTUAL_GRAPHICS_BUFFER_LIMIT_EXCEEDED");
-            if (method.getReturnType() == void.class || method.getReturnType() == Void.class) {
-                return Decision.handled(null);
-            }
-            graphicsBuffers.remove(token);
-            return Decision.handled(null);
+            // NBB IGraphicsStatsProxy.RequestBufferForProcess and VA GraphicsStatsStub both
+            // replace the guest package with the host package and invoke the real service.
+            // Identity rewrite on the pass-through path does that substitution. A synthetic
+            // null PFD is not a gfx-stats ashmem buffer; HWUI then logs
+            // "Could not acquire gfx stats buffer" and Chromium/U4 DrawFunctor create_functor
+            // SIGSEGVs on a null compositor (AwDrawFnImpl.getFunctorTable stays 0).
+            return Decision.passThrough();
         }
         if (containsAny(name, "getstats", "querystats", "fetchstats")) {
             if (!profile.exposeStats()) return Decision.handled(emptyValue(method.getReturnType()));

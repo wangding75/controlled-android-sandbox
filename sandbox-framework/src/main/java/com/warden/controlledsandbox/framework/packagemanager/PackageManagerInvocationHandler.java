@@ -820,6 +820,10 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
                 || (!renderer && !providerService)) {
             return NoResult.VALUE;
         }
+        if (renderer) {
+            android.util.Log.i("CS_PM_RENDERER", "getServiceInfo component="
+                    + component.flattenToShortString() + " provider=" + profile.providerPackage());
+        }
         try {
             Object raw = method.invoke(delegate, args);
             if (!(raw instanceof ServiceInfo service)) {
@@ -838,6 +842,15 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
             projected.applicationInfo = service.applicationInfo;
             projected.permission = service.permission;
             projected.flags = service.flags;
+            if (renderer) {
+                android.util.Log.i("CS_PM_RENDERER", "getServiceInfo result component="
+                        + component.flattenToShortString() + " package=" + projected.packageName
+                        + " process=" + projected.processName + " appProcess="
+                        + (projected.applicationInfo == null ? "null"
+                        : projected.applicationInfo.processName) + " uid="
+                        + (projected.applicationInfo == null ? -1 : projected.applicationInfo.uid)
+                        + " flags=0x" + Integer.toHexString(projected.flags));
+            }
             return projected;
         } catch (InvocationTargetException error) {
             throw error.getCause();
@@ -961,7 +974,20 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
      */
     private Object serviceComponent(Method method, Object[] args) throws Throwable {
         Object virtual = component(args, VirtualPackageMetadata.Type.SERVICE);
-        if (virtual != null) return virtual;
+        if (virtual != null) {
+            ComponentName component = firstComponent(args);
+            if (component != null && component.getClassName().contains("SandboxedPrivilegedProcessService")
+                    && virtual instanceof ServiceInfo service) {
+                android.util.Log.i("CS_PM_RENDERER", "virtual getServiceInfo component="
+                        + component.flattenToShortString() + " package=" + service.packageName
+                        + " process=" + service.processName + " appProcess="
+                        + (service.applicationInfo == null ? "null"
+                        : service.applicationInfo.processName) + " uid="
+                        + (service.applicationInfo == null ? -1 : service.applicationInfo.uid)
+                        + " flags=0x" + Integer.toHexString(service.flags));
+            }
+            return virtual;
+        }
         ComponentName component = firstComponent(args);
         Object raw = invokeDelegate(method, args);
         return raw instanceof ServiceInfo service

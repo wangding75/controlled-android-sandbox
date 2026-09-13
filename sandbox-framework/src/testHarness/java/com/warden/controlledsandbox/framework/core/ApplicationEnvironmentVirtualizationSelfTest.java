@@ -38,6 +38,7 @@ public final class ApplicationEnvironmentVirtualizationSelfTest {
         UserApi user = proxy(UserApi.class, identity, "userManager");
         require(user.getUserHandle() == 3, "virtual user handle");
         require(user.isUserUnlocked(), "virtual user unlocked");
+        require(user.isUserUnlockingOrUnlocked(), "virtual user unlocking or unlocked");
         require(user.getUserRestrictions().getBoolean("no_install_unknown_sources", false), "user restriction");
 
         RestrictionsApi restrictions = proxy(RestrictionsApi.class, identity, "restrictions");
@@ -157,11 +158,13 @@ public final class ApplicationEnvironmentVirtualizationSelfTest {
     }
 
     interface UserApi {
-        int getUserHandle(); boolean isUserUnlocked(); Bundle getUserRestrictions();
+        int getUserHandle(); boolean isUserUnlocked(); boolean isUserUnlockingOrUnlocked();
+        Bundle getUserRestrictions();
     }
     static final class HostUserDelegate implements UserApi {
         public int getUserHandle() { return 77; }
         public boolean isUserUnlocked() { return false; }
+        public boolean isUserUnlockingOrUnlocked() { return false; }
         public Bundle getUserRestrictions() { return new Bundle(); }
     }
     interface RestrictionsApi {

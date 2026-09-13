@@ -109,7 +109,9 @@ final class ApplicationEnvironmentInvocationInterceptor {
                                             profile)));
         }
         if (containsAny(name, "isuserrunning")) return Decision.handled(profile.running());
-        if (containsAny(name, "isuserunlocked", "isunlocked")) return Decision.handled(profile.unlocked());
+        if (containsAny(name, "isuserunlockingorunlocked", "isuserunlocked", "isunlocked")) {
+            return Decision.handled(profile.unlocked());
+        }
         if (containsAny(name, "isquietmodeenabled")) return Decision.handled(profile.quietMode());
         if (containsAny(name, "hasuserrestriction")) {
             return Decision.handled(profile.hasRestriction(firstRelevantString(arguments)));
