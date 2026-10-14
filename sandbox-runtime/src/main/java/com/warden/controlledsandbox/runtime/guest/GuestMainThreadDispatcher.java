@@ -45,6 +45,8 @@ final class GuestMainThreadDispatcher implements AutoCloseable {
     // WebView/U4 and native-bridge loader checks reject an otherwise valid Guest process.
     private volatile ClassLoader guestClassLoader;
     private volatile boolean closed;
+    private volatile Thread debugWatchdog;
+    private volatile boolean debugMessageLoggingInstalled;
 
     GuestMainThreadDispatcher(ClassLoader guestClassLoader) {
         this.guestClassLoader = Objects.requireNonNull(guestClassLoader, "guestClassLoader");
@@ -59,6 +61,100 @@ final class GuestMainThreadDispatcher implements AutoCloseable {
     void installFrameworkClassLoader(ClassLoader frameworkClassLoader) {
         this.guestClassLoader = Objects.requireNonNull(frameworkClassLoader,
                 "frameworkClassLoader");
+    }
+
+    /** Temporary diagnostic hook; it never runs work on or changes the Guest main queue. */
+    void startDebugWatchdog(String label) {
+        if (debugWatchdog != null) return;
+        final String safeLabel = label == null ? "" : label;
+        installDebugMessageLogging();
+        android.util.Log.i("CS_MAIN_WATCHDOG", "WATCHDOG_START pid="
+                + android.os.Process.myPid() + " callerTid="
+                + Thread.currentThread().getId() + " label=" + safeLabel);
+        Thread watcher = new Thread(() -> {
+            final long watcherTid = Thread.currentThread().getId();
+            try {
+                Thread main = Looper.getMainLooper().getThread();
+                android.util.Log.i("CS_MAIN_WATCHDOG", "WATCHDOG_THREAD_START pid="
+                        + android.os.Process.myPid() + " watcherTid=" + watcherTid
+                        + " mainTid=" + main.getId() + " label=" + safeLabel);
+                boolean failureLogged = false;
+                while (!closed) {
+                    try {
+                        Thread.State state = main.getState();
+                        StackTraceElement[] stack = main.getStackTrace();
+                        StringBuilder summary = new StringBuilder();
+                        // Keep enough frames to identify a Guest/Quark wait site.  The previous
+                        // eight-frame cap stopped at ExecutorCompletionService.take(), which
+                        // hid whether the waiter was our Broker bridge or Quark's own startup
+                        // future.  This is diagnostic-only and does not touch the main queue.
+                        int count = Math.min(stack.length, 64);
+                        for (int index = 0; index < count; index++) {
+                            if (index > 0) summary.append(" <- ");
+                            summary.append(stack[index].getClassName()).append('.')
+                                    .append(stack[index].getMethodName());
+                        }
+                        android.util.Log.i("CS_MAIN_WATCHDOG", "label=" + safeLabel
+                                + " pid=" + android.os.Process.myPid() + " state=" + state
+                                + " stack=" + summary);
+                        Thread.sleep(500L);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        android.util.Log.i("CS_MAIN_WATCHDOG", "WATCHDOG_INTERRUPTED pid="
+                                + android.os.Process.myPid() + " label=" + safeLabel
+                                + " closed=" + closed);
+                        return;
+                    } catch (Throwable error) {
+                        if (!failureLogged) {
+                            failureLogged = true;
+                            android.util.Log.e("CS_MAIN_WATCHDOG", "WATCHDOG_SAMPLE_FAILED pid="
+                                    + android.os.Process.myPid() + " label=" + safeLabel, error);
+                        }
+                        try {
+                            Thread.sleep(500L);
+                        } catch (InterruptedException interrupted) {
+                            Thread.currentThread().interrupt();
+                            return;
+                        }
+                    }
+                }
+                android.util.Log.i("CS_MAIN_WATCHDOG", "WATCHDOG_STOP pid="
+                        + android.os.Process.myPid() + " watcherTid=" + watcherTid
+                        + " label=" + safeLabel);
+            } catch (Throwable error) {
+                android.util.Log.e("CS_MAIN_WATCHDOG", "WATCHDOG_THREAD_FAILED pid="
+                        + android.os.Process.myPid() + " watcherTid=" + watcherTid
+                        + " label=" + safeLabel, error);
+            }
+        }, "guest-main-watchdog");
+        watcher.setDaemon(true);
+        debugWatchdog = watcher;
+        watcher.start();
+    }
+
+    /**
+     * Temporary boundary tracing for a Guest main loop that stops producing stack samples.
+     * Thread.getStackTrace() can itself wait for an ART safepoint while the target is inside a
+     * large class initializer, so the last Looper dispatch boundary is a more reliable marker.
+     */
+    private void installDebugMessageLogging() {
+        if (debugMessageLoggingInstalled) return;
+        synchronized (this) {
+            if (debugMessageLoggingInstalled) return;
+            try {
+                Looper.getMainLooper().setMessageLogging(line -> {
+                    if (line == null) return;
+                    if (line.startsWith(">>>>> Dispatching")
+                            || line.startsWith("<<<<< Finished")) {
+                        android.util.Log.i("CS_MAIN_LOOP", line);
+                    }
+                });
+                debugMessageLoggingInstalled = true;
+            } catch (Throwable error) {
+                FatalErrorPolicy.rethrowIfFatal(error);
+                android.util.Log.w("CS_MAIN_LOOP", "MESSAGE_LOGGING_INSTALL_FAILED", error);
+            }
+        }
     }
 
     <T> T call(Callable<T> action) {
@@ -161,6 +257,12 @@ final class GuestMainThreadDispatcher implements AutoCloseable {
         return queue.poll(waitMillis, TimeUnit.MILLISECONDS);
     }
 
+    private PendingTask<?> pollReentrantNonBlocking(Handler handler) {
+        BlockingQueue<PendingTask<?>> queue = handler == null
+                ? pending : handlerPending.computeIfAbsent(handler, ignored -> new LinkedBlockingQueue<>());
+        return queue.poll();
+    }
+
     private <T> T awaitWhilePumpingMain(PendingTask<T> task) {
         long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(DEFAULT_TIMEOUT_MS);
         while (!task.complete()) {
@@ -187,6 +289,8 @@ final class GuestMainThreadDispatcher implements AutoCloseable {
 
     @Override public void close() {
         closed = true;
+        Thread watcher = debugWatchdog;
+        if (watcher != null) watcher.interrupt();
         brokerWorkers.shutdownNow();
         PendingTask<?> task;
         while ((task = pending.poll()) != null) {

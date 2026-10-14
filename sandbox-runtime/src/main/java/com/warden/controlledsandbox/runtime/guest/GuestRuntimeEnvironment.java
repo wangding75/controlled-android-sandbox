@@ -54,6 +54,7 @@ import com.warden.controlledsandbox.nativebridge.NativeNetworkIdentity;
 import com.warden.controlledsandbox.runtime.systemservice.RemoteVirtualSystemServiceAuthority;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.OutputStream;
 import android.os.ParcelFileDescriptor;
 import java.lang.reflect.Method;
@@ -80,6 +81,178 @@ public final class GuestRuntimeEnvironment {
     private static final long PREPARATION_WAIT_TIMEOUT_SECONDS = 60L;
 
     private GuestRuntimeEnvironment() { }
+
+    /**
+     * Publishes U4's health-check paths before the first ServiceConfig lookup. U4 calls
+     * File.exists() on these values while deciding whether multi-process mode is usable, so
+     * this Java-facing configuration must retain real CAS/runtime paths. Identity-facing values
+     * (ApplicationInfo and DexPathList) remain logically projected; NativePolicy maps the real
+     * paths at the native boundary. The projection is repeated at renderer service load time for
+     * processes that enter U4 through a late framework bind.
+     */
+    static void applyU4CorePathProjection(ClassLoader guestLoader, GuestPackageSpec spec,
+                                          File guestDataRoot,
+                                          String applicationNativeLibraryDir) {
+        if (guestLoader == null || spec == null || spec.isolatedProcess) return;
+        GuestNativeRuntimeProjection.CorePaths selected = GuestNativeRuntimeProjection.corePaths(
+                guestDataRoot, spec.nativeAbi, false, spec.effectiveNativeLibraryDir(),
+                spec.apkPath);
+        // h0.a(String...) is a Java File.exists() gate, not an identity/path lookup. Feeding it
+        // /data/app/<guest> or /data/user/<guest> makes ServiceConfig mark the renderer pool
+        // unhealthy even though NativePolicy can resolve those paths for later opens.
+        String logicalApkPath = logicalApkPath(spec.packageName);
+        String dexPath = projectExactDexPath(
+                nonEmpty(selected.dexPath, spec.apkPath), spec.apkPath, logicalApkPath);
+        String odexPath = nonEmpty(selected.odexPath,
+                guestDataRoot == null ? "" : new File(guestDataRoot, "code_cache").getAbsolutePath());
+        String packagedNativeLibraryDir = spec.effectiveNativeLibraryDir();
+        String libraryPath = selected.libraryPath;
+        if (isSamePath(libraryPath, packagedNativeLibraryDir)) {
+            // The packaged directory is the one path U4 later uses to locate libwebviewuc.so.
+            // Give it the verified symlink published in ApplicationInfo so File.exists() and
+            // the subsequent native load both observe the same accessible directory.
+            libraryPath = nonEmpty(applicationNativeLibraryDir, packagedNativeLibraryDir);
+        }
+        libraryPath = nonEmpty(libraryPath, applicationNativeLibraryDir);
+        libraryPath = nonEmpty(libraryPath, packagedNativeLibraryDir);
+        try {
+            Class<?> globalSettings = Class.forName(
+                    "com.uc.webview.export.extension.GlobalSettings", true, guestLoader);
+            Class<?> settingKeys = Class.forName(
+                    "com.uc.webview.export.extension.SettingKeys", true, guestLoader);
+            String coreDexKey = settingKey(settingKeys, "CoreDexPath");
+            String coreLibKey = settingKey(settingKeys, "CoreLibPath");
+            String coreOdexKey = settingKey(settingKeys, "CoreOdexPath");
+            java.lang.reflect.Method setter = findGlobalSettingMethod(globalSettings,
+                    "setStringValue");
+            Object receiver = receiverFor(globalSettings, setter);
+            invokeGlobalSetting(setter, receiver, coreDexKey, dexPath, 206, guestLoader);
+            invokeGlobalSetting(setter, receiver, coreLibKey, libraryPath, 207, guestLoader);
+            invokeGlobalSetting(setter, receiver, coreOdexKey, odexPath, 208, guestLoader);
+            android.util.Log.i("CS_U4_PATH", "applied=true package=" + spec.packageName
+                    + " dex=" + dexPath + " odex=" + odexPath + " lib=" + libraryPath
+                    + " source=" + (selected.odexPath.isEmpty() ? "apk-fallback" : "dlibs"));
+        } catch (ClassNotFoundException missing) {
+            android.util.Log.i("CS_U4_PATH", "applied=false package=" + spec.packageName
+                    + " reason=U4_GLOBAL_SETTINGS_CLASS_MISSING");
+        } catch (Throwable error) {
+            android.util.Log.w("CS_U4_PATH", "applied=false package=" + spec.packageName
+                    + " error=" + error.getClass().getName() + ":"
+                    + String.valueOf(error.getMessage()), error);
+        }
+    }
+
+    private static java.lang.reflect.Method findGlobalSettingMethod(Class<?> type, String name)
+            throws NoSuchMethodException {
+        try {
+            java.lang.reflect.Method method = type.getDeclaredMethod(name, String.class,
+                    String.class);
+            method.setAccessible(true);
+            return method;
+        } catch (NoSuchMethodException missing) {
+            java.lang.reflect.Method method = type.getMethod(name, String.class, String.class);
+            method.setAccessible(true);
+            return method;
+        }
+    }
+
+    private static Object receiverFor(Class<?> type, java.lang.reflect.Method method)
+            throws ReflectiveOperationException {
+        if (java.lang.reflect.Modifier.isStatic(method.getModifiers())) return null;
+        java.lang.reflect.Constructor<?> constructor = type.getDeclaredConstructor();
+        constructor.setAccessible(true);
+        return constructor.newInstance();
+    }
+
+    private static void invokeGlobalSetting(java.lang.reflect.Method setter, Object receiver,
+                                            String key, String value, int fallbackId,
+                                            ClassLoader guestLoader) throws ReflectiveOperationException {
+        try {
+            setter.invoke(receiver, key, value);
+            return;
+        } catch (java.lang.reflect.InvocationTargetException failed) {
+            // Some U4 revisions ship the extension facade without wiring all keys into
+            // KeyIdMap.  The same revision's GlobalSettingsImpl is the authoritative fallback.
+            Class<?> impl = Class.forName("com.uc.webview.base.GlobalSettingsImpl", true,
+                    guestLoader);
+            java.lang.reflect.Method indexed = impl.getDeclaredMethod("b", int.class,
+                    String.class);
+            indexed.setAccessible(true);
+            indexed.invoke(null, fallbackId, value);
+        }
+    }
+
+    private static String settingKey(Class<?> settingKeys, String fieldName)
+            throws ReflectiveOperationException {
+        java.lang.reflect.Field field = settingKeys.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        Object value = field.get(null);
+        return value == null ? fieldName : String.valueOf(value);
+    }
+
+    private static boolean isSamePath(String first, String second) {
+        if (first == null || first.trim().isEmpty() || second == null || second.trim().isEmpty()) {
+            return false;
+        }
+        return new File(first.trim()).getAbsolutePath().equals(
+                new File(second.trim()).getAbsolutePath());
+    }
+
+    private static String projectGuestDataPath(String realPath, File guestDataRoot,
+                                               String logicalDataRoot, String fallback) {
+        if (realPath == null || realPath.trim().isEmpty() || guestDataRoot == null) return fallback;
+        try {
+            File root = guestDataRoot.getCanonicalFile();
+            File value = new File(realPath).getCanonicalFile();
+            String rootPath = root.getPath();
+            String valuePath = value.getPath();
+            if (valuePath.equals(rootPath)) return logicalDataRoot;
+            String prefix = rootPath + File.separator;
+            if (!valuePath.startsWith(prefix)) return fallback;
+            String relative = valuePath.substring(prefix.length()).replace(File.separatorChar, '/');
+            return logicalDataRoot + "/" + relative;
+        } catch (IOException | RuntimeException ignored) {
+            return fallback;
+        }
+    }
+
+    /**
+     * Replaces only the verified base APK element in a dex path list.  NativePolicy resolves the
+     * Guest /data/app alias back to the immutable CAS APK before ART opens it; keeping the alias
+     * as the input path is important because ART rejects the writable CAS staging path as a dex
+     * source on Android 12+.
+     */
+    private static String projectExactDexPath(String dexPath, String realApkPath,
+                                              String logicalApkPath) {
+        if (dexPath == null || dexPath.trim().isEmpty() || realApkPath == null
+                || realApkPath.trim().isEmpty() || logicalApkPath == null
+                || logicalApkPath.trim().isEmpty()) return dexPath;
+        String[] entries = dexPath.split(java.util.regex.Pattern.quote(File.pathSeparator), -1);
+        boolean changed = false;
+        for (int index = 0; index < entries.length; index++) {
+            if (samePathLexically(entries[index], realApkPath)) {
+                entries[index] = logicalApkPath;
+                changed = true;
+            }
+        }
+        if (!changed) return dexPath;
+        StringBuilder result = new StringBuilder(dexPath.length());
+        for (int index = 0; index < entries.length; index++) {
+            if (index > 0) result.append(File.pathSeparator);
+            result.append(entries[index]);
+        }
+        return result.toString();
+    }
+
+    private static String logicalApkPath(String packageName) {
+        return "/data/app/" + safe(packageName) + "/base.apk";
+    }
+
+    private static boolean samePathLexically(String first, String second) {
+        if (first == null || second == null) return false;
+        return new File(first.trim()).getAbsolutePath().equals(
+                new File(second.trim()).getAbsolutePath());
+    }
 
     static Bundle consumeActivityRoute(Session session, String token) throws Exception {
         if (session == null) throw new IllegalArgumentException("session is required");
@@ -364,6 +537,18 @@ public final class GuestRuntimeEnvironment {
                 }
                 guestDexPath = GuestSharedLibraryPathResolver.appendResolvedLibraryPaths(
                         guestDexPath, spec.packageState, spec.packageUniverse);
+                // Android 12+ rejects writable dex files.  ART reads the APK directly via
+                // DexFile.openDexFileNative, which calls openat() inside libart.so — a code
+                // path that PLT hooks do not cover.  VA and NBB both solve this by keeping
+                // the real APK path in the ClassLoader and ensuring the file is read-only.
+                // We follow the same pattern: use the real CAS staging path and seal it here
+                // if the import-time sealPublishedRevision() left it writable.
+                File apkFile = spec.apkPath != null ? new File(spec.apkPath) : null;
+                if (apkFile != null && apkFile.exists() && apkFile.canWrite()) {
+                    boolean sealed = apkFile.setWritable(false, false);
+                    android.util.Log.i("CS_APK_SEAL",
+                            "path=" + spec.apkPath + " sealed=" + sealed);
+                }
             }
             android.util.Log.i("CS_NATIVE_RUNTIME", "projection="
                     + (!runtimeNativeLibraryDir.equals(packagedNativeLibraryDir))
@@ -372,6 +557,7 @@ public final class GuestRuntimeEnvironment {
                     + " applicationDir=" + applicationNativeLibraryDir
                     + " applicationAlias=" + nativeLibraryAliasRoot
                     + " dexPathProjected=" + !guestDexPath.equals(spec.dexPath())
+                    + " apkReadOnly=" + (spec.apkPath != null && !new File(spec.apkPath).canWrite())
                     + " coreDexMode=" + coreDexMode);
             if (Build.VERSION.SDK_INT >= 29 && !NativePolicy.installHiddenApiBridge()) {
                 throw new IllegalStateException("HIDDEN_API_BRIDGE_UNAVAILABLE");
@@ -390,6 +576,56 @@ public final class GuestRuntimeEnvironment {
                     + " translatedAbi=" + translatedGuestAbi
                     + " guestAbi=" + safe(spec.nativeAbi)
                     + " hostAbi=" + safe(hostAbi()));
+            // Install IO hooks BEFORE constructing GuestClassLoader so that guest
+            // native libraries loaded later (including those opened by DexFile) have
+            // their file-system calls redirected from the first dlopen.  VA and NBB
+            // both configure their IO redirect layer before ClassLoader construction.
+            boolean requiresNativeHooks = !spec.isolatedProcess;
+            boolean enableNativeHooks = requiresNativeHooks && nativePolicyConfigured
+                    && !translatedGuestAbi;
+            if (requiresNativeHooks && !nativePolicyConfigured) {
+                throw new IllegalStateException("NATIVE_FILE_POLICY_UNAVAILABLE");
+            }
+            if (requiresNativeHooks) NativePolicy.setGuestProcessExitAllowed(false);
+            boolean nativeHooksInstalled = systemIoHooksInstalled
+                    || (enableNativeHooks && NativePolicy.installHooks(nativePolicyLibraryRoot));
+            if (enableNativeHooks && !nativeHooksInstalled) {
+                throw new IllegalStateException("NATIVE_FILE_HOOK_INSTALL_FAILED:" + NativePolicy.hookStatus());
+            }
+            if (enableNativeHooks && nativeHooksInstalled && !systemIoHooksInstalled) {
+                if (!NativePolicy.installSystemIoHooks()) {
+                    throw new IllegalStateException("NATIVE_SYSTEM_IO_HOOK_INSTALL_FAILED:"
+                            + NativePolicy.hookStatus());
+                }
+                systemIoHooksInstalled = true;
+            }
+            if (enableNativeHooks && !NativePolicy.rebindSystemIo()) {
+                throw new IllegalStateException("NATIVE_NIO_REBIND_FAILED:" + NativePolicy.hookStatus());
+            }
+            boolean processLifetimeHooksInstalled = translatedGuestAbi && nativePolicyConfigured
+                    && NativePolicy.installProcessLifetimeHooks();
+            if (translatedGuestAbi && !processLifetimeHooksInstalled) {
+                throw new IllegalStateException("NATIVE_PROCESS_LIFETIME_HOOK_INSTALL_FAILED:"
+                        + NativePolicy.hookStatus());
+            }
+            boolean nativeBoundaryAvailable = nativeHooksInstalled || translatedGuestAbi;
+            boolean nativeLoadDiag = nativeCodePresent && !translatedGuestAbi
+                    && NativePolicy.installNativeLoadDiagnostic();
+            boolean nativeLoadRedirect = nativeCodePresent && !translatedGuestAbi
+                    && NativePolicy.installNativeLoadRedirect();
+            if (nativeCodePresent && !translatedGuestAbi && !nativeLoadRedirect) {
+                throw new IllegalStateException("NATIVE_LOAD_REDIRECT_INSTALL_FAILED:"
+                        + NativePolicy.hookStatus());
+            }
+            String nativeBoundaryMode = translatedGuestAbi
+                    ? (nativeLoadRedirect ? "translated-loader-redirect" : "translated-platform-loader")
+                    : (nativeHooksInstalled ? "native-plt-io" : "java-framework-only");
+            if (processLifetimeHooksInstalled) nativeBoundaryMode += "+host-lifetime";
+            android.util.Log.i("CS_NATIVE_BIND", "PROBE nativeLoadDiagnostic=" + nativeLoadDiag
+                    + " nativeLoadRedirect=" + nativeLoadRedirect
+                    + " translatedAbi=" + translatedGuestAbi
+                    + " processLifetimeHooks=" + processLifetimeHooksInstalled
+                    + " boundaryMode=" + nativeBoundaryMode);
             GuestClassLoader loader;
             try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.CLASSLOADER)) {
             if (spec.isolatedProcess) {
@@ -421,6 +657,24 @@ public final class GuestRuntimeEnvironment {
                         emptyToNull(nativeLibrarySearchPath), GuestRuntimeEnvironment.class.getClassLoader(),
                         spec.packageName, declaredGuestClasses(spec));
             }
+            }
+            if (!spec.isolatedProcess) {
+                // The defining loader was opened through the Guest APK alias.  Project the
+                // remaining retained metadata without changing the bytes or NativeLoader
+                // namespace; native search entries intentionally stay physical.
+                String logicalApkPath = logicalApkPath(spec.packageName);
+                String logicalNativeLibraryDir = "/data/app/" + spec.packageName
+                        + "/lib/" + safe(spec.nativeAbi);
+                String logicalDataRoot = "/data/user/" + spec.virtualUserId + "/"
+                        + spec.packageName;
+                loader.projectDexPathListPaths(
+                        spec.apkPath,
+                        logicalApkPath,
+                        runtimeNativeLibraryDir.isEmpty()
+                                ? spec.effectiveNativeLibraryDir() : runtimeNativeLibraryDir,
+                        logicalNativeLibraryDir,
+                        guestDataRoot.getAbsolutePath(),
+                        logicalDataRoot);
             }
             loader.configureNativeCompatibility(translatedGuestAbi);
             GuestNativeBindingDiagnostic.installProcessProbes();
@@ -460,76 +714,7 @@ public final class GuestRuntimeEnvironment {
             GuestContext guestContext = new GuestContext(host, spec, loader,
                     loadedResources.resources, loadedResources.assets, processPackageManager,
                     loadedResources.manifestMetadata.application(), appComponentFactory,
-                    parsedApplicationInfo);
-            // Native policy also owns the process-wide framework/native boundary for a pure
-            // Java Guest (not only APK-provided .so files).  Such a Guest has no package ABI,
-            // but its process still has the host ABI and must not enter the policy with an
-            // empty abiName.
-            boolean requiresNativeHooks = !spec.isolatedProcess;
-            // A foreign-ABI guest is executed by Android's native bridge. The host process
-            // cannot safely rewrite that guest ELF's PLT/GOT, so the platform bridge remains
-            // the loader boundary and Java framework proxies provide the compatibility path.
-            // Keep a narrow host-ABI lifetime boundary even for a translated guest. It protects
-            // the CAS-owned service from direct native kill/_exit/abort calls without parsing the
-            // foreign Guest ELF. Java Runtime.nativeExit is handled separately by the supported
-            // JNI registration boundary and is forwarded as a real process-lifetime event, just
-            // as VA/NBB do; Binder death/recovery owns the resulting new process record.
-            // Do not patch the translated guest ELF or its general host-ABI PLT entries: the
-            // platform bridge may enter those modules with translated register state.
-            boolean enableNativeHooks = requiresNativeHooks && nativePolicyConfigured
-                    && !translatedGuestAbi;
-            if (requiresNativeHooks && !nativePolicyConfigured) {
-                throw new IllegalStateException("NATIVE_FILE_POLICY_UNAVAILABLE");
-            }
-            if (requiresNativeHooks) NativePolicy.setGuestProcessExitAllowed(false);
-            boolean processLifetimeHooksInstalled = translatedGuestAbi && nativePolicyConfigured
-                    && NativePolicy.installProcessLifetimeHooks();
-            if (translatedGuestAbi && !processLifetimeHooksInstalled) {
-                throw new IllegalStateException("NATIVE_PROCESS_LIFETIME_HOOK_INSTALL_FAILED:"
-                        + NativePolicy.hookStatus());
-            }
-            boolean nativeHooksInstalled = systemIoHooksInstalled
-                    || (enableNativeHooks && NativePolicy.installHooks(nativePolicyLibraryRoot));
-            if (enableNativeHooks && !nativeHooksInstalled) {
-                throw new IllegalStateException("NATIVE_FILE_HOOK_INSTALL_FAILED:" + NativePolicy.hookStatus());
-            }
-            if (enableNativeHooks && nativeHooksInstalled && !systemIoHooksInstalled) {
-                if (!NativePolicy.installSystemIoHooks()) {
-                    throw new IllegalStateException("NATIVE_SYSTEM_IO_HOOK_INSTALL_FAILED:"
-                            + NativePolicy.hookStatus());
-                }
-                systemIoHooksInstalled = true;
-            }
-            boolean nativeBoundaryAvailable = nativeHooksInstalled || translatedGuestAbi;
-            // Runtime.nativeLoad is an ART native-method registration boundary. Replacing that
-            // method in an ARM64 guest running through the x86_64 native bridge is not safe: the
-            // bridge owns the foreign-ABI load path and may call it from a translated frame.
-            // Native guests keep the diagnostic wrapper; translated guests use the platform
-            // loader unchanged and rely on the structured loader evidence around it.
-            boolean nativeLoadDiag = nativeCodePresent && !translatedGuestAbi
-                    && NativePolicy.installNativeLoadDiagnostic();
-            // A translated guest cannot safely receive host-ABI PLT/GOT patches.  It also must
-            // not replace Runtime.nativeLoad globally: the Android foreign-ABI bridge and
-            // WebView/Chromium call this entry from translated frames, and a JNI replacement
-            // changes the callback ABI for every native library in the process.  The framework
-            // PathClassLoader already owns the verified guest native directory, so translated
-            // guests use the platform loader unchanged. Native-ABI guests keep the diagnostic
-            // wrapper and the PLT/IO policy above.
-            boolean nativeLoadRedirect = nativeCodePresent && !translatedGuestAbi
-                    && NativePolicy.installNativeLoadRedirect();
-            if (nativeCodePresent && !translatedGuestAbi && !nativeLoadRedirect) {
-                throw new IllegalStateException("NATIVE_LOAD_REDIRECT_INSTALL_FAILED:"
-                        + NativePolicy.hookStatus());
-            }
-            String nativeBoundaryMode = translatedGuestAbi
-                    ? (nativeLoadRedirect ? "translated-loader-redirect" : "translated-platform-loader")
-                    : (nativeHooksInstalled ? "native-plt-io" : "java-framework-only");
-            if (processLifetimeHooksInstalled) nativeBoundaryMode += "+host-lifetime";
-            android.util.Log.i("CS_NATIVE_BIND", "PROBE nativeLoadDiagnostic=" + nativeLoadDiag
-                    + " nativeLoadRedirect=" + nativeLoadRedirect
-                    + " translatedAbi=" + translatedGuestAbi
-                    + " processLifetimeHooks=" + processLifetimeHooksInstalled
-                    + " boundaryMode=" + nativeBoundaryMode);
+                    parsedApplicationInfo, applicationNativeLibraryDir);
             // handleBindApplication publishes process identity before LoadedApk asks the
             // AppComponentFactory to wrap the ClassLoader. The hidden-API bridge must be
             // installed first so Process.setArgV0 is visible.
@@ -667,6 +852,11 @@ public final class GuestRuntimeEnvironment {
             ClassLoader processLoader = GuestComponentFactory.instantiateClassLoader(
                     frameworkLoader, appComponentFactory, guestContext.getApplicationInfo());
             guestContext.installProcessClassLoader(processLoader);
+            // U4's ServiceConfig is initialized from global settings during Application
+            // construction on some releases.  Publish the projected paths before that first
+            // lookup; the renderer hook below repeats this after a late service bind.
+            applyU4CorePathProjection(processLoader, spec, guestDataRoot,
+                    applicationNativeLibraryDir);
             android.util.Log.i("CS_GUEST_FACTORY", "classLoader factory=" + appComponentFactory
                     + " base=" + loader.getClass().getName()
                     + " frameworkBase=" + frameworkLoader.getClass().getName()
@@ -683,6 +873,7 @@ public final class GuestRuntimeEnvironment {
                     camera1AdapterInstalled, nativeCrashRecorderInstalled, webViewProfile,
                     stagedProcessIdentity, loaderApkDescriptor, loaderNativeArchiveDescriptor);
             stagedSession = session;
+            session.mainThread.startDebugWatchdog(spec.packageName + ":" + spec.processName);
             loaderApkDescriptor = null;
             loaderNativeArchiveDescriptor = null;
             bootstrapStage = "LOADED_APK_INSTALL";
@@ -712,6 +903,7 @@ public final class GuestRuntimeEnvironment {
             bootstrapStage = "APPLICATION_ATTACH_BASE_CONTEXT";
             bootstrapTrace(bootstrapStage, spec, started, null);
             guestContext.mainThread.run(() -> invokeNearestAttachBaseContext(application, guestContext));
+            logApplicationContextProjection(application, guestContext);
             if (nativeHooksInstalled && !NativePolicy.refreshHooks()) {
                 throw new IllegalStateException("NATIVE_FILE_HOOK_REFRESH_FAILED_AFTER_APPLICATION_CREATE:"
                         + NativePolicy.hookStatus());
@@ -758,6 +950,8 @@ public final class GuestRuntimeEnvironment {
             try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.APPLICATION_ONCREATE)) {
                 session.mainThread.run(application::onCreate);
             }
+            applyU4CorePathProjection(guestContext.getClassLoader(), spec, guestDataRoot,
+                    applicationNativeLibraryDir);
             // Application/Provider bootstrap is allowed to install process-local SDK hooks,
             // but it must not replace the ActivityThread transport used by the Guest lifecycle.
             // Reassert the bridge before publishing READY so the first physical Stub transaction
@@ -917,8 +1111,13 @@ public final class GuestRuntimeEnvironment {
                     + ":" + NativePolicy.hookStatus());
         }
         boolean systemIoHooksInstalled = installIsolatedIoCapabilities(spec);
+        // The host Context path is a logical private path once NativePolicy is active.  A
+        // regular Guest cannot open /data/user/0/<host>/files anymore: the policy correctly
+        // rejects that cross-package root.  Keep the evidence inside this Guest's physical
+        // instance root (isolated Guests use the capability-backed logical root, which is
+        // resolved by the installed system-I/O capability).
         RuntimeDiagnostics.install(host, "guest-slot-" + spec.processSlot,
-                spec.isolatedProcess ? new File(spec.dataRootFile(), "diagnostics") : null);
+                new File(spec.dataRootFile(), "diagnostics"));
         if (spec.isolatedProcess) verifyIsolatedArtifactCapability(spec);
         File nativeCrashFile = RuntimeDiagnostics.nativeCrashFile();
         // Do not install a second signal-chain handler in a foreign-ABI process.  The
@@ -1200,6 +1399,71 @@ public final class GuestRuntimeEnvironment {
         if (attach == null) throw new NoSuchMethodException("attachBaseContext");
         attach.setAccessible(true);
         attach.invoke(application, context);
+    }
+
+    /**
+     * Records the exact Context chain exposed to U4's reflective bind helper.  U4 starts from
+     * the Application object, repeatedly calls getBaseContext() while it is a ContextWrapper,
+     * and invokes bindServiceAsUser() on the terminal object.  TinkerApplication overrides
+     * getBaseContext() through its inline fence, so the raw ContextWrapper.mBase and the dynamic
+     * result must both be visible when diagnosing a renderer bind timeout.
+     */
+    private static void logApplicationContextProjection(Application application, Context expected) {
+        String rawBase = "unavailable";
+        try {
+            java.lang.reflect.Field field = android.content.ContextWrapper.class
+                    .getDeclaredField("mBase");
+            field.setAccessible(true);
+            rawBase = describeContext((Context) field.get(application));
+        } catch (Throwable error) {
+            rawBase = "error=" + error.getClass().getSimpleName()
+                    + ":" + String.valueOf(error.getMessage());
+        }
+        String dynamicBase;
+        try {
+            dynamicBase = describeContext(application.getBaseContext());
+        } catch (Throwable error) {
+            dynamicBase = "error=" + error.getClass().getSimpleName()
+                    + ":" + String.valueOf(error.getMessage());
+        }
+        String applicationContext;
+        try {
+            applicationContext = describeContext(application.getApplicationContext());
+        } catch (Throwable error) {
+            applicationContext = "error=" + error.getClass().getSimpleName()
+                    + ":" + String.valueOf(error.getMessage());
+        }
+        android.util.Log.i("CS_APP_CONTEXT", "app=" + application.getClass().getName()
+                + " expected=" + describeContext(expected)
+                + " rawBase=" + rawBase
+                + " dynamicBase=" + dynamicBase
+                + " applicationContext=" + applicationContext
+                + " expectedSameRaw=" + sameContext(application, expected)
+                + " pid=" + Process.myPid());
+    }
+
+    private static boolean sameContext(Application application, Context expected) {
+        try {
+            java.lang.reflect.Field field = android.content.ContextWrapper.class
+                    .getDeclaredField("mBase");
+            field.setAccessible(true);
+            return field.get(application) == expected;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static String describeContext(Context context) {
+        if (context == null) return "null";
+        String packageName;
+        try {
+            packageName = context.getPackageName();
+        } catch (Throwable error) {
+            packageName = "error:" + error.getClass().getSimpleName();
+        }
+        return context.getClass().getName() + "@"
+                + Integer.toHexString(System.identityHashCode(context))
+                + "/pkg=" + packageName;
     }
 
     /** Projects only virtual network data into native policy; no host resolver identity is read. */

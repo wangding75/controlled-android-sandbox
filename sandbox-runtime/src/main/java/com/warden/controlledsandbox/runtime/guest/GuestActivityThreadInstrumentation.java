@@ -48,6 +48,7 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
         return thread;
     });
     private volatile boolean closed;
+    private volatile boolean quarkMessageProbeInstalled;
 
     private GuestActivityThreadInstrumentation(Object activityThread, Field instrumentationField,
                                                Instrumentation delegate,
@@ -302,6 +303,20 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
                             ? "" : intent.getComponent().flattenToShortString())
                     + " requestCode=" + requestCode
                     + " pid=" + android.os.Process.myPid());
+            if (requestCode < 0 && session.mainThread.isMainThread()) {
+                // Ordinary Activity.startActivity() does not have an ActivityResult to return.
+                // Do not hold the framework ActivityThread Handler in the Broker re-entrancy
+                // wait: a cold Guest Activity launch can take seconds, and input ACKs must still
+                // be serviced by the Looper during that interval.
+                android.util.Log.i("CS_FRAMEWORK_ACTIVITY", "EXEC_START_ASYNC_SUBMIT request="
+                        + route.requestId + " operation=" + route.operationId
+                        + " target=" + (intent == null || intent.getComponent() == null
+                                ? "" : intent.getComponent().flattenToShortString())
+                        + " pid=" + android.os.Process.myPid());
+                dispatchFrameworkActivityStartAsync(who, contextThread, token, target, intent,
+                        requestCode, options, route);
+                return null;
+            }
             Bundle result = session.context().startActivityFromFrameworkActivity(
                     intent, options, route.taskId, requestCode);
             // The Broker returns a Host Intent carrying the selected physical component and
@@ -327,6 +342,53 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
             if (error instanceof RuntimeException runtime) throw runtime;
             throw new IllegalStateException("FRAMEWORK_HOST_ACTIVITY_START_FAILED", error);
         }
+    }
+
+    private void dispatchFrameworkActivityStartAsync(android.content.Context who,
+            android.os.IBinder contextThread, android.os.IBinder token, Activity target,
+            Intent intent, int requestCode, Bundle options, Launch route) {
+        session.context().startActivityFromFrameworkActivityAsync(
+                intent, options, route.taskId, requestCode,
+                result -> {
+                    try {
+                        Intent hostIntent = hostIntent(result);
+                        if (hostIntent == null) {
+                            throw new IllegalStateException(
+                                    "FRAMEWORK_HOST_ACTIVITY_INTENT_MISSING");
+                        }
+                        session.mainThread.call(() -> {
+                            try (FrameworkClassLoaderScope ignored = enterFrameworkClassLoader()) {
+                                android.util.Log.i("CS_FRAMEWORK_ACTIVITY",
+                                        "EXEC_START_ASYNC_RETURN request=" + route.requestId
+                                                + " operation=" + route.operationId
+                                                + " hostComponent="
+                                                + (hostIntent.getComponent() == null ? ""
+                                                : hostIntent.getComponent().flattenToShortString())
+                                                + " childActivityToken="
+                                                + hostIntent.getStringExtra(
+                                                        RuntimeKeys.ACTIVITY_TOKEN)
+                                                + " pid=" + android.os.Process.myPid());
+                                invokeDelegateExecStartActivity(who, contextThread, token, target,
+                                        hostIntent, requestCode, options);
+                                return null;
+                            }
+                        });
+                    } catch (Throwable error) {
+                        com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy
+                                .rethrowIfFatal(error);
+                        emitFailure(target, route, error);
+                        android.util.Log.e("CS_FRAMEWORK_ACTIVITY",
+                                "async framework activity start failed component="
+                                        + route.component, error);
+                    }
+                }, error -> {
+                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy
+                            .rethrowIfFatal(error);
+                    emitFailure(target, route, error);
+                    android.util.Log.e("CS_FRAMEWORK_ACTIVITY",
+                            "async Broker activity launch failed component=" + route.component,
+                            error);
+                });
     }
 
     private Intent hostIntent(Bundle result) {
@@ -414,6 +476,7 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
             // Chrome creates its content/DecorView during onCreate. Rebind any manager that was
             // materialized by that framework-owned Context while retaining the first hook above.
             installActivityAutofillHook(activity);
+            installQuarkMessageProbe(activity);
             android.util.Log.i("CS_FRAMEWORK_ACTIVITY", "CALLBACK_CREATE_DELEGATE_RETURN component="
                     + route.component + " request=" + route.requestId
                     + " operation=" + route.operationId + " delegateElapsedMs="
@@ -476,6 +539,7 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
                     + " persistable=true pid=" + android.os.Process.myPid());
             delegate.callActivityOnCreate(activity, effectiveState, effectivePersistentState);
             installActivityAutofillHook(activity);
+            installQuarkMessageProbe(activity);
             android.util.Log.i("CS_FRAMEWORK_ACTIVITY", "CALLBACK_CREATE_DELEGATE_RETURN component="
                     + route.component + " request=" + route.requestId
                     + " operation=" + route.operationId + " delegateElapsedMs="
@@ -630,6 +694,70 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
                 android.util.Log.w("CS_AUTOFILL_PROXY",
                         "ACTIVITY_BINDING_ROLLBACK_FAILED", error);
             }
+        }
+    }
+
+    /**
+     * Temporary diagnostic boundary for the Quark main-message bus. The platform Looper printer
+     * exposes only the outer Handler message; this preserves the app callback's inner what and
+     * lets us identify a callback that holds the main Looper without changing its scheduling.
+     */
+    private void installQuarkMessageProbe(Activity activity) {
+        if (quarkMessageProbeInstalled || activity == null) return;
+        try {
+            ClassLoader loader = activity.getClass().getClassLoader();
+            if (loader == null) loader = GuestActivityThreadInstrumentation.class.getClassLoader();
+            Class<?> busType = Class.forName("nq3.c", false, loader);
+            Class<?> callbackType = Class.forName("nq3.a", false, loader);
+            Method singletonMethod = busType.getDeclaredMethod("c");
+            singletonMethod.setAccessible(true);
+            Object bus = singletonMethod.invoke(null);
+            Field callbackField = findField(busType, "d");
+            callbackField.setAccessible(true);
+            Object weakReference = callbackField.get(bus);
+            if (!(weakReference instanceof java.lang.ref.WeakReference<?> weak)) return;
+            Object callback = weak.get();
+            if (callback == null || !callbackType.isInstance(callback)) return;
+            java.lang.reflect.InvocationHandler handler = (proxy, method, args) -> {
+                if (!"c".equals(method.getName()) || args == null || args.length != 1
+                        || !(args[0] instanceof android.os.Message message)) {
+                    return invokeQuarkCallback(callback, method, args);
+                }
+                android.util.Log.i("CS_QUARK_MSG", "BEGIN what=" + message.what
+                        + " arg1=" + message.arg1 + " arg2=" + message.arg2
+                        + " obj=" + String.valueOf(message.obj)
+                        + " objClass=" + (message.obj == null
+                        ? "null" : message.obj.getClass().getName())
+                        + " callback=" + callback.getClass().getName()
+                        + " pid=" + android.os.Process.myPid()
+                        + " tid=" + android.os.Process.myTid());
+                try {
+                    return invokeQuarkCallback(callback, method, args);
+                } finally {
+                    android.util.Log.i("CS_QUARK_MSG", "END what=" + message.what
+                            + " pid=" + android.os.Process.myPid()
+                            + " tid=" + android.os.Process.myTid());
+                }
+            };
+            Object proxy = java.lang.reflect.Proxy.newProxyInstance(
+                    callbackType.getClassLoader(), new Class<?>[] {callbackType}, handler);
+            callbackField.set(bus, new java.lang.ref.WeakReference<>(proxy));
+            quarkMessageProbeInstalled = true;
+            android.util.Log.i("CS_QUARK_MSG", "PROBE_INSTALLED callback="
+                    + callback.getClass().getName() + " bus=" + busType.getName()
+                    + " pid=" + android.os.Process.myPid());
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            android.util.Log.w("CS_QUARK_MSG", "PROBE_INSTALL_FAILED", error);
+        }
+    }
+
+    private static Object invokeQuarkCallback(Object callback, Method method, Object[] args)
+            throws Throwable {
+        try {
+            return method.invoke(callback, args);
+        } catch (java.lang.reflect.InvocationTargetException error) {
+            throw error.getCause() == null ? error : error.getCause();
         }
     }
 

@@ -21,6 +21,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 
 /** Process-local crash, ANR, liveness and structured runtime evidence recorder. */
 public final class RuntimeDiagnostics {
@@ -35,6 +38,17 @@ public final class RuntimeDiagnostics {
     private static final AtomicBoolean INSTALLED = new AtomicBoolean();
     private static final AtomicLong MAIN_ACK = new AtomicLong();
     private static final AnrEpisodeTracker ANR_TRACKER = new AnrEpisodeTracker(ANR_THRESHOLD_MS);
+    /**
+     * Event evidence must never make the Android main thread wait on storage.  In particular,
+     * Activity first-frame/lifecycle callbacks call RuntimeEventLog from the main Looper and
+     * FileDescriptor.sync() can block for seconds on the Guest's projected data root.
+     */
+    private static final ExecutorService MAIN_EVIDENCE_WRITER = Executors.newSingleThreadExecutor(
+            runnable -> {
+                Thread thread = new Thread(runnable, "controlled-sandbox-evidence");
+                thread.setDaemon(true);
+                return thread;
+            });
     private static volatile File eventFile;
     private static volatile File nativeCrashFile;
     private static volatile File javaCrashFile;
@@ -237,6 +251,20 @@ public final class RuntimeDiagnostics {
     }
 
     private static void appendEvidence(File target, String body) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            try {
+                MAIN_EVIDENCE_WRITER.execute(() -> appendEvidenceSynchronously(target, body));
+            } catch (RejectedExecutionException error) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy
+                        .rethrowIfFatal(error);
+                Log.e(TAG, "Diagnostics async write rejected", error);
+            }
+            return;
+        }
+        appendEvidenceSynchronously(target, body);
+    }
+
+    private static void appendEvidenceSynchronously(File target, String body) {
         synchronized (LOCK) {
             try {
                 byte[] bytes = body.getBytes(StandardCharsets.UTF_8);

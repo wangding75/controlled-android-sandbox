@@ -22,16 +22,20 @@ final class GuestLoadedApkBridge implements AutoCloseable {
     private final Object boundApplication;
     private final Field boundInfoField;
     private final Object originalBoundInfo;
+    private final Field initialApplicationField;
+    private final Object originalInitialApplication;
     private final Field packagesField;
     private final Object packages;
     private final Object originalPackageEntry;
     private final Object loadedApk;
     private final String packageName;
+    private Application projectedApplication;
     private final boolean installed;
     private boolean closed;
 
     private GuestLoadedApkBridge(Object activityThread, Object boundApplication,
                                   Field boundInfoField, Object originalBoundInfo,
+                                  Field initialApplicationField, Object originalInitialApplication,
                                   Field packagesField, Object packages,
                                   Object originalPackageEntry, Object loadedApk,
                                   String packageName) {
@@ -39,6 +43,8 @@ final class GuestLoadedApkBridge implements AutoCloseable {
         this.boundApplication = boundApplication;
         this.boundInfoField = boundInfoField;
         this.originalBoundInfo = originalBoundInfo;
+        this.initialApplicationField = initialApplicationField;
+        this.originalInitialApplication = originalInitialApplication;
         this.packagesField = packagesField;
         this.packages = packages;
         this.originalPackageEntry = originalPackageEntry;
@@ -62,6 +68,16 @@ final class GuestLoadedApkBridge implements AutoCloseable {
         boundInfoField.setAccessible(true);
         Object originalBoundInfo = boundInfoField.get(boundApplication);
         if (originalBoundInfo == null) throw new IllegalStateException("HOST_LOADED_APK_UNAVAILABLE");
+
+        // ActivityThread.currentApplication() is a process-global escape hatch used by many
+        // SDKs instead of Context.getApplicationContext().  VA and NBB both publish their
+        // guest Application here before provider/Application callbacks run.  CAS previously
+        // replaced mBoundApplication.info and LoadedApk.mApplication but left this field
+        // pointing at MainApplication, so those SDKs received the host ContextImpl and opened
+        // /data/user/0/com.warden.controlledsandbox.debug/... directly.
+        Field initialApplicationField = findField(activityThreadType, "mInitialApplication");
+        initialApplicationField.setAccessible(true);
+        Object originalInitialApplication = initialApplicationField.get(activityThread);
 
         Method compatibilityMethod = originalBoundInfo.getClass().getDeclaredMethod(
                 "getCompatibilityInfo");
@@ -110,8 +126,8 @@ final class GuestLoadedApkBridge implements AutoCloseable {
                 + " loader=" + processLoader.getClass().getName()
                 + " application=DEFERRED_UNTIL_BIND_APPLICATION");
         return new GuestLoadedApkBridge(activityThread, boundApplication, boundInfoField,
-                originalBoundInfo, packagesField, packages, originalEntry, loadedApk,
-                session.spec.packageName);
+                originalBoundInfo, initialApplicationField, originalInitialApplication,
+                packagesField, packages, originalEntry, loadedApk, session.spec.packageName);
     }
 
     synchronized void bindApplication(Application application) {
@@ -123,6 +139,17 @@ final class GuestLoadedApkBridge implements AutoCloseable {
         }
         setOptional(loadedApk, "mApplication", application);
         verifyFrameworkApplicationOwnership(loadedApk, activityThread, application);
+        try {
+            initialApplicationField.set(activityThread, application);
+            projectedApplication = application;
+            android.util.Log.i("CS_GUEST_LOADED_APK", "initialApplication=GUEST"
+                    + " application=" + application.getClass().getName()
+                    + " previous=" + (originalInitialApplication == null
+                    ? "null" : originalInitialApplication.getClass().getName()));
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            throw new IllegalStateException("GUEST_INITIAL_APPLICATION_PROJECTION_FAILED", error);
+        }
         android.util.Log.i("CS_GUEST_LOADED_APK", "frameworkMakeApplication=OWNED_BY_GUEST"
                 + " application=" + application.getClass().getName());
     }
@@ -171,6 +198,13 @@ final class GuestLoadedApkBridge implements AutoCloseable {
         try {
             if (boundInfoField.get(boundApplication) == loadedApk) {
                 boundInfoField.set(boundApplication, originalBoundInfo);
+            }
+            if (projectedApplication != null && initialApplicationField.get(activityThread)
+                    == projectedApplication) {
+                initialApplicationField.set(activityThread, originalInitialApplication);
+                android.util.Log.i("CS_GUEST_LOADED_APK", "initialApplication=RESTORED"
+                        + " application=" + (originalInitialApplication == null
+                        ? "null" : originalInitialApplication.getClass().getName()));
             }
             if (mapGet(packages, packageName) instanceof WeakReference
                     && ((WeakReference<?>) mapGet(packages, packageName)).get() == loadedApk) {

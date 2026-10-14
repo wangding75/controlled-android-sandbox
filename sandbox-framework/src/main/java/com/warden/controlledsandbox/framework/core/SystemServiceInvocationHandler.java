@@ -34,6 +34,7 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
     private final MediaCommunicationInvocationInterceptor mediaCommunicationInterceptor;
     private final PeripheralServicesInvocationInterceptor peripheralServicesInterceptor;
     private final PrivilegedServicesInvocationInterceptor privilegedServicesInterceptor;
+    private final MiuiSecurityInvocationInterceptor miuiSecurityInterceptor;
     private volatile BinderInterceptionFoundation binderBoundary;
 
     SystemServiceInvocationHandler(Object delegate, GuestIdentity identity) {
@@ -82,6 +83,7 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                 "contexthub", "persistentdatablock", "systemupdate").contains(
                 this.serviceName.toLowerCase(java.util.Locale.ROOT))
                 ? new PrivilegedServicesInvocationInterceptor(identity, this.serviceName) : null;
+        this.miuiSecurityInterceptor = new MiuiSecurityInvocationInterceptor(this.serviceName);
         this.binderBoundary = null;
     }
 
@@ -112,6 +114,14 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                 // ViewRootImpl.W Binder. Wrapping IWindow replaces that identity and WMS cannot
                 // attach the window to the Stub ActivityRecord (windows=[], reportedDrawn=false).
                 .preserveBinderType("android.view.IWindow")
+                // InputMethodManager registers its process-local client Binder once in
+                // InputMethodManager#createRealInstance and reuses the exact same Binder for
+                // addClient/startInput/show/hide calls. Wrapping IInputMethodClient creates a
+                // different Binder identity; IMMS then rejects it as "Unknown client" and the
+                // Guest never gets an input connection (API 36 moved this AIDL into
+                // com.android.internal.inputmethod; keep the legacy package for older releases).
+                .preserveBinderType("com.android.internal.inputmethod.IInputMethodClient")
+                .preserveBinderType("com.android.internal.view.IInputMethodClient")
                 .build();
     }
 
@@ -167,6 +177,10 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                         : privilegedServicesInterceptor.before(method, arguments);
         if (privilegedCall.handled()) {
             return wrapBoundaryResult(privilegedCall.result(), serviceName + ".privileged.return");
+        }
+        MiuiSecurityInvocationInterceptor.Decision miuiCall = miuiSecurityInterceptor.before(method, arguments);
+        if (miuiCall.handled()) {
+            return wrapBoundaryResult(miuiCall.result(), serviceName + ".miuisecurity.return");
         }
         PeripheralServicesInvocationInterceptor.Decision peripheralCall =
                 peripheralServicesInterceptor == null
@@ -238,19 +252,68 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                                     + "_SIGNATURE_UNSUPPORTED:" + method.getName());
                 }
                 recordInteractionInvocation(method, true);
+                boolean activityClientTrace = "activityclient".equalsIgnoreCase(serviceName)
+                        && ("isUniversalResizeable".equals(method.getName())
+                        || "getDisplayId".equals(method.getName())
+                        || "reportSizeConfigurations".equals(method.getName()));
+                if (activityClientTrace) {
+                    android.util.Log.i("CS_ACTIVITY_CLIENT_TRACE", "DELEGATE_BEGIN method="
+                            + method.getName() + " pid=" + android.os.Process.myPid()
+                            + " tid=" + android.os.Process.myTid());
+                }
+                boolean windowSessionTrace = isWindowSessionTrace(method);
+                long windowSessionTraceStart = windowSessionTrace
+                        ? android.os.SystemClock.uptimeMillis() : 0L;
+                if (windowSessionTrace) {
+                    android.util.Log.i("CS_WINDOW_SESSION_TRACE", "DELEGATE_BEGIN method="
+                            + method.getName() + " pid=" + android.os.Process.myPid()
+                            + " tid=" + android.os.Process.myTid());
+                }
+                boolean inputTrace = isInputMethodTrace(method);
+                long inputTraceStart = inputTrace ? android.os.SystemClock.uptimeMillis() : 0L;
+                if (inputTrace) {
+                    android.util.Log.i("CS_INPUT_TRACE", "BEGIN service=" + serviceName
+                            + " method=" + method.getName()
+                            + " pid=" + android.os.Process.myPid());
+                }
                 Object[] binderArguments = binderBoundary == null ? rewritten
                         : binderBoundary.wrapArguments(rewritten, method.getParameterTypes(),
                                 serviceName + ".callback");
+                if (inputTrace) {
+                    android.util.Log.i("CS_INPUT_TRACE", "ARGS_WRAPPED method=" + method.getName()
+                            + " elapsedMs=" + (android.os.SystemClock.uptimeMillis() - inputTraceStart));
+                }
                 Object result = method.invoke(delegate, binderArguments);
+                if (activityClientTrace) {
+                    android.util.Log.i("CS_ACTIVITY_CLIENT_TRACE", "DELEGATE_RETURN method="
+                            + method.getName() + " pid=" + android.os.Process.myPid()
+                            + " tid=" + android.os.Process.myTid());
+                }
+                if (windowSessionTrace) {
+                    android.util.Log.i("CS_WINDOW_SESSION_TRACE", "DELEGATE_RETURN method="
+                            + method.getName() + " elapsedMs="
+                            + (android.os.SystemClock.uptimeMillis() - windowSessionTraceStart)
+                            + " pid=" + android.os.Process.myPid()
+                            + " tid=" + android.os.Process.myTid());
+                }
+                if (inputTrace) {
+                    android.util.Log.i("CS_INPUT_TRACE", "DELEGATE_RETURN method=" + method.getName()
+                            + " elapsedMs=" + (android.os.SystemClock.uptimeMillis() - inputTraceStart));
+                }
                 if (capabilityInterceptor != null) {
                     capabilityInterceptor.afterSuccess(capabilityCall, delegate, rewritten, result);
                 }
                 Object identityRewritten = semanticAdapter.projectResult(result);
                 Object interactionRewritten = interactionCall.after(identityRewritten);
                 Object projected = virtualCall.rewriteResult(interactionRewritten);
-                return binderBoundary == null ? projected
+                Object returned = binderBoundary == null ? projected
                         : binderBoundary.wrapReturned(projected, method.getReturnType(),
                                 serviceName + ".return");
+                if (inputTrace) {
+                    android.util.Log.i("CS_INPUT_TRACE", "END method=" + method.getName()
+                            + " elapsedMs=" + (android.os.SystemClock.uptimeMillis() - inputTraceStart));
+                }
+                return returned;
             } catch (InvocationTargetException error) {
                 Throwable cause = error.getCause();
                 interactionCall.onFailure();
@@ -294,6 +357,22 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
         if (!(cause instanceof IllegalArgumentException)) return false;
         String message = cause.getMessage();
         return message != null && message.startsWith("unknown client");
+    }
+
+    private boolean isInputMethodTrace(Method method) {
+        if (!"inputmethod".equalsIgnoreCase(serviceName) || method == null) return false;
+        String name = method.getName().toLowerCase(java.util.Locale.ROOT);
+        return name.contains("startinput") || name.contains("windowgainedfocus")
+                || name.contains("showsoftinput") || name.contains("hidesoftinput")
+                || name.contains("finishinput") || name.contains("removeclient");
+    }
+
+    private boolean isWindowSessionTrace(Method method) {
+        if (!"windowsession".equalsIgnoreCase(serviceName) || method == null) return false;
+        String name = method.getName();
+        return "addToDisplayAsUser".equals(name) || "setOnBackInvokedCallbackInfo".equals(name)
+                || "relayout".equals(name) || "finishDrawing".equals(name)
+                || "remove".equals(name);
     }
 
     private Object activityManagerResult(Method method) {

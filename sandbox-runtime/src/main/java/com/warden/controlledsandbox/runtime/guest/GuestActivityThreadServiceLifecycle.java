@@ -30,10 +30,15 @@ import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /** ActivityThread-owned Service lifecycle and token transport for one Guest process. */
 final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
+    private static final AtomicInteger FRAMEWORK_EVENT_EXECUTOR_IDS = new AtomicInteger();
     private static final int CREATE_SERVICE = 114;
     private static final int SERVICE_ARGS = 115;
     private static final int STOP_SERVICE = 116;
@@ -53,6 +58,14 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
     private final Object services;
     private final Object activityManager;
     private final GuestRuntimeBrokerBridge routeBroker;
+    /**
+     * ActivityThread delivers Service callbacks on the Guest main looper.  The corresponding
+     * Broker operation is state-only, but it is still a Guest -> Broker Binder transaction.  A
+     * synchronous transaction here makes the main looper wait while the Broker can be waiting for
+     * another Guest callback, which is the exact input-dispatch deadlock seen in the device log.
+     * Keep these commits ordered, but never make the framework callback wait for one.
+     */
+    private final ExecutorService frameworkEventExecutor;
     private final Map<IBinder, Record> records = new IdentityHashMap<>();
     private final GuestServiceForegroundTransport foregroundTransport;
     private final Map<String, RecoveryWaiter> recoveryWaiters = new HashMap<>();
@@ -73,6 +86,13 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
         this.services = services;
         this.activityManager = activityManager;
         this.routeBroker = routeBroker;
+        int executorId = FRAMEWORK_EVENT_EXECUTOR_IDS.incrementAndGet();
+        this.frameworkEventExecutor = Executors.newSingleThreadExecutor(runnable -> {
+            Thread thread = new Thread(runnable,
+                    "cs-framework-events-" + session.processSlot() + "-" + executorId);
+            thread.setDaemon(true);
+            return thread;
+        });
         this.foregroundTransport = new GuestServiceForegroundTransport(session, activityManager,
                 routeBroker);
     }
@@ -246,6 +266,9 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
     @Override public void close() {
         if (closed) return;
         closed = true;
+        // No queued state commit may outlive the retired Guest generation.  In-flight Binder work
+        // is best-effort and is fenced by the same generation checks in the Broker.
+        frameworkEventExecutor.shutdownNow();
         synchronized (records) {
             for (Record record : new ArrayList<>(records.values())) {
                 try { record.service.onDestroy(); } catch (Throwable error) {
@@ -395,13 +418,15 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
     private void bindService(Object data, Record record) throws Exception {
         Intent hostIntent = (Intent) field(data, "intent");
         Intent intent = decodeGuestIntent(hostIntent);
+        android.util.Log.i("CS_SERVICE_FRAMEWORK", "BIND_DATA guest=" + record.className
+                + " hostExtras=" + (hostIntent == null ? null : hostIntent.getExtras())
+                + " decodedExtras=" + (intent == null ? null : intent.getExtras()));
         boolean rebind = booleanField(data, "rebind");
         FrameworkServiceBindingLedger.Entry binding;
         if (rebind) {
             binding = record.bindings.takePendingRebind(intent);
             if (binding != null) {
                 record.service.onRebind(intent);
-                serviceDone(record.token, SERVICE_DONE_EXECUTING_ANON, 0, 0);
             } else {
                 // Be tolerant of an OEM/framework that marks a first bind as rebind.  The
                 // authoritative record is still created per filtered Intent; only the callback
@@ -413,6 +438,11 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
             binding = record.bindings.bind(intent, record.service::onBind);
             publishService(data, record.token, hostIntent, binding.binder());
         }
+        // ActivityThread.handleBindService() acknowledges every BIND_SERVICE callback after
+        // publishService()/onRebind().  The bridge owns this Handler callback, so omitting the
+        // completion leaves the physical StubService in AMS's executing set and produces a
+        // delayed "executing service ... waited 20000ms" ANR.
+        serviceDone(record.token, SERVICE_DONE_EXECUTING_ANON, 0, 0);
         record.lastBinder = binding.binder();
         recordFrameworkEvent(record, lifecycleRoute(record, hostIntent), ComponentOperations.FRAMEWORK_SERVICE_EVENT_BIND,
                 0, 0);
@@ -532,6 +562,30 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
         if (intentPayload != null) {
             RuntimeIntentWireCodec.attachRoutePayloadDescriptor(request, intentPayload);
         }
+        // This method is called from ActivityThread's main Handler.  VA/NBB keep the framework
+        // callback local and do not synchronously re-enter their component broker from that
+        // Handler.  CAS must retain the cross-process state commit, so submit it to one serial
+        // worker: ordering is preserved (BIND/START/STOP), while input, IME and back dispatch can
+        // continue even if the Broker is slow or is delivering a reentrant Guest callback.
+        final Bundle queuedRequest = new Bundle(request);
+        try {
+            frameworkEventExecutor.execute(() -> commitFrameworkEvent(queuedRequest, event));
+            android.util.Log.i("CS_SERVICE_FRAMEWORK", "Broker lifecycle commit queued event=" + event
+                    + " component=" + record.className + " thread=" + Thread.currentThread().getName());
+        } catch (RejectedExecutionException error) {
+            // Teardown can race the final ActivityThread callback.  The generation is already
+            // fenced in that case; never turn a late bookkeeping edge into a main-thread crash.
+            android.util.Log.w("CS_SERVICE_FRAMEWORK",
+                    "Broker lifecycle commit dropped after teardown event=" + event, error);
+        }
+    }
+
+    private void commitFrameworkEvent(Bundle request, String event) {
+        if (closed) {
+            android.util.Log.i("CS_SERVICE_FRAMEWORK",
+                    "Broker lifecycle commit skipped after teardown event=" + event);
+            return;
+        }
         try {
             Bundle result = routeBroker.invokeComponent(request);
             if (result == null || "FAILED".equals(result.getString(RuntimeKeys.STATUS, ""))) {
@@ -539,12 +593,14 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
                         + (result == null ? "NO_RESULT" : result.getString(RuntimeKeys.ERROR_TYPE, "FAILED")));
             }
             RuntimeEventLog.event("GUEST_SERVICE_FRAMEWORK_EVENT_RECORDED", result);
+            android.util.Log.i("CS_SERVICE_FRAMEWORK", "Broker lifecycle commit complete event=" + event
+                    + " thread=" + Thread.currentThread().getName());
         } catch (Throwable error) {
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-            android.util.Log.e("CS_SERVICE_FRAMEWORK", "Broker lifecycle commit failed event=" + event,
-                    error);
-            throw error instanceof RuntimeException
-                    ? (RuntimeException) error : new IllegalStateException(error);
+            // A bookkeeping failure must be observable, but it must not kill the ActivityThread
+            // callback after the Guest Service has already returned to Android.
+            android.util.Log.e("CS_SERVICE_FRAMEWORK",
+                    "Broker lifecycle async commit failed event=" + event, error);
         }
     }
 

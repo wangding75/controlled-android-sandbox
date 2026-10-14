@@ -266,6 +266,11 @@ public final class NativePolicy {
         return AVAILABLE && nativeInstallSystemIoHooks();
     }
 
+    /** Rebinds libopenjdk's cached filesystem callbacks after its PLT boundary is installed. */
+    public static boolean rebindSystemIo() {
+        return AVAILABLE && nativeRebindSystemIo();
+    }
+
     /**
      * Installs only the host runtime-library process-lifetime boundary used by translated guests.
      * Direct native termination remains deny-only; Runtime.nativeExit is forwarded as the normal
@@ -382,6 +387,7 @@ public final class NativePolicy {
     private static native String nativeHostileSeccompDenyNames();
     private static native boolean nativeInstallHooks(String guestLibraryRoot);
     private static native boolean nativeInstallSystemIoHooks();
+    private static native boolean nativeRebindSystemIo();
     private static native boolean nativeInstallProcessLifetimeHooks();
     private static native boolean nativeRefreshHooks();
     private static native boolean nativeRefreshProcessLifetimeHooks();

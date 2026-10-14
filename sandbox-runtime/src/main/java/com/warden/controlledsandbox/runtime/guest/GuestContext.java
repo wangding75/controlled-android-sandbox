@@ -39,6 +39,7 @@ import java.lang.reflect.Method;
 import com.warden.controlledsandbox.contract.VirtualPackageProjectionSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import java.util.concurrent.Executor;
+import java.util.function.Consumer;
 
 /**
  * Instance-scoped Context view used by Guest Application and components.
@@ -81,19 +82,21 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     final GuestMainThreadDispatcher mainThread;
     private final boolean deviceProtected;
     private final Map<String, SharedPreferences> preferences = new HashMap<>();
+    /** Real Host-files symlink exposed only to U4's Java native-library health probe. */
+    private final String applicationNativeLibraryDir;
 
     GuestContext(Context host, GuestPackageSpec spec, ClassLoader classLoader,
                  Resources resources, AssetManager assets) {
         this(host, spec, classLoader, resources, assets, host.getPackageManager(), false,
                 new SharedState(new GuestCapabilityGate(spec.packageState.permissions()), classLoader),
-                null, "", null);
+                null, "", null, "");
     }
 
     GuestContext(Context host, GuestPackageSpec spec, ClassLoader classLoader,
                  Resources resources, AssetManager assets, PackageManager packageManager) {
         this(host, spec, classLoader, resources, assets, packageManager, false,
                 new SharedState(new GuestCapabilityGate(spec.packageState.permissions()), classLoader),
-                null, "", null);
+                null, "", null, "");
     }
 
     GuestContext(Context host, GuestPackageSpec spec, ClassLoader classLoader,
@@ -107,16 +110,25 @@ public final class GuestContext extends GuestHostOperationDenyContext {
                  Bundle applicationMetadata, String appComponentFactory) {
         this(host, spec, classLoader, resources, assets, packageManager, false,
                 new SharedState(new GuestCapabilityGate(spec.packageState.permissions()), classLoader),
-                applicationMetadata, appComponentFactory, null);
+                applicationMetadata, appComponentFactory, null, "");
     }
 
     GuestContext(Context host, GuestPackageSpec spec, ClassLoader classLoader,
                  Resources resources, AssetManager assets, PackageManager packageManager,
                  Bundle applicationMetadata, String appComponentFactory,
                  ApplicationInfo parsedApplicationInfo) {
+        this(host, spec, classLoader, resources, assets, packageManager, applicationMetadata,
+                appComponentFactory, parsedApplicationInfo, "");
+    }
+
+    GuestContext(Context host, GuestPackageSpec spec, ClassLoader classLoader,
+                 Resources resources, AssetManager assets, PackageManager packageManager,
+                 Bundle applicationMetadata, String appComponentFactory,
+                 ApplicationInfo parsedApplicationInfo, String applicationNativeLibraryDir) {
         this(host, spec, classLoader, resources, assets, packageManager, false,
                 new SharedState(new GuestCapabilityGate(spec.packageState.permissions()), classLoader),
-                applicationMetadata, appComponentFactory, parsedApplicationInfo);
+                applicationMetadata, appComponentFactory, parsedApplicationInfo,
+                applicationNativeLibraryDir);
     }
 
     private GuestContext(Context host, GuestPackageSpec spec, ClassLoader classLoader,
@@ -124,7 +136,8 @@ public final class GuestContext extends GuestHostOperationDenyContext {
                          boolean deviceProtected,
                          SharedState sharedState, Bundle applicationMetadata,
                          String appComponentFactory,
-                         ApplicationInfo parsedApplicationInfo) {
+                         ApplicationInfo parsedApplicationInfo,
+                         String applicationNativeLibraryDir) {
         // ContextWrapper has a small set of hidden framework helpers (for example
         // getDisplayNoVerify(), used while PhoneWindow tears down a DecorView) that call the
         // private base field directly. Keep that field on the host's application transport so
@@ -166,6 +179,8 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         this.deviceProtected = deviceProtected;
         this.sharedState = sharedState;
         this.unwrapBoundary = new GuestContextUnwrapBoundary(this);
+        this.applicationNativeLibraryDir = applicationNativeLibraryDir == null
+                ? "" : applicationNativeLibraryDir.trim();
         android.util.Log.i("CS_GUEST_STORAGE", "bootstrap isolated=" + spec.isolatedProcess
                 + " dataFd=" + (spec.dataRootDescriptor == null ? -1 : spec.dataRootDescriptor.getFd())
                 + " dataRoot=" + spec.dataRoot);
@@ -177,14 +192,18 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         this.externalRoot = ensureDirectory(new File(instanceRoot, "external"));
         this.storageNames = new GuestStorageNameCodec(instanceRoot, capabilityBackedStorage);
         this.applicationInfo = GuestApplicationInfoFactory.create(spec, dataRoot.getAbsolutePath(),
-                applicationMetadata, appComponentFactory, parsedApplicationInfo);
-        // Keep ApplicationInfo.nativeLibraryDir on the Android logical path
-        // (/data/app/<pkg>/lib/<abi>). NBB's BPackageManager uses /data/app-lib/<pkg>;
-        // VA uses the virtual lib path plus IO redirect. The Host-files alias is created
-        // once in prepareNativeBootstrap; re-creating it here runs after system IO hooks
-        // and Files.createDirectories(/data/user/0/<host>/files) is denied as a
-        // cross-package private path. Window decor calls createConfigurationContext on
-        // every Activity start, so that throw killed the previously working homepage.
+                applicationMetadata, appComponentFactory, parsedApplicationInfo,
+                this.applicationNativeLibraryDir);
+        android.util.Log.i("CS_GUEST_PATH", "codePath=" + getPackageCodePath()
+                + " resourcePath=" + getPackageResourcePath()
+                + " sourceDir=" + applicationInfo.sourceDir
+                + " nativeDir=" + applicationInfo.nativeLibraryDir);
+        // Regular U4 guests publish the already-created Host-files alias here. U4 checks
+        // ApplicationInfo.nativeLibraryDir/liblibloaderuc.so with java.io.File.exists(); the
+        // logical /data/app path correctly hides CAS identity but cannot pass that probe. The
+        // alias is a verified symlink and NativePolicy maps native opens back to the CAS root.
+        // Derived contexts carry this immutable override; they must not recreate the alias after
+        // native IO hooks are installed.
         // ContentResolver captures its Context attribution source at construction time. Use the
         // physical Host context for the platform-facing resolver: Android 12+ validates the
         // first AttributionSource against the real Binder caller and rejects a virtual UID when
@@ -325,6 +344,8 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         if (!isChromiumRendererService(componentClass) || isTranslatedGuestAbi()) return;
         synchronized (sharedState) {
             if (sharedState.rendererNativeBindingsInstalled) return;
+            GuestRuntimeEnvironment.applyU4CorePathProjection(classLoader, spec, dataRoot,
+                    applicationNativeLibraryDir);
             GuestRuntimeEnvironment.bindGuestSystemRendererNamespace(classLoader);
             GuestRuntimeEnvironment.installGuestDrawFnFunctionTable(classLoader);
             sharedState.rendererNativeBindingsInstalled = true;
@@ -507,6 +528,11 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         return componentRouter.startActivityFromFrameworkActivity(
                 intent, options, callerTaskId, requestCode);
     }
+    void startActivityFromFrameworkActivityAsync(Intent intent, Bundle options, int callerTaskId,
+            int requestCode, Consumer<Bundle> success, Consumer<Throwable> failure) {
+        componentRouter.startActivityFromFrameworkActivityAsync(
+                intent, options, callerTaskId, requestCode, success, failure);
+    }
     @Override public void startActivities(Intent[] intents) { startActivities(intents, null); }
     @Override public void startActivities(Intent[] intents, Bundle options) {
         if (intents == null) throw new IllegalArgumentException("intents is required");
@@ -522,6 +548,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     @Override public boolean bindService(Intent service, ServiceConnection connection, int flags) {
         ensureRendererNativeBindings(service);
         logRendererBind("bindService", service);
+        logRendererContextBind("bindService", service);
         if (webViewProviderServices.bind(service, connection, flags, null)) return true;
         return componentRouter.bindService(service, connection, flags, null);
     }
@@ -535,6 +562,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
             Executor executor, ServiceConnection connection) {
         ensureRendererNativeBindings(service);
         logRendererBind("bindIsolatedService", service);
+        logRendererContextBind("bindIsolatedService", service);
         if (webViewProviderServices.bindIsolated(service, flags, instanceName, executor, connection)) {
             return true;
         }
@@ -561,9 +589,23 @@ public final class GuestContext extends GuestHostOperationDenyContext {
             int flags, Handler handler, UserHandle user) {
         ensureRendererNativeBindings(service);
         logRendererBind("bindServiceAsUser", service);
+        logRendererContextBind("bindServiceAsUser", service);
         Executor executor = handler == null ? null : handler::post;
         if (webViewProviderServices.bind(service, connection, flags, executor)) return true;
         return componentRouter.bindService(service, connection, flags, executor);
+    }
+
+    private void logRendererContextBind(String api, Intent service) {
+        if (service == null || service.getComponent() == null
+                || !isChromiumRendererService(service.getComponent().getClassName())) return;
+        android.util.Log.i("CS_CONTEXT_BIND", "api=" + api
+                + " guest=" + spec.packageName
+                + " component=" + service.getComponent().flattenToShortString()
+                + " this=" + getClass().getName()
+                + " base=" + String.valueOf(super.getBaseContext())
+                + " app=" + String.valueOf(getApplicationContext())
+                + " thread=" + Thread.currentThread().getName()
+                + " pid=" + android.os.Process.myPid());
     }
 
     private static void logRendererBind(String api, Intent service) {
@@ -572,7 +614,8 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         android.util.Log.i("CS_RENDERER_BIND", "api=" + api
                 + " component=" + service.getComponent().flattenToShortString()
                 + " package=" + service.getPackage()
-                + " flags=0x" + Integer.toHexString(service.getFlags()));
+                + " flags=0x" + Integer.toHexString(service.getFlags())
+                + " extras=" + service.getExtras());
     }
     @Override public void updateServiceGroup(ServiceConnection connection, int group,
             int importance) {
@@ -797,8 +840,8 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     @Override public File[] getExternalMediaDirs() {
         return new File[]{ensureDirectory(new File(externalRoot, "media"))};
     }
-    @Override public String getPackageCodePath() { return spec.apkPath; }
-    @Override public String getPackageResourcePath() { return spec.apkPath; }
+    @Override public String getPackageCodePath() { return applicationInfo.sourceDir; }
+    @Override public String getPackageResourcePath() { return applicationInfo.publicSourceDir; }
 
     @Override public Context createPackageContext(String packageName, int flags)
             throws PackageManager.NameNotFoundException {
@@ -962,7 +1005,8 @@ public final class GuestContext extends GuestHostOperationDenyContext {
                 configuration);
         return new GuestContext(hostServiceContext, spec, classLoader, configuredResources, assets,
                 packageManager, deviceProtected, sharedState, applicationInfo.metaData,
-                GuestApplicationInfoFactory.readComponentFactory(applicationInfo), applicationInfo);
+                GuestApplicationInfoFactory.readComponentFactory(applicationInfo), applicationInfo,
+                applicationNativeLibraryDir);
     }
 
     @Override public Context createDisplayContext(android.view.Display display) {
@@ -973,7 +1017,8 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         // the derived context just as createConfigurationContext does.
         return new GuestContext(hostServiceContext, spec, classLoader, resources, assets,
                 packageManager, deviceProtected, sharedState, applicationInfo.metaData,
-                GuestApplicationInfoFactory.readComponentFactory(applicationInfo), applicationInfo);
+                GuestApplicationInfoFactory.readComponentFactory(applicationInfo), applicationInfo,
+                applicationNativeLibraryDir);
     }
 
     public Context createCredentialProtectedStorageContext() {
@@ -989,7 +1034,8 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     private GuestContext storageContext(boolean targetDeviceProtected) {
         return new GuestContext(hostServiceContext, spec, classLoader, resources, assets,
                 packageManager, targetDeviceProtected, sharedState, applicationInfo.metaData,
-                GuestApplicationInfoFactory.readComponentFactory(applicationInfo), applicationInfo);
+                GuestApplicationInfoFactory.readComponentFactory(applicationInfo), applicationInfo,
+                applicationNativeLibraryDir);
     }
 
     private ApplicationInfo packageContextApplicationInfo(

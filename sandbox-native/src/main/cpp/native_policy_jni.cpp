@@ -288,7 +288,19 @@ bool install_hidden_api_bridge(JNIEnv* env) {
             // Android 17's Wi-Fi module shades ParceledListSlice into a distinct hidden
             // framework type.  The public List constructor is the only audited adapter path;
             // exempt that concrete class rather than the whole modules-utils namespace.
-            "Lcom/android/wifi/x/com/android/modules/utils/ParceledListSlice;"
+            "Lcom/android/wifi/x/com/android/modules/utils/ParceledListSlice;",
+            // libopenjdk's UnixNativeDispatcher caches libc entry points from its private
+            // native init() method.  NIO is the path-policy boundary for projected DexPathList
+            // paths, so exempt this exact core class to re-run that initializer after the PLT
+            // hooks are installed; do not open the whole sun.* namespace.
+            "Lsun/nio/fs/UnixNativeDispatcher;",
+            // The same initializer resolves the private stat fields written by
+            // libopenjdk into UnixFileAttributes.  Keep the exemption class-exact.
+            "Lsun/nio/fs/UnixFileAttributes;",
+            // It also resolves the private statvfs fields used by FileStore queries.
+            "Lsun/nio/fs/UnixFileStoreAttributes;",
+            // Mount enumeration fills private UnixMountEntry fields during the same init.
+            "Lsun/nio/fs/UnixMountEntry;"
     };
     constexpr jsize prefix_count = static_cast<jsize>(sizeof(prefixes) / sizeof(prefixes[0]));
     jobjectArray values = env->NewObjectArray(prefix_count, string_class, nullptr);
@@ -762,6 +774,44 @@ Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeInstallSystemI
         JNIEnv* env, jclass) {
     try {
         return controlled_sandbox::global_hooks().install_system_io() ? JNI_TRUE : JNI_FALSE;
+    } catch (const std::exception& error) {
+        throw_java(env, "java/lang/IllegalStateException", error.what());
+        return JNI_FALSE;
+    }
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeRebindSystemIo(
+        JNIEnv* env, jclass) {
+    try {
+        if (!controlled_sandbox::global_hooks().refresh()) return JNI_FALSE;
+        jclass dispatcher = env->FindClass("sun/nio/fs/UnixNativeDispatcher");
+        if (dispatcher == nullptr) {
+            env->ExceptionClear();
+            __android_log_print(ANDROID_LOG_WARN, "CS_NATIVE_HOOK",
+                    "NIO_REBIND unavailable dispatcher-class");
+            return JNI_FALSE;
+        }
+        jmethodID init = env->GetStaticMethodID(dispatcher, "init", "()I");
+        if (init == nullptr) {
+            env->ExceptionClear();
+            env->DeleteLocalRef(dispatcher);
+            __android_log_print(ANDROID_LOG_WARN, "CS_NATIVE_HOOK",
+                    "NIO_REBIND unavailable init-method");
+            return JNI_FALSE;
+        }
+        (void) env->CallStaticIntMethod(dispatcher, init);
+        const bool success = !env->ExceptionCheck();
+        if (!success) {
+            __android_log_print(ANDROID_LOG_WARN, "CS_NATIVE_HOOK",
+                    "NIO_REBIND exception while invoking dispatcher.init");
+            env->ExceptionDescribe();
+            env->ExceptionClear();
+        }
+        env->DeleteLocalRef(dispatcher);
+        __android_log_print(success ? ANDROID_LOG_INFO : ANDROID_LOG_WARN,
+                "CS_NATIVE_HOOK", "NIO_REBIND success=%s", success ? "true" : "false");
+        return success ? JNI_TRUE : JNI_FALSE;
     } catch (const std::exception& error) {
         throw_java(env, "java/lang/IllegalStateException", error.what());
         return JNI_FALSE;

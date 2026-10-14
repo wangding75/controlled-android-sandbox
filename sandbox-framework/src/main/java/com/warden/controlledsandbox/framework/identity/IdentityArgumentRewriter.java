@@ -18,8 +18,12 @@ import java.util.Objects;
 public final class IdentityArgumentRewriter {
     private static final String ATTRIBUTION_SOURCE = "android.content.AttributionSource";
     private static final String ATTRIBUTION_SOURCE_STATE = "android.content.AttributionSourceState";
+    private static final long PROCESS_INDEX_CACHE_NANOS = 500_000_000L;
 
     private final IdentityContext context;
+    private final Object processIndexLock = new Object();
+    private volatile long processIndexTimestampNanos;
+    private volatile Map<String, IndexedGuestProcess> processIndex = Collections.emptyMap();
 
     public IdentityArgumentRewriter(IdentityContext context) {
         this.context = Objects.requireNonNull(context, "context");
@@ -231,6 +235,7 @@ public final class IdentityArgumentRewriter {
         LiveProcessIdentityList(List<?> source, List<Object> initial) {
             this.source = source;
             this.current = initial;
+            this.refreshedAtNanos = System.nanoTime();
         }
 
         @Override public Object get(int index) {
@@ -255,14 +260,23 @@ public final class IdentityArgumentRewriter {
             throw new UnsupportedOperationException("running process projection is read-only");
         }
 
-        private synchronized void refresh() {
-            List<?> snapshot = appendIndexedGuestProcesses(source);
-            ArrayList<Object> projected = new ArrayList<>(snapshot.size());
-            for (Object item : snapshot) {
-                if (item != null && shouldHideHostSlotProcess(item)) continue;
-                projected.add(rewriteOutboundValue(item, new IdentityHashMap<>()));
+        private volatile long refreshedAtNanos;
+
+        private void refresh() {
+            long now = System.nanoTime();
+            if (now - refreshedAtNanos < PROCESS_INDEX_CACHE_NANOS) return;
+            synchronized (this) {
+                now = System.nanoTime();
+                if (now - refreshedAtNanos < PROCESS_INDEX_CACHE_NANOS) return;
+                List<?> snapshot = appendIndexedGuestProcesses(source);
+                ArrayList<Object> projected = new ArrayList<>(snapshot.size());
+                for (Object item : snapshot) {
+                    if (item != null && shouldHideHostSlotProcess(item)) continue;
+                    projected.add(rewriteOutboundValue(item, new IdentityHashMap<>()));
+                }
+                current = Collections.unmodifiableList(projected);
+                refreshedAtNanos = now;
             }
-            current = Collections.unmodifiableList(projected);
         }
     }
 
@@ -274,15 +288,11 @@ public final class IdentityArgumentRewriter {
      * publication gap, copying the platform record shape rather than inventing a new type.
      */
     private List<?> appendIndexedGuestProcesses(List<?> list) {
-        android.util.Log.i("CS_GUEST_PROCESS_IDENTITY", "AMS_PROCESS_LIST_SCAN size=" + list.size()
-                + " first=" + (list.isEmpty() || list.get(0) == null
-                ? "null" : list.get(0).getClass().getName()));
         Object template = null;
         Field templatePid = null;
         Field templateProcessName = null;
         HashSet<Integer> knownPids = new HashSet<>();
         HashSet<String> knownNames = new HashSet<>();
-        StringBuilder observed = new StringBuilder();
         for (Object item : list) {
             if (item == null || !isProcessIdentityRecord(item)) continue;
             if (template == null) {
@@ -296,61 +306,81 @@ public final class IdentityArgumentRewriter {
                 Field processName = processNameField(item.getClass());
                 Object name = processName == null ? null : processName.get(item);
                 if (name instanceof String text && !text.isEmpty()) knownNames.add(text);
-                observed.append(pid).append('=').append(name).append(" uid=")
-                        .append(processUid(item)).append(';');
             } catch (ReflectiveOperationException | RuntimeException ignored) {
                 // An OEM process-record shape may be partially inaccessible; the normal rewrite
                 // below remains best-effort for that record.
             }
         }
-        android.util.Log.i("CS_GUEST_PROCESS_IDENTITY", "AMS_PROCESS_LIST_RECORDS " + observed);
         if (template == null || templatePid == null || templateProcessName == null) return list;
 
-        Map<String, IndexedGuestProcess> indexedProcesses = new HashMap<>();
-        for (java.io.File directory : guestPidIndexDirectories()) {
-            java.io.File[] files = directory.listFiles();
-            android.util.Log.i("CS_GUEST_PROCESS_IDENTITY", "AMS_PROCESS_LIST_INDEX dir="
-                    + directory + " exists=" + directory.isDirectory() + " files="
-                    + (files == null ? -1 : files.length));
-            if (files == null) continue;
-            for (java.io.File file : files) {
-                int pid = parsePid(file);
-                if (pid <= 0 || knownPids.contains(pid) || !isLiveProcess(pid)) continue;
-                String processName = readGuestProcessName(file);
-                if (!isGuestProcessName(processName)) continue;
-                IndexedGuestProcess candidate = new IndexedGuestProcess(
-                        pid, processName, file.lastModified());
-                IndexedGuestProcess previous = indexedProcesses.get(processName);
-                if (previous == null || candidate.isNewerThan(previous)) {
-                    indexedProcesses.put(processName, candidate);
-                }
-            }
-        }
+        Map<String, IndexedGuestProcess> indexedProcesses = indexedGuestProcesses();
 
         ArrayList<Object> expanded = null;
         for (IndexedGuestProcess candidate : indexedProcesses.values()) {
-                int pid = candidate.pid();
-                String processName = candidate.processName();
-                if (knownNames.contains(processName)) continue;
-                Object copy = copyProcessIdentityRecord(template);
-                if (copy == null) continue;
-                try {
-                    Field pidField = findOptionalField(copy.getClass(), "pid");
-                    Field processNameField = processNameField(copy.getClass());
-                    if (pidField == null || processNameField == null) continue;
-                    pidField.setInt(copy, pid);
-                    processNameField.set(copy, processName);
-                } catch (ReflectiveOperationException | RuntimeException ignored) {
-                    continue;
-                }
-                if (expanded == null) expanded = new ArrayList<>(list);
-                expanded.add(copy);
-                knownPids.add(pid);
-                knownNames.add(processName);
-                android.util.Log.i("CS_GUEST_PROCESS_IDENTITY", "pid index projected pid=" + pid
-                        + " process=" + processName);
+            int pid = candidate.pid();
+            String processName = candidate.processName();
+            if (knownNames.contains(processName)) continue;
+            Object copy = copyProcessIdentityRecord(template);
+            if (copy == null) continue;
+            try {
+                Field pidField = findOptionalField(copy.getClass(), "pid");
+                Field processNameField = processNameField(copy.getClass());
+                if (pidField == null || processNameField == null) continue;
+                pidField.setInt(copy, pid);
+                processNameField.set(copy, processName);
+            } catch (ReflectiveOperationException | RuntimeException ignored) {
+                continue;
+            }
+            if (expanded == null) expanded = new ArrayList<>(list);
+            expanded.add(copy);
+            knownPids.add(pid);
+            knownNames.add(processName);
         }
         return expanded == null ? list : expanded;
+    }
+
+    /**
+     * The Guest PID index is a compatibility bridge for the short interval before AMS publishes
+     * the physical service process.  It is not a live filesystem API.  Re-scanning four mapped
+     * directories on every List.size()/List.get() made Quark's push worker spend the startup
+     * window in /proc and file opens, and the live wrapper called it once per accessor.  Keep a
+     * short process-local snapshot; a newly-started renderer is still visible within 500 ms.
+     */
+    private Map<String, IndexedGuestProcess> indexedGuestProcesses() {
+        long now = System.nanoTime();
+        Map<String, IndexedGuestProcess> cached = processIndex;
+        if (now - processIndexTimestampNanos < PROCESS_INDEX_CACHE_NANOS) return cached;
+        synchronized (processIndexLock) {
+            now = System.nanoTime();
+            if (now - processIndexTimestampNanos < PROCESS_INDEX_CACHE_NANOS) {
+                return processIndex;
+            }
+            Map<String, IndexedGuestProcess> refreshed = new HashMap<>();
+            for (java.io.File directory : guestPidIndexDirectories()) {
+                java.io.File[] files;
+                try {
+                    files = directory.listFiles();
+                } catch (RuntimeException ignored) {
+                    continue;
+                }
+                if (files == null) continue;
+                for (java.io.File file : files) {
+                    int pid = parsePid(file);
+                    if (pid <= 0 || !isLiveProcess(pid)) continue;
+                    String processName = readGuestProcessName(file);
+                    if (!isGuestProcessName(processName)) continue;
+                    IndexedGuestProcess candidate = new IndexedGuestProcess(
+                            pid, processName, file.lastModified());
+                    IndexedGuestProcess previous = refreshed.get(processName);
+                    if (previous == null || candidate.isNewerThan(previous)) {
+                        refreshed.put(processName, candidate);
+                    }
+                }
+            }
+            processIndex = Collections.unmodifiableMap(refreshed);
+            processIndexTimestampNanos = now;
+            return processIndex;
+        }
     }
 
     private boolean isProcessIdentityRecord(Object value) {
@@ -530,9 +560,6 @@ public final class IdentityArgumentRewriter {
                     if (uid != null && isGuestProcessName(projected)) {
                         uid.setInt(target, context.guestUid());
                     }
-                    android.util.Log.i("CS_GUEST_PROCESS_IDENTITY", "AMS_PROCESS_RECORD pid="
-                            + recordPid + " raw=" + name + " projected=" + processName.get(target)
-                            + " uid=" + processUid(target));
                 }
             }
             if (pkgList != null) {
@@ -542,16 +569,6 @@ public final class IdentityArgumentRewriter {
             return value;
         }
         return target;
-    }
-
-    private static int processUid(Object value) {
-        Field uid = findOptionalField(value.getClass(), "uid");
-        if (uid == null) return -1;
-        try {
-            return uid.getInt(value);
-        } catch (ReflectiveOperationException | RuntimeException ignored) {
-            return -1;
-        }
     }
 
     private boolean shouldHideHostSlotProcess(Object value) {
@@ -577,6 +594,9 @@ public final class IdentityArgumentRewriter {
 
     private String lookupGuestProcessName(int pid) {
         if (pid <= 0) return null;
+        for (IndexedGuestProcess candidate : indexedGuestProcesses().values()) {
+            if (candidate.pid() == pid) return candidate.processName();
+        }
         String relative = "files/instances/u" + context.virtualUserId() + "/"
                 + context.guestPackage() + "/data/files/guest-pid/" + pid;
         java.io.File[] candidates = {

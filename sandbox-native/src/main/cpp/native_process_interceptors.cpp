@@ -3,6 +3,7 @@
 #include "controlled_sandbox/native_boundary.h"
 #include "controlled_sandbox/native_fd_ledger.h"
 #include "controlled_sandbox/native_file_system.h"
+#include "controlled_sandbox/native_interceptors.h"
 #include "controlled_sandbox/native_policy.h"
 
 #include <algorithm>
@@ -24,6 +25,8 @@
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+
+#include <android/log.h>
 
 #if __has_include(<linux/seccomp.h>)
 #include <linux/seccomp.h>
@@ -132,6 +135,26 @@ Function require_real(std::atomic<Function>& storage, const char* name) {
 
 bool configured() noexcept {
     return global_policy().snapshot().configured;
+}
+
+// Process creation is intentionally fail-closed once a Guest policy is active.  Keep a
+// low-volume trace at this boundary: a Chromium/UC helper can otherwise look like an
+// unexplained renderer hang when the actual failure is an intercepted fork/clone/exec.
+void log_process_edge(const char* operation, const char* decision, long flags = 0,
+                      int error_number = 0, long result = 0) noexcept {
+    const NativePolicySnapshot policy = global_policy().snapshot();
+    __android_log_print(ANDROID_LOG_INFO, "CS_PROCESS_EDGE",
+            "op=%s decision=%s result=%ld errno=%d flags=0x%lx hostPid=%d hostPpid=%d hostTid=%d "
+            "principal=%d virtualPid=%d configured=%s exitAllowed=%s",
+            operation == nullptr ? "" : operation,
+            decision == nullptr ? "" : decision,
+            result, error_number, static_cast<unsigned long>(flags),
+            static_cast<int>(NativeProcessIdentity::host_pid()),
+            static_cast<int>(NativeProcessIdentity::host_ppid()),
+            static_cast<int>(NativeProcessIdentity::host_tid()),
+            policy.principal_host_pid, policy.virtual_pid,
+            policy.configured ? "true" : "false",
+            guest_process_exit_allowed() ? "true" : "false");
 }
 
 template <typename Function, typename... Args>
@@ -419,22 +442,47 @@ extern "C" long controlled_ptrace(long request, ...) {
 }
 
 extern "C" pid_t controlled_fork() {
-    if (configured()) return static_cast<pid_t>(deny_process_creation());
+    if (configured()) {
+        log_process_edge("fork", "DENY", 0, EPERM, -1);
+        return static_cast<pid_t>(deny_process_creation());
+    }
     ForkFn function = require_real(real_fork, "fork");
-    return function == nullptr ? static_cast<pid_t>(deny_process_creation()) : function();
+    if (function == nullptr) {
+        log_process_edge("fork", "DENY_NO_IMPL", 0, ENOSYS, -1);
+        return static_cast<pid_t>(deny_process_creation());
+    }
+    const pid_t result = function();
+    log_process_edge("fork", "FORWARD", 0, 0, result);
+    return result;
 }
 
 extern "C" pid_t controlled_vfork() {
-    if (configured()) return static_cast<pid_t>(deny_process_creation());
+    if (configured()) {
+        log_process_edge("vfork", "DENY", 0, EPERM, -1);
+        return static_cast<pid_t>(deny_process_creation());
+    }
     ForkFn function = require_real(real_vfork, "vfork");
-    return function == nullptr ? static_cast<pid_t>(deny_process_creation()) : function();
+    if (function == nullptr) {
+        log_process_edge("vfork", "DENY_NO_IMPL", 0, ENOSYS, -1);
+        return static_cast<pid_t>(deny_process_creation());
+    }
+    const pid_t result = function();
+    log_process_edge("vfork", "FORWARD", 0, 0, result);
+    return result;
 }
 
 extern "C" int controlled_clone(int (*function)(void*), void* stack, int flags,
                                  void* argument, ...) {
     CloneFn real_function = require_real(real_clone, "clone");
-    if (real_function == nullptr) { errno = ENOSYS; return -1; }
-    if (configured() && !is_thread_clone(flags)) return deny_process_creation();
+    if (real_function == nullptr) {
+        log_process_edge("clone", "DENY_NO_IMPL", flags, ENOSYS, -1);
+        errno = ENOSYS;
+        return -1;
+    }
+    if (configured() && !is_thread_clone(flags)) {
+        log_process_edge("clone", "DENY", flags, EPERM, -1);
+        return deny_process_creation();
+    }
     va_list values;
     va_start(values, argument);
     void* parent_tid = nullptr;
@@ -446,33 +494,69 @@ extern "C" int controlled_clone(int (*function)(void*), void* stack, int flags,
     if ((flags & CLONE_SETTLS) != 0) tls = va_arg(values, void*);
     if ((flags & CLONE_CHILD_CLEARTID) != 0) child_tid = va_arg(values, void*);
     va_end(values);
-    return real_function(function, stack, flags, argument, parent_tid, tls, child_tid);
+    const int result = real_function(function, stack, flags, argument, parent_tid, tls, child_tid);
+    if (!is_thread_clone(flags)) log_process_edge("clone", "FORWARD", flags, 0, result);
+    return result;
 }
 
 extern "C" long controlled_clone3(void* arguments, std::size_t size) {
     Clone3Fn function = require_real(real_clone3, "clone3");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
-    if (configured()) {
-        if (arguments == nullptr || size < sizeof(std::uint64_t)) { errno = EFAULT; return -1; }
-        const std::uint64_t flags = *reinterpret_cast<const std::uint64_t*>(arguments);
-        if ((flags & CLONE_THREAD) == 0) return deny_process_creation();
+    if (function == nullptr) {
+        log_process_edge("clone3", "DENY_NO_IMPL", 0, ENOSYS, -1);
+        errno = ENOSYS;
+        return -1;
     }
-    return function(arguments, size);
+    if (configured()) {
+        if (arguments == nullptr || size < sizeof(std::uint64_t)) {
+            log_process_edge("clone3", "DENY_BAD_ARGS", 0, EFAULT, -1);
+            errno = EFAULT;
+            return -1;
+        }
+        const std::uint64_t flags = *reinterpret_cast<const std::uint64_t*>(arguments);
+        if ((flags & CLONE_THREAD) == 0) {
+            log_process_edge("clone3", "DENY", static_cast<long>(flags), EPERM, -1);
+            return deny_process_creation();
+        }
+    }
+    const long result = function(arguments, size);
+    if (arguments != nullptr && size >= sizeof(std::uint64_t)) {
+        const auto flags = *reinterpret_cast<const std::uint64_t*>(arguments);
+        if ((flags & CLONE_THREAD) == 0) {
+            log_process_edge("clone3", "FORWARD", static_cast<long>(flags), 0, result);
+        }
+    }
+    return result;
 }
 
 extern "C" int controlled_execve(const char* filename, char* const argv[],
                                   char* const envp[]) {
-    if (configured()) { errno = EPERM; return -1; }
+    if (configured()) {
+        log_process_edge("execve", "DENY", 0, EPERM, -1);
+        errno = EPERM;
+        return -1;
+    }
     ExecveFn function = require_real(real_execve, "execve");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
+    if (function == nullptr) {
+        log_process_edge("execve", "DENY_NO_IMPL", 0, ENOSYS, -1);
+        errno = ENOSYS;
+        return -1;
+    }
     return function(filename, argv, envp);
 }
 
 extern "C" int controlled_execveat(int directory, const char* filename,
                                     char* const argv[], char* const envp[], int flags) {
-    if (configured()) { errno = EPERM; return -1; }
+    if (configured()) {
+        log_process_edge("execveat", "DENY", flags, EPERM, -1);
+        errno = EPERM;
+        return -1;
+    }
     ExecveAtFn function = require_real(real_execveat, "execveat");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
+    if (function == nullptr) {
+        log_process_edge("execveat", "DENY_NO_IMPL", flags, ENOSYS, -1);
+        errno = ENOSYS;
+        return -1;
+    }
     return function(directory, filename, argv, envp, flags);
 }
 
@@ -703,6 +787,12 @@ extern "C" void* controlled_dlsym(void* handle, const char* name) {
     DlsymFn function = require_real(real_dlsym, "dlsym");
     if (name != nullptr && configured()) {
         if (void* replacement = native_process_replacement_for_symbol(name); replacement != nullptr) {
+            return replacement;
+        }
+        // libopenjdk/libjavacore resolve their filesystem entry points once through
+        // dlsym and then call the cached function pointers directly.  Returning the
+        // normal I/O replacement here keeps those JNI paths on NativePolicy too.
+        if (void* replacement = replacement_for_symbol(name); replacement != nullptr) {
             return replacement;
         }
     }

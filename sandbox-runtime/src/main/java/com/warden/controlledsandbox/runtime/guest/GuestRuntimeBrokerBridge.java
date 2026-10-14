@@ -1,6 +1,8 @@
 package com.warden.controlledsandbox.runtime.guest;
 
 import android.os.Bundle;
+import android.os.Process;
+import android.os.SystemClock;
 import com.warden.controlledsandbox.contract.IRuntimeBroker;
 import com.warden.controlledsandbox.contract.RuntimeOperationRequest;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
@@ -20,17 +22,26 @@ final class GuestRuntimeBrokerBridge {
     }
 
     Bundle invokeComponent(Bundle request) {
+        logSubmission("SYNC", RuntimeOperationRequest.INVOKE_COMPONENT, request);
         return execute(RuntimeOperationRequest.INVOKE_COMPONENT, request);
     }
 
     void invokeComponentAsync(Bundle request, Consumer<Bundle> success,
                               Consumer<Throwable> failure) {
+        logSubmission("ASYNC", RuntimeOperationRequest.INVOKE_COMPONENT, request);
         mainThread.callBrokerAsync(
                 () -> execute(RuntimeOperationRequest.INVOKE_COMPONENT, request), success, failure);
     }
 
     Bundle launchActivity(Bundle request) {
         return execute(RuntimeOperationRequest.LAUNCH_ACTIVITY, request);
+    }
+
+    void launchActivityAsync(Bundle request, Consumer<Bundle> success,
+                             Consumer<Throwable> failure) {
+        logSubmission("ASYNC", RuntimeOperationRequest.LAUNCH_ACTIVITY, request);
+        mainThread.callBrokerAsync(
+                () -> execute(RuntimeOperationRequest.LAUNCH_ACTIVITY, request), success, failure);
     }
 
     Bundle launchActivityFromFrameworkHost(Bundle request) {
@@ -83,18 +94,54 @@ final class GuestRuntimeBrokerBridge {
         return request;
     }
 
+    private void logSubmission(String mode, String operation, Bundle request) {
+        String component = request == null ? "" : request.getString(RuntimeKeys.COMPONENT_CLASS, "");
+        String componentOperation = request == null ? "" : request.getString(
+                com.warden.controlledsandbox.runtime.protocol.ComponentOperations.OPERATION, "");
+        android.util.Log.i("CS_BROKER_CALL", "SUBMIT mode=" + mode
+                + " operation=" + operation
+                + " component=" + component
+                + " componentOp=" + componentOperation
+                + " callerMain=" + mainThread.isMainThread()
+                + " pid=" + Process.myPid()
+                + " tid=" + Process.myTid()
+                + " thread=" + Thread.currentThread().getName());
+    }
+
     private Bundle execute(String operation, Bundle request) {
+        long startedAt = SystemClock.elapsedRealtime();
         try {
             if (broker == null) throw new IllegalStateException("RUNTIME_BROKER_CAPABILITY_INVALID");
             Bundle payload = request == null ? baseRequest() : new Bundle(request);
             fillIdentity(payload);
+            String component = payload.getString(RuntimeKeys.COMPONENT_CLASS, "");
+            String componentOperation = payload.getString(
+                    com.warden.controlledsandbox.runtime.protocol.ComponentOperations.OPERATION, "");
+            android.util.Log.i("CS_BROKER_CALL", "BEGIN operation=" + operation
+                    + " component=" + component
+                    + " componentOp=" + componentOperation
+                    + " main=" + mainThread.isMainThread()
+                    + " pid=" + Process.myPid()
+                    + " tid=" + Process.myTid());
             Bundle result = mainThread.callBroker(() -> RuntimeOperationTransport.toLegacyBundle(
                     RuntimeOperationTransport.execute(broker, operation, payload)));
             requireSuccess(result, operation);
+            android.util.Log.i("CS_BROKER_CALL", "END operation=" + operation
+                    + " componentOp=" + componentOperation
+                    + " elapsedMs=" + Math.max(0L, SystemClock.elapsedRealtime() - startedAt)
+                    + " status=" + result.getString(RuntimeKeys.STATUS, "")
+                    + " pid=" + Process.myPid()
+                    + " tid=" + Process.myTid());
             return result;
         } catch (RuntimeException error) {
+            android.util.Log.e("CS_BROKER_CALL", "FAIL operation=" + operation
+                    + " elapsedMs=" + Math.max(0L, SystemClock.elapsedRealtime() - startedAt)
+                    + " error=" + error.getClass().getName() + ":" + error.getMessage(), error);
             throw error;
         } catch (Exception error) {
+            android.util.Log.e("CS_BROKER_CALL", "FAIL operation=" + operation
+                    + " elapsedMs=" + Math.max(0L, SystemClock.elapsedRealtime() - startedAt)
+                    + " error=" + error.getClass().getName() + ":" + error.getMessage(), error);
             throw new IllegalStateException("RUNTIME_BROKER_CALL_FAILED:" + operation, error);
         }
     }

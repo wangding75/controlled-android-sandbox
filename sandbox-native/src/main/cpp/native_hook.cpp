@@ -460,7 +460,8 @@ bool NativeHookRuntime::is_process_io_system_module(std::string_view module_path
 bool NativeHookRuntime::is_target_symbol(std::string_view symbol) noexcept {
     static constexpr auto targets = std::to_array<std::string_view>({
             "open", "open64", "openat", "openat64", "__open_2", "__openat_2", "openat2",
-            "access", "faccessat", "faccessat2", "stat", "lstat", "fstatat", "statx",
+            "access", "faccessat", "faccessat2", "stat", "lstat", "stat64", "lstat64",
+            "fstatat", "statx",
             "rename", "renameat", "renameat2", "unlink", "unlinkat", "mkdir", "mkdirat", "rmdir",
             "fopen", "fopen64", "fclose", "opendir",
             "readlink", "readlinkat", "getdents64", "mmap",
@@ -486,7 +487,7 @@ bool NativeHookRuntime::is_system_io_symbol(std::string_view symbol) noexcept {
     static constexpr auto process_only = std::to_array<std::string_view>({
             "getpid", "getppid", "gettid", "getuid", "geteuid", "getgid", "getegid",
             "prctl", "ptrace", "fork", "vfork", "clone", "clone3", "execve", "execveat",
-            "seccomp", "dlsym"});
+            "seccomp"});
     return std::find(process_only.begin(), process_only.end(), symbol) == process_only.end();
 }
 

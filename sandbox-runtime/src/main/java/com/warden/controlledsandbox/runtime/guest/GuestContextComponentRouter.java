@@ -19,6 +19,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.function.Consumer;
 
 /** Standard Context component APIs backed by the virtual runtime Broker. */
 final class GuestContextComponentRouter {
@@ -41,6 +42,14 @@ final class GuestContextComponentRouter {
     private final IdentityHashMap<ServiceConnection, Boolean> failedConnections =
             new IdentityHashMap<>();
     private final IdentityHashMap<ServiceConnection, Boolean> failedHostConnections =
+            new IdentityHashMap<>();
+    /**
+     * Only protects the local connection state.  Never hold this lock while calling AMS, the
+     * host Context, or the Broker: those calls can synchronously re-enter ActivityThread and
+     * otherwise block unrelated Guest UI work behind a service bind.
+     */
+    private final Object connectionLock = new Object();
+    private final IdentityHashMap<ServiceConnection, Boolean> pendingConnections =
             new IdentityHashMap<>();
     private volatile boolean closed;
 
@@ -78,6 +87,21 @@ final class GuestContextComponentRouter {
         return startActivityInternal(intent, options, callerTaskId, requestCode, true);
     }
 
+    void startActivityFromFrameworkActivityAsync(Intent intent, Bundle options, int callerTaskId,
+            int requestCode, Consumer<Bundle> success, Consumer<Throwable> failure) {
+        // The Instrumentation caller may finish its physical Stub Activity as soon as this
+        // method returns. Do not let the delayed Broker transaction validate that now-stale
+        // virtual task id; the framework-host transaction can select the current front task and
+        // still links its lifecycle observation by session.
+        Bundle request = buildActivityRequest(intent, options, callerTaskId, requestCode, true,
+                false);
+        // The Instrumentation path has already selected the Guest Activity. The actual
+        // delegate call is posted back to the framework main thread after the Broker returns,
+        // so this thread can continue servicing nativePollOnce and input ACKs meanwhile.
+        request.putBoolean(RuntimeKeys.ACTIVITY_FRAMEWORK_HOST, true);
+        bridge.launchActivityAsync(request, success, failure);
+    }
+
     private Bundle startActivityInternal(Intent intent, Bundle options, int callerTaskId,
             boolean frameworkHost) {
         return startActivityInternal(intent, options, callerTaskId, -1, frameworkHost);
@@ -85,6 +109,29 @@ final class GuestContextComponentRouter {
 
     private Bundle startActivityInternal(Intent intent, Bundle options, int callerTaskId,
             int requestCode, boolean frameworkHost) {
+        Bundle request = buildActivityRequest(intent, options, callerTaskId, requestCode,
+                frameworkHost, true);
+        if (frameworkHost) {
+            // Instrumentation.execStartActivity needs the Broker result before it delegates to
+            // the real framework ActivityManager.  Keep that boundary synchronous.
+            return bridge.launchActivityFromFrameworkHost(request);
+        }
+        if (context.mainThread.isMainThread()) {
+            // Context.startActivity() has no result to return. Waiting here would put the Guest
+            // Looper into GuestMainThreadDispatcher.callBroker()'s re-entrancy spin while a cold
+            // target process is being started, starving nativePollOnce and input ACKs.
+            bridge.launchActivityAsync(request, ignored -> { }, error ->
+                    android.util.Log.e("CS_GUEST_ACTIVITY",
+                            "async startActivity failed component="
+                                    + request.getString(RuntimeKeys.COMPONENT_CLASS, ""), error));
+            return null;
+        }
+        bridge.launchActivity(request);
+        return null;
+    }
+
+    private Bundle buildActivityRequest(Intent intent, Bundle options, int callerTaskId,
+            int requestCode, boolean frameworkHost, boolean includeCallerTaskId) {
         GuestIntentResolver.Target target = resolver.resolveOne(intent, GuestIntentResolver.Kind.ACTIVITY);
         Bundle request = bridge.baseRequest();
         request.putAll(resolver.activityRequest(intent, target));
@@ -93,7 +140,8 @@ final class GuestContextComponentRouter {
         // namespace; passing the caller's task id would make ActivityTaskLedger reject a
         // legitimate Android-style cross-package launch as a task-owner violation.  Same-package
         // launches retain the caller task for launchMode, result and back-stack semantics.
-        if (callerTaskId > 0 && spec.packageName.equals(target.packageName())) {
+        if (includeCallerTaskId && callerTaskId > 0
+                && spec.packageName.equals(target.packageName())) {
             request.putInt(RuntimeKeys.CALLER_TASK_ID, callerTaskId);
         }
         // A real Activity.startActivityForResult call has already crossed the framework
@@ -114,10 +162,7 @@ final class GuestContextComponentRouter {
                 + " requestId=" + request.getString(RuntimeKeys.REQUEST_ID, "")
                 + " operationId=" + request.getString(RuntimeKeys.OPERATION_ID, "")
                 + " pid=" + android.os.Process.myPid());
-        Bundle result = frameworkHost
-                ? bridge.launchActivityFromFrameworkHost(request)
-                : bridge.launchActivity(request);
-        return frameworkHost ? result : null;
+        return request;
     }
 
     ComponentName startService(Intent intent, boolean foreground) {
@@ -157,8 +202,7 @@ final class GuestContextComponentRouter {
         return !"SERVICE_NOT_RUNNING".equals(result.getString(RuntimeKeys.STATUS, ""));
     }
 
-    synchronized boolean bindService(Intent intent, ServiceConnection connection, int flags,
-            Executor executor) {
+    boolean bindService(Intent intent, ServiceConnection connection, int flags, Executor executor) {
         // NBB/VA route ordinary bindService and bindIsolatedService through the same virtual
         // service path. Mark both Guest-owned entry points so a manifest service whose process
         // name is historically isolated cannot fall through to the platform isolated worker.
@@ -170,126 +214,193 @@ final class GuestContextComponentRouter {
      * name, the virtual AMS treats the target as an ordinary virtual Service. The Broker marker
      * is consumed only by the isolated-route policy and does not mint an Android isolated UID.
      */
-    synchronized boolean bindIsolatedService(Intent intent, ServiceConnection connection, int flags,
+    boolean bindIsolatedService(Intent intent, ServiceConnection connection, int flags,
             Executor executor) {
         return bindServiceInternal(intent, connection, flags, executor, true);
     }
 
     private boolean bindServiceInternal(Intent intent, ServiceConnection connection, int flags,
             Executor executor, boolean isolatedServiceFallback) {
-        if (closed) throw new IllegalStateException("GUEST_COMPONENT_ROUTER_CLOSED");
         if (connection == null) throw new IllegalArgumentException("connection is required");
-        if (connections.containsKey(connection) || hostConnections.containsKey(connection)) {
-            throw new IllegalArgumentException("ServiceConnection already bound");
-        }
-        failedConnections.remove(connection);
-        failedHostConnections.remove(connection);
-        GuestIntentResolver.Target target = resolver.resolveOptionalService(intent);
-        if (target == null) {
-            logServiceAbsence("bindService", intent);
-            return false;
-        }
-        if (target.className().contains("SandboxedPrivilegedProcessService")
-                || target.className().contains("SandboxedProcessService")) {
-            android.util.Log.i("CS_RENDERER_BIND", "resolved package=" + target.packageName()
-                    + " component=" + target.className() + " process=" + target.processName()
-                    + " hostOwned=" + target.hostOwned()
-                    + " isolatedFallback=" + isolatedServiceFallback);
-        }
-        if (target.hostOwned()) {
-            Executor callbackExecutor = executor == null ? context.getMainExecutor() : executor;
-            ComponentName component = new ComponentName(target.packageName(), target.className());
-            GuestServiceConnectionRelay relay = new GuestServiceConnectionRelay(
-                    component, connection, callbackExecutor);
-            try {
-                boolean accepted = executor == null
-                        ? context.hostServiceContext().bindService(intent, relay, flags)
-                        : context.hostServiceContext().bindService(intent, flags,
-                                callbackExecutor, relay);
-                if (!accepted) {
-                    relay.close();
-                    failedHostConnections.put(connection, Boolean.TRUE);
-                    return false;
-                }
-                hostConnections.put(connection, new HostConnectionRecord(relay, component));
-                android.util.Log.i("CS_GUEST_SERVICE_ROUTE", "owner=HOST_SYSTEM bind=true package="
-                        + target.packageName() + " component=" + target.className()
-                        + " process=" + target.processName());
-                return true;
-            } catch (Throwable error) {
-                relay.close();
-                failedHostConnections.put(connection, Boolean.TRUE);
-                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy
-                        .rethrowIfFatal(error);
-                if (error instanceof RuntimeException runtime) throw runtime;
-                if (error instanceof Error fatal) throw fatal;
-                throw new IllegalStateException("HOST_SERVICE_BIND_FAILED", error);
+        synchronized (connectionLock) {
+            if (closed) throw new IllegalStateException("GUEST_COMPONENT_ROUTER_CLOSED");
+            if (connections.containsKey(connection) || hostConnections.containsKey(connection)
+                    || pendingConnections.containsKey(connection)) {
+                throw new IllegalArgumentException("ServiceConnection already bound");
             }
+            failedConnections.remove(connection);
+            failedHostConnections.remove(connection);
+            pendingConnections.put(connection, Boolean.TRUE);
         }
-        String connectionId = java.util.UUID.randomUUID().toString();
-        Bundle request = bridge.baseRequest();
-        request.putAll(resolver.request(intent, target));
-        if (isolatedServiceFallback) {
-            request.putBoolean(RuntimeKeys.ISOLATED_SERVICE_BIND_FALLBACK, true);
-        }
-        GuestActivityThreadServiceBridge framework = context.serviceFrameworkBridge();
-        if (framework != null) {
-            boolean accepted = framework.bind(request, target.className(), connection, flags, executor);
-            if (!accepted) {
-                android.util.Log.w("CS_GUEST_SERVICE", "framework bind rejected component="
-                        + target.className());
-            }
-            return accepted;
-        }
-        android.util.Log.i("CS_PREPARE_COMPONENT_FALLBACK", "operation="
-                + request.getString(ComponentOperations.OPERATION, "")
-                + " component=" + target.className()
-                + " package=" + target.packageName()
-                + " process=" + target.processName()
-                + " session=" + spec.sessionId
-                + " generation=" + spec.generation);
-        request.putString(ComponentOperations.OPERATION, ComponentOperations.BIND_SERVICE);
-        request.putString(RuntimeKeys.CONNECTION_ID, connectionId);
-        request.putInt(RuntimeKeys.SERVICE_BIND_FLAGS, flags);
-        Bundle result;
         try {
-            result = bridge.invokeComponent(request);
-        } catch (RuntimeException error) {
-            failedConnections.put(connection, Boolean.TRUE);
-            throw error;
-        }
-        android.os.IBinder binder = result.getBinder(RuntimeKeys.BINDER);
-        ComponentName component = new ComponentName(target.packageName(), target.className());
-        ConnectionRecord record = new ConnectionRecord(connectionId, target, component,
-                isolatedServiceFallback);
-        connections.put(connection, record);
-        Executor callbackExecutor = executor == null ? context.getMainExecutor() : executor;
-        if (binder == null) callbackExecutor.execute(() -> {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                connection.onNullBinding(component);
-            } else {
-                connection.onServiceDisconnected(component);
+            GuestIntentResolver.Target target = resolver.resolveOptionalService(intent);
+            if (target == null) {
+                logServiceAbsence("bindService", intent);
+                return false;
             }
-        });
-        else callbackExecutor.execute(() -> connection.onServiceConnected(component, binder));
-        return true;
+            if (target.className().contains("SandboxedPrivilegedProcessService")
+                    || target.className().contains("SandboxedProcessService")) {
+                android.util.Log.i("CS_RENDERER_BIND", "resolved package=" + target.packageName()
+                        + " component=" + target.className() + " process=" + target.processName()
+                        + " hostOwned=" + target.hostOwned()
+                        + " isolatedFallback=" + isolatedServiceFallback);
+            }
+            // Chromium's isolated renderer uses android:isolatedProcess=true. The Broker's
+            // virtual-service path creates a stub in the CAS host process, which does not mint
+            // a real Android isolated UID. Route isolated-renderer binds for the guest's own
+            // package directly through the host context so Android starts the real isolated
+            // process. The relay maps the component name back to the guest identity so
+            // Chromium's ServiceConnection receives the expected ComponentName.
+            if (isolatedServiceFallback && !target.hostOwned()
+                    && isIsolatedRendererService(target.className())) {
+                return bindGuestIsolatedRenderer(intent, connection, flags, executor, target);
+            }
+            if (target.hostOwned()) {
+                Executor callbackExecutor = executor == null ? context.getMainExecutor() : executor;
+                ComponentName component = new ComponentName(target.packageName(), target.className());
+                GuestServiceConnectionRelay relay = new GuestServiceConnectionRelay(
+                        component, connection, callbackExecutor);
+                try {
+                    // This is deliberately outside connectionLock. Host AMS may wait for a
+                    // callback or re-enter Guest code before returning from bindService().
+                    boolean accepted = executor == null
+                            ? context.hostServiceContext().bindService(intent, relay, flags)
+                            : context.hostServiceContext().bindService(intent, flags,
+                                    callbackExecutor, relay);
+                    if (!accepted) {
+                        relay.close();
+                        synchronized (connectionLock) {
+                            failedHostConnections.put(connection, Boolean.TRUE);
+                        }
+                        return false;
+                    }
+                    boolean retired;
+                    synchronized (connectionLock) {
+                        retired = closed;
+                        if (!retired) {
+                            hostConnections.put(connection,
+                                    new HostConnectionRecord(relay, component));
+                        }
+                    }
+                    if (retired) {
+                        relay.close();
+                        try { context.hostServiceContext().unbindService(relay); }
+                        catch (RuntimeException ignored) { }
+                        return false;
+                    }
+                    android.util.Log.i("CS_GUEST_SERVICE_ROUTE",
+                            "owner=HOST_SYSTEM bind=true package=" + target.packageName()
+                                    + " component=" + target.className()
+                                    + " process=" + target.processName());
+                    return true;
+                } catch (Throwable error) {
+                    relay.close();
+                    synchronized (connectionLock) {
+                        failedHostConnections.put(connection, Boolean.TRUE);
+                    }
+                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy
+                            .rethrowIfFatal(error);
+                    if (error instanceof RuntimeException runtime) throw runtime;
+                    if (error instanceof Error fatal) throw fatal;
+                    throw new IllegalStateException("HOST_SERVICE_BIND_FAILED", error);
+                }
+            }
+            String connectionId = java.util.UUID.randomUUID().toString();
+            Bundle request = bridge.baseRequest();
+            request.putAll(resolver.request(intent, target));
+            if (isolatedServiceFallback) {
+                request.putBoolean(RuntimeKeys.ISOLATED_SERVICE_BIND_FALLBACK, true);
+            }
+            GuestActivityThreadServiceBridge framework = context.serviceFrameworkBridge();
+            if (framework != null) {
+                // The framework bridge owns its own relay map and performs host AMS calls
+                // asynchronously with respect to this router's local state.
+                boolean accepted = framework.bind(request, target.className(), connection, flags,
+                        executor);
+                if (!accepted) {
+                    android.util.Log.w("CS_GUEST_SERVICE", "framework bind rejected component="
+                            + target.className());
+                }
+                return accepted;
+            }
+            android.util.Log.i("CS_PREPARE_COMPONENT_FALLBACK", "operation="
+                    + request.getString(ComponentOperations.OPERATION, "")
+                    + " component=" + target.className()
+                    + " package=" + target.packageName()
+                    + " process=" + target.processName()
+                    + " session=" + spec.sessionId
+                    + " generation=" + spec.generation);
+            request.putString(ComponentOperations.OPERATION, ComponentOperations.BIND_SERVICE);
+            request.putString(RuntimeKeys.CONNECTION_ID, connectionId);
+            request.putInt(RuntimeKeys.SERVICE_BIND_FLAGS, flags);
+            Bundle result;
+            try {
+                // Broker invocation is also outside connectionLock: it can cross Binder and
+                // synchronously call back into ActivityThread.
+                result = bridge.invokeComponent(request);
+            } catch (RuntimeException error) {
+                synchronized (connectionLock) {
+                    failedConnections.put(connection, Boolean.TRUE);
+                }
+                throw error;
+            }
+            android.os.IBinder binder = result.getBinder(RuntimeKeys.BINDER);
+            ComponentName component = new ComponentName(target.packageName(), target.className());
+            ConnectionRecord record = new ConnectionRecord(connectionId, target, component,
+                    isolatedServiceFallback);
+            boolean retired;
+            synchronized (connectionLock) {
+                retired = closed;
+                if (!retired) connections.put(connection, record);
+            }
+            if (retired) {
+                try { unbindGuestRecord(record); }
+                catch (RuntimeException error) {
+                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy
+                            .rethrowIfFatal(error);
+                    android.util.Log.w("CS_GUEST_SERVICE",
+                            "late bind cleanup failed after router teardown", error);
+                }
+                return false;
+            }
+            Executor callbackExecutor = executor == null ? context.getMainExecutor() : executor;
+            if (binder == null) callbackExecutor.execute(() -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    connection.onNullBinding(component);
+                } else {
+                    connection.onServiceDisconnected(component);
+                }
+            });
+            else callbackExecutor.execute(() -> connection.onServiceConnected(component, binder));
+            return true;
+        } finally {
+            synchronized (connectionLock) {
+                pendingConnections.remove(connection);
+            }
+        }
     }
 
-    synchronized void unbindService(ServiceConnection connection) {
+    void unbindService(ServiceConnection connection) {
         // Activity destruction is asynchronous.  WebView and other framework providers can
         // issue a late unbind after the Guest ActivityThread/Service bridge has already retired
         // its HostConnection map.  The teardown fence is intentionally checked before the
         // framework-owned branch as well; otherwise that branch bypasses the idempotent cleanup
         // used by the Broker-backed path and crashes the caller's worker thread.
-        if (closed) {
-            android.util.Log.i("CS_GUEST_SERVICE",
-                    "late framework unbind ignored after component-router teardown");
-            return;
+        HostConnectionRecord hostRecord;
+        boolean failedHost;
+        synchronized (connectionLock) {
+            if (closed) {
+                android.util.Log.i("CS_GUEST_SERVICE",
+                        "late framework unbind ignored after component-router teardown");
+                return;
+            }
+            hostRecord = hostConnections.remove(connection);
+            failedHost = failedHostConnections.remove(connection) != null;
         }
-        HostConnectionRecord hostRecord = hostConnections.remove(connection);
         if (hostRecord != null) {
             hostRecord.relay.close();
             try {
+                // Host AMS is intentionally called after releasing connectionLock.
                 context.hostServiceContext().unbindService(hostRecord.relay);
             } catch (RuntimeException error) {
                 com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy
@@ -298,7 +409,7 @@ final class GuestContextComponentRouter {
             }
             return;
         }
-        if (failedHostConnections.remove(connection) != null) {
+        if (failedHost) {
             android.util.Log.i("CS_GUEST_SERVICE",
                     "unbind ignored after failed host bind");
             return;
@@ -308,12 +419,22 @@ final class GuestContextComponentRouter {
             framework.unbind(connection);
             return;
         }
-        if (failedConnections.remove(connection) != null) {
+        ConnectionRecord record;
+        boolean failed;
+        synchronized (connectionLock) {
+            if (closed) {
+                android.util.Log.i("CS_GUEST_SERVICE",
+                        "late framework unbind ignored after component-router teardown");
+                return;
+            }
+            failed = failedConnections.remove(connection) != null;
+            record = connections.remove(connection);
+        }
+        if (failed) {
             android.util.Log.i("CS_GUEST_SERVICE",
                     "unbind ignored after failed Guest bind");
             return;
         }
-        ConnectionRecord record = connections.remove(connection);
         if (record == null) {
             // WebView can deliver a late unbind after the concrete Guest service has already
             // released its Broker-side bindings.  Preserve Android's strict error while the
@@ -326,37 +447,43 @@ final class GuestContextComponentRouter {
             }
             throw new IllegalArgumentException("ServiceConnection not bound");
         }
-        Bundle request = bridge.baseRequest();
-        request.putString(ComponentOperations.OPERATION, ComponentOperations.UNBIND_SERVICE);
-        request.putString(RuntimeKeys.COMPONENT_CLASS, record.target.className());
-        request.putString(RuntimeKeys.PROCESS_NAME, processName(record.target));
-        request.putString(RuntimeKeys.CONNECTION_ID, record.connectionId);
-        if (record.isolatedServiceBindFallback) {
-            request.putBoolean(RuntimeKeys.ISOLATED_SERVICE_BIND_FALLBACK, true);
-        }
         try {
-            bridge.invokeComponent(request);
+            unbindGuestRecord(record);
         } catch (RuntimeException error) {
-            connections.put(connection, record);
+            synchronized (connectionLock) {
+                if (!closed && !connections.containsKey(connection)
+                        && !pendingConnections.containsKey(connection)) {
+                    connections.put(connection, record);
+                }
+            }
             throw error;
         }
     }
 
-    synchronized void updateServiceGroup(ServiceConnection connection, int group, int importance) {
+    void updateServiceGroup(ServiceConnection connection, int group, int importance) {
         if (connection == null) throw new IllegalArgumentException("connection is null");
+        HostConnectionRecord hostRecord;
+        boolean failedHost;
+        synchronized (connectionLock) {
+            hostRecord = hostConnections.get(connection);
+            failedHost = failedHostConnections.containsKey(connection);
+            if (closed) {
+                hostRecord = null;
+                failedHost = false;
+            }
+        }
         if (closed) {
             android.util.Log.i("CS_GUEST_SERVICE",
                     "late updateServiceGroup ignored after component-router teardown");
             return;
         }
-        HostConnectionRecord hostRecord = hostConnections.get(connection);
         if (hostRecord != null) {
             // The relay is the actual host AMS binding, just as NBB/VA's IServiceConnection
             // delegate is. Do not pass the Guest callback object to host ContextImpl.
             context.hostServiceContext().updateServiceGroup(hostRecord.relay, group, importance);
             return;
         }
-        if (failedHostConnections.containsKey(connection)) {
+        if (failedHost) {
             android.util.Log.i("CS_GUEST_SERVICE",
                     "updateServiceGroup ignored after failed host bind");
             return;
@@ -365,12 +492,17 @@ final class GuestContextComponentRouter {
         if (framework != null && framework.updateServiceGroup(connection, group, importance)) {
             return;
         }
-        if (failedConnections.containsKey(connection)) {
+        ConnectionRecord record;
+        boolean failed;
+        synchronized (connectionLock) {
+            failed = failedConnections.containsKey(connection);
+            record = connections.get(connection);
+        }
+        if (failed) {
             android.util.Log.i("CS_GUEST_SERVICE",
                     "updateServiceGroup ignored after failed Guest bind");
             return;
         }
-        ConnectionRecord record = connections.get(connection);
         if (record != null) {
             // Broker-owned services do not have a physical per-connection process group. The
             // group is advisory, so retain the valid call without leaking a Host AMS handle.
@@ -382,17 +514,153 @@ final class GuestContextComponentRouter {
         throw new IllegalArgumentException("ServiceConnection not bound");
     }
 
+    private void unbindGuestRecord(ConnectionRecord record) {
+        Bundle request = bridge.baseRequest();
+        request.putString(ComponentOperations.OPERATION, ComponentOperations.UNBIND_SERVICE);
+        request.putString(RuntimeKeys.COMPONENT_CLASS, record.target.className());
+        request.putString(RuntimeKeys.PROCESS_NAME, processName(record.target));
+        request.putString(RuntimeKeys.CONNECTION_ID, record.connectionId);
+        if (record.isolatedServiceBindFallback) {
+            request.putBoolean(RuntimeKeys.ISOLATED_SERVICE_BIND_FALLBACK, true);
+        }
+        bridge.invokeComponent(request);
+    }
+
+    /**
+     * Binds the guest app's own isolated renderer service (SandboxedProcessService*) through the
+     * host context so Android mints a real isolated process UID. The Broker virtual-service path
+     * only creates CAS stubs and does not start Android isolated processes.
+     */
+    private boolean bindGuestIsolatedRenderer(Intent intent, ServiceConnection connection,
+            int flags, Executor executor, GuestIntentResolver.Target target) {
+        Executor callbackExecutor = executor == null ? context.getMainExecutor() : executor;
+        ComponentName component = new ComponentName(target.packageName(), target.className());
+        GuestServiceConnectionRelay relay = new GuestServiceConnectionRelay(
+                component, connection, callbackExecutor);
+        String instanceName = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                && intent.getComponent() != null
+                ? intent.getComponent().getClassName() : null;
+        // Pre-register so unbind() works even if the host bind hasn't returned yet.
+        synchronized (connectionLock) {
+            if (closed) {
+                relay.close();
+                throw new IllegalStateException("GUEST_COMPONENT_ROUTER_CLOSED");
+            }
+            hostConnections.put(connection, new HostConnectionRecord(relay, component));
+        }
+        android.util.Log.i("CS_RENDERER_BIND",
+                "ISOLATED_HOST_BIND component=" + component.flattenToShortString()
+                        + " instance=" + instanceName + " main=" + context.mainThread.isMainThread());
+        if (context.mainThread.isMainThread()) {
+            final String capturedInstance = instanceName;
+            frameworkOrderedBroadcasts.execute(() -> {
+                if (closed) {
+                    relay.close();
+                    synchronized (connectionLock) { hostConnections.remove(connection); }
+                    return;
+                }
+                boolean accepted;
+                try {
+                    accepted = capturedInstance != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                            ? context.hostServiceContext().bindIsolatedService(
+                                    intent, flags, capturedInstance, callbackExecutor, relay)
+                            : context.hostServiceContext().bindService(intent, relay, flags);
+                } catch (Throwable error) {
+                    relay.close();
+                    synchronized (connectionLock) {
+                        hostConnections.remove(connection);
+                        failedHostConnections.put(connection, Boolean.TRUE);
+                    }
+                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy
+                            .rethrowIfFatal(error);
+                    android.util.Log.e("CS_RENDERER_BIND", "async isolated bind failed component="
+                            + component.flattenToShortString(), error);
+                    return;
+                }
+                if (!accepted) {
+                    relay.close();
+                    synchronized (connectionLock) {
+                        hostConnections.remove(connection);
+                        failedHostConnections.put(connection, Boolean.TRUE);
+                    }
+                    android.util.Log.w("CS_RENDERER_BIND", "async isolated bind rejected component="
+                            + component.flattenToShortString());
+                    return;
+                }
+                android.util.Log.i("CS_RENDERER_BIND", "ISOLATED_BOUND_ASYNC component="
+                        + component.flattenToShortString());
+                if (closed) {
+                    relay.close();
+                    synchronized (connectionLock) { hostConnections.remove(connection); }
+                    try { context.hostServiceContext().unbindService(relay); }
+                    catch (RuntimeException ignored) { }
+                }
+            });
+            return true;
+        }
+        boolean accepted;
+        try {
+            accepted = instanceName != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                    ? context.hostServiceContext().bindIsolatedService(
+                            intent, flags, instanceName, callbackExecutor, relay)
+                    : context.hostServiceContext().bindService(intent, relay, flags);
+        } catch (Throwable error) {
+            relay.close();
+            synchronized (connectionLock) {
+                hostConnections.remove(connection);
+                failedHostConnections.put(connection, Boolean.TRUE);
+            }
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            if (error instanceof RuntimeException runtime) throw runtime;
+            if (error instanceof Error fatal) throw fatal;
+            throw new IllegalStateException("ISOLATED_RENDERER_BIND_FAILED", error);
+        }
+        if (!accepted) {
+            relay.close();
+            synchronized (connectionLock) {
+                hostConnections.remove(connection);
+                failedHostConnections.put(connection, Boolean.TRUE);
+            }
+            return false;
+        }
+        if (closed) {
+            relay.close();
+            synchronized (connectionLock) { hostConnections.remove(connection); }
+            try { context.hostServiceContext().unbindService(relay); }
+            catch (RuntimeException ignored) { }
+            return false;
+        }
+        android.util.Log.i("CS_RENDERER_BIND", "ISOLATED_BOUND component="
+                + component.flattenToShortString());
+        return true;
+    }
+
+    private static boolean isIsolatedRendererService(String className) {
+        if (className == null) return false;
+        final String base = "SandboxedProcessService";
+        final String privileged = "SandboxedPrivilegedProcessService";
+        return className.contains(base) || className.contains(privileged);
+    }
+
     /**
      * Publishes the teardown fence before ActivityThread starts asynchronous Activity destruction.
      * Android may deliver Activity.onDestroy after finishAndRemoveTask() returns; no Guest
      * component callback from that late lifecycle window may re-enter the Broker or request a
      * replacement generation.
      */
-    synchronized void beginTeardown() {
-        if (closed) return;
-        closed = true;
-        frameworkOrderedBroadcasts.shutdownNow();
-        for (HostConnectionRecord record : hostConnections.values()) {
+    void beginTeardown() {
+        java.util.ArrayList<HostConnectionRecord> boundHostConnections;
+        synchronized (connectionLock) {
+            if (closed) return;
+            closed = true;
+            frameworkOrderedBroadcasts.shutdownNow();
+            boundHostConnections = new java.util.ArrayList<>(hostConnections.values());
+            hostConnections.clear();
+            connections.clear();
+            failedConnections.clear();
+            failedHostConnections.clear();
+        }
+        for (HostConnectionRecord record : boundHostConnections) {
             record.relay.close();
             try {
                 context.hostServiceContext().unbindService(record.relay);
@@ -401,14 +669,10 @@ final class GuestContextComponentRouter {
                         .rethrowIfFatal(error);
             }
         }
-        hostConnections.clear();
-        connections.clear();
-        failedConnections.clear();
-        failedHostConnections.clear();
         receivers.clear();
     }
 
-    synchronized void close() {
+    void close() {
         beginTeardown();
     }
 
@@ -423,6 +687,7 @@ final class GuestContextComponentRouter {
             throw new IllegalArgumentException("Receiver cannot be both exported and not exported");
         }
         String receiverId = receivers.reserve(receiver, scheduler);
+        boolean asynchronous = context.mainThread.isMainThread();
         Bundle request = null;
         try {
             request = bridge.baseRequest();
@@ -434,11 +699,37 @@ final class GuestContextComponentRouter {
             request.putString(RuntimeKeys.RECEIVER_PERMISSION, permission == null ? "" : permission);
             request.putBoolean(RuntimeKeys.RECEIVER_EXPORTED,
                     (flags & Context.RECEIVER_EXPORTED) != 0);
+            if (asynchronous) {
+                Bundle rollbackRequest = new Bundle(request);
+                bridge.invokeComponentAsync(request,
+                        ignored -> {
+                            if (closed) {
+                                throw new IllegalStateException("GUEST_COMPONENT_ROUTER_CLOSED");
+                            }
+                            GuestActivityThreadServiceBridge framework =
+                                    context.serviceFrameworkBridge();
+                            if (framework != null) {
+                                framework.registerDynamicReceiver(receiverId, receiver, filter,
+                                        permission, scheduler, flags);
+                            }
+                        },
+                        error -> rollbackReceiverRegistration(receiverId, rollbackRequest, error));
+                // Android's return value is the last matching sticky Intent.  Quark does not use
+                // it, and waiting for it here would put this main-thread callback back into the
+                // Broker re-entrancy spin loop that starves nativePollOnce/input dispatch.
+                return null;
+            }
             bridge.invokeComponent(request);
             GuestActivityThreadServiceBridge framework = context.serviceFrameworkBridge();
             return framework == null ? null : framework.registerDynamicReceiver(receiverId,
                     receiver, filter, permission, scheduler, flags);
         } catch (RuntimeException error) {
+            if (asynchronous) {
+                // Submission failure happens before the asynchronous transaction is accepted;
+                // never fall back to a synchronous Broker cleanup on the Guest main thread.
+                receivers.rollback(receiverId);
+                throw error;
+            }
             if (request != null) {
                 try {
                     request.putString(ComponentOperations.OPERATION,
@@ -448,6 +739,26 @@ final class GuestContextComponentRouter {
             }
             receivers.rollback(receiverId);
             throw error;
+        }
+    }
+
+    private void rollbackReceiverRegistration(String receiverId, Bundle registeredRequest,
+                                              Throwable error) {
+        receivers.rollback(receiverId);
+        android.util.Log.w("CS_GUEST_RECEIVER",
+                "async dynamic receiver registration failed id=" + receiverId, error);
+        if (registeredRequest == null) return;
+        Bundle cleanup = new Bundle(registeredRequest);
+        cleanup.putString(ComponentOperations.OPERATION, ComponentOperations.UNREGISTER_RECEIVER);
+        try {
+            bridge.invokeComponentAsync(cleanup, ignored -> { }, cleanupError ->
+                    android.util.Log.w("CS_GUEST_RECEIVER",
+                            "async dynamic receiver rollback failed id=" + receiverId,
+                            cleanupError));
+        } catch (RuntimeException cleanupSubmissionError) {
+            android.util.Log.w("CS_GUEST_RECEIVER",
+                    "dynamic receiver rollback submission failed id=" + receiverId,
+                    cleanupSubmissionError);
         }
     }
 
@@ -464,12 +775,34 @@ final class GuestContextComponentRouter {
         java.util.List<String> receiverIds = receivers.ids(receiver);
         for (String receiverId : receiverIds) {
             GuestActivityThreadServiceBridge framework = context.serviceFrameworkBridge();
-            if (framework != null) framework.unregisterDynamicReceiver(receiverId);
             Bundle request = bridge.baseRequest();
             request.putString(ComponentOperations.OPERATION, ComponentOperations.UNREGISTER_RECEIVER);
             request.putString(RuntimeKeys.RECEIVER_ID, receiverId);
+            if (context.mainThread.isMainThread()) {
+                bridge.invokeComponentAsync(request,
+                        ignored -> finishAsyncReceiverUnregistration(receiverId, framework, null),
+                        error -> finishAsyncReceiverUnregistration(receiverId, framework, error));
+                continue;
+            }
+            if (framework != null) framework.unregisterDynamicReceiver(receiverId);
             bridge.invokeComponent(request);
             receivers.remove(receiverId);
+        }
+    }
+
+    private void finishAsyncReceiverUnregistration(String receiverId,
+                                                   GuestActivityThreadServiceBridge framework,
+                                                   Throwable error) {
+        try {
+            if (framework != null) framework.unregisterDynamicReceiver(receiverId);
+        } catch (RuntimeException cleanupError) {
+            android.util.Log.w("CS_GUEST_RECEIVER",
+                    "dynamic receiver host unregister failed id=" + receiverId, cleanupError);
+        }
+        receivers.remove(receiverId);
+        if (error != null) {
+            android.util.Log.w("CS_GUEST_RECEIVER",
+                    "async dynamic receiver unregister failed id=" + receiverId, error);
         }
     }
 
@@ -558,6 +891,20 @@ final class GuestContextComponentRouter {
         request.putString(RuntimeKeys.BROADCAST_REQUIRED_RECEIVER_PERMISSION,
                 receiverPermission == null ? "" : receiverPermission);
         if (options != null) request.putBundle("broadcastOptions", new Bundle(options));
+
+        // Context.sendBroadcast() has no return value.  A synchronous Broker call here is
+        // therefore pure waiting on the main thread: while the Broker resolves/starts a target,
+        // callBroker's re-entrancy loop keeps this Looper away from nativePollOnce and input
+        // dispatch.  Keep synchronous semantics for worker callers, but let the main Looper
+        // return immediately.  The Broker operation itself is still serialized by the bridge;
+        // only completion/error reporting runs on its worker.
+        if (context.mainThread.isMainThread()) {
+            bridge.invokeComponentAsync(request,
+                    ignored -> { },
+                    error -> android.util.Log.w("CS_GUEST_BROADCAST",
+                            "async sendBroadcast failed action=" + intent.getAction(), error));
+            return;
+        }
         bridge.invokeComponent(request);
     }
 
@@ -594,6 +941,23 @@ final class GuestContextComponentRouter {
         if (frameworkRoute) {
             dispatchFrameworkOrderedBroadcast(request, intent, resultReceiver, scheduler,
                     initialCode, initialData);
+            return;
+        }
+        if (context.mainThread.isMainThread()) {
+            // An ordered broadcast has no synchronous return value.  Waiting for the Broker here
+            // would put the Guest Looper back into callBroker's re-entrancy spin while the Broker
+            // may be waiting for a callback on this same Looper.  Deliver the optional result on
+            // its requested scheduler after the worker-side Broker call completes.
+            bridge.invokeComponentAsync(request,
+                    result -> deliverOrderedResult(intent, resultReceiver, scheduler, initialCode,
+                            initialData, result),
+                    error -> {
+                        android.util.Log.w("CS_GUEST_BROADCAST",
+                                "async ordered broadcast failed action=" + intent.getAction(),
+                                error);
+                        deliverOrderedResult(intent, resultReceiver, scheduler, initialCode,
+                                initialData, null);
+                    });
             return;
         }
         deliverOrderedResult(intent, resultReceiver, scheduler, initialCode, initialData,

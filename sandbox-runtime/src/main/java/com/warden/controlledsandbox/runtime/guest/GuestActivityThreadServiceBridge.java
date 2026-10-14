@@ -113,13 +113,36 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
     ComponentName start(Bundle request, String guestClass, boolean foreground) {
         Bundle routedRequest = new Bundle(request == null ? new Bundle() : request);
         routedRequest.putBoolean(RuntimeKeys.FRAMEWORK_SERVICE_FOREGROUND, foreground);
+        ComponentName result = new ComponentName(session.spec.packageName, guestClass);
+        if (closed) throw new IllegalStateException("GUEST_SERVICE_FRAMEWORK_BRIDGE_CLOSED");
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            // route() calls the Broker synchronously which can take 1-3 s for a cold process.
+            // Blocking the main Looper that long prevents nativePollOnce from running and causes
+            // an Input dispatching ANR before AMS's service timeout fires. Offload to a worker;
+            // AMS delivers CREATE_SERVICE/SERVICE_ARGS back to the main Looper regardless.
+            session.mainThread.callBrokerAsync(
+                    () -> {
+                        if (closed) return null;
+                        Route r = route(routedRequest, guestClass);
+                        Intent hostIntent = hostIntent(r);
+                        ComponentName c = foreground
+                                ? session.context.hostServiceContext().startForegroundService(hostIntent)
+                                : session.context.hostServiceContext().startService(hostIntent);
+                        if (c == null) throw new IllegalStateException("FRAMEWORK_SERVICE_START_RETURNED_NULL");
+                        return null;
+                    },
+                    ignored -> {},
+                    error -> android.util.Log.e("CS_SERVICE_FRAMEWORK",
+                            "async start failed guest=" + guestClass, error));
+            return result;
+        }
         Route route = route(routedRequest, guestClass);
         Intent hostIntent = hostIntent(route);
         ComponentName started = foreground
                 ? session.context.hostServiceContext().startForegroundService(hostIntent)
                 : session.context.hostServiceContext().startService(hostIntent);
         if (started == null) throw new IllegalStateException("FRAMEWORK_SERVICE_START_RETURNED_NULL");
-        return new ComponentName(session.spec.packageName, guestClass);
+        return result;
     }
 
     /**
@@ -143,6 +166,47 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
     }
 
     boolean stop(Bundle request, String guestClass) {
+        if (closed) throw new IllegalStateException("GUEST_SERVICE_FRAMEWORK_BRIDGE_CLOSED");
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            // Context.stopService() only reports whether AMS accepted the stop request.  The
+            // route lookup and the host AMS transaction can both cross a slow Broker/service
+            // boundary, so doing them on the Guest Looper recreates the input-dispatch ANR that
+            // the async start/bind paths avoid.  Reserve the lifecycle waiter before queueing so
+            // a second stop cannot overtake this one; the worker cancels it on rejection/failure.
+            GuestActivityThreadServiceLifecycle.StopWaiter waiter =
+                    serviceLifecycle.prepareStop(guestClass);
+            Bundle routedRequest = new Bundle(request == null ? new Bundle() : request);
+            session.mainThread.callBrokerAsync(
+                    () -> {
+                        try {
+                            Route route = route(routedRequest, guestClass);
+                            boolean accepted = session.context.hostServiceContext().stopService(
+                                    hostIntent(route));
+                            if (!accepted) {
+                                serviceLifecycle.cancelStop(guestClass, waiter);
+                                return Boolean.FALSE;
+                            }
+                            handler.postDelayed(
+                                    () -> serviceLifecycle.cancelStop(guestClass, waiter),
+                                    GuestMainThreadDispatcher.DEFAULT_TIMEOUT_MS);
+                            android.util.Log.i("CS_SERVICE_FRAMEWORK",
+                                    "STOP_ACCEPTED_ASYNC guest=" + guestClass);
+                            return Boolean.TRUE;
+                        } catch (Throwable error) {
+                            serviceLifecycle.cancelStop(guestClass, waiter);
+                            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy
+                                    .rethrowIfFatal(error);
+                            throw error instanceof RuntimeException
+                                    ? (RuntimeException) error : new IllegalStateException(error);
+                        }
+                    },
+                    accepted -> android.util.Log.i("CS_SERVICE_FRAMEWORK",
+                            "STOP_SUBMITTED_ASYNC guest=" + guestClass
+                                    + " accepted=" + accepted),
+                    error -> android.util.Log.e("CS_SERVICE_FRAMEWORK",
+                            "async stop failed guest=" + guestClass, error));
+            return true;
+        }
         Route route = route(request, guestClass);
         GuestActivityThreadServiceLifecycle.StopWaiter waiter = serviceLifecycle.prepareStop(guestClass);
         boolean accepted;
@@ -206,9 +270,70 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
         }
         routedRequest.putBinder(RuntimeKeys.SERVICE_CONNECTION_BINDER, new Binder());
         synchronized (hostConnections) {
-            // A caller may retry the same ServiceConnection after a failed bind. The marker is
-            // only for the one cleanup edge associated with the previous attempt.
             failedConnections.remove(guestConnection);
+        }
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            // route() calls the Broker synchronously (1-3 s for a cold process slot), which
+            // blocks the main Looper and triggers an Input dispatching ANR. Offload the entire
+            // route+hostBind sequence to a worker thread so nativePollOnce stays available.
+            // The HostConnection is registered after routing succeeds on the worker thread.
+            Executor callbackExecutor = executor == null ? session.context.getMainExecutor() : executor;
+            session.mainThread.callBrokerAsync(
+                    () -> {
+                        if (closed) return null;
+                        Route route = route(routedRequest, guestClass);
+                        HostConnection hostConnection = new HostConnection(route, guestConnection,
+                                callbackExecutor);
+                        boolean cancelledBeforeBind;
+                        synchronized (hostConnections) {
+                            cancelledBeforeBind = closed || hostConnection.closed
+                                    || hostConnections.get(guestConnection) != hostConnection;
+                        }
+                        if (cancelledBeforeBind) {
+                            hostConnection.close();
+                            synchronized (hostConnections) { hostConnections.remove(guestConnection); }
+                            return null;
+                        }
+                        boolean accepted;
+                        try {
+                            accepted = session.context.hostServiceContext().bindService(
+                                    hostIntent(route), hostConnection, flags);
+                        } catch (Throwable error) {
+                            hostConnection.close();
+                            synchronized (hostConnections) { hostConnections.remove(guestConnection); }
+                            rememberFailedBinding(guestConnection);
+                            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy
+                                    .rethrowIfFatal(error);
+                            throw error instanceof RuntimeException
+                                    ? (RuntimeException) error : new IllegalStateException(error);
+                        }
+                        if (accepted) {
+                            boolean retired;
+                            synchronized (hostConnections) {
+                                retired = closed || hostConnections.get(guestConnection) != hostConnection;
+                                if (!retired) hostConnection.published = true;
+                                else hostConnections.remove(guestConnection, hostConnection);
+                            }
+                            if (retired) {
+                                hostConnection.close();
+                                try { session.context.hostServiceContext().unbindService(hostConnection); }
+                                catch (RuntimeException ignored) { }
+                            }
+                        } else {
+                            hostConnection.close();
+                            synchronized (hostConnections) { hostConnections.remove(guestConnection); }
+                            rememberFailedBinding(guestConnection);
+                        }
+                        return null;
+                    },
+                    ignored -> {},
+                    error -> {
+                        synchronized (hostConnections) { hostConnections.remove(guestConnection); }
+                        rememberFailedBinding(guestConnection);
+                        android.util.Log.e("CS_SERVICE_FRAMEWORK",
+                                "async bind failed guest=" + guestClass, error);
+                    });
+            return true;
         }
         Route route;
         try {
@@ -303,10 +428,15 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
             }
             throw new IllegalArgumentException("ServiceConnection not bound");
         }
-        // Fence the Guest callback queue before asking host AMS to remove the binding.  AMS is
+        // Fence the Guest callback queue before asking host AMS to remove the binding. AMS is
         // allowed to race a pending onServiceConnected/onBindingDied notification with unbind.
+        // If the async bind worker has not reached host AMS yet, only mark the relay closed here;
+        // the worker will observe the removed map entry and skip the bind, or undo it after the
+        // in-flight bind returns. Calling host unbind before host bind is accepted throws and
+        // turns a harmless bind/unbind race into a Guest crash.
+        boolean published = found.published;
         found.close();
-        session.context.hostServiceContext().unbindService(found);
+        if (published) session.context.hostServiceContext().unbindService(found);
     }
 
     /** Forwards AOSP's advisory process-group hint through the physical relay binding. */
@@ -398,7 +528,18 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
         copyIntentPayload(route.request, intent);
         Bundle extras = route.request.getBundle(RuntimeKeys.INTENT_EXTRAS);
         if (extras != null) intent.putExtra(RuntimeKeys.INTENT_EXTRAS, new Bundle(extras));
+        android.util.Log.i("CS_SERVICE_FRAMEWORK", "HOST_INTENT guest=" + route.guestClass
+                + " requestExtras=" + route.request.getBundle(RuntimeKeys.INTENT_EXTRAS)
+                + " requestWire=" + wireSize(route.request)
+                + " requestFd=" + route.request.containsKey(RuntimeKeys.INTENT_PAYLOAD_FD)
+                + " hostExtras=" + intent.getExtras());
         return intent;
+    }
+
+    private static int wireSize(Bundle request) {
+        if (request == null) return 0;
+        byte[] payload = request.getByteArray(RuntimeKeys.INTENT_WIRE_PAYLOAD);
+        return payload == null ? 0 : payload.length;
     }
 
     private boolean handleMessage(Message message) {

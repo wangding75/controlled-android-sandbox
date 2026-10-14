@@ -15,7 +15,11 @@ import android.os.Bundle;
 import android.os.IBinder;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -66,9 +70,9 @@ public final class ActivityFieldBridge {
         // storage calls terminate at the Guest Context rather than at the Host Stub.
         direct.put("mBase", session.context());
         // Activity.attach() constructs ContextThemeWrapper's cached Theme while the Stub is
-        // still the temporary base. Replace that cache as well; otherwise AndroidX resolves
-        // Host drawable/style IDs through Guest Resources during onCreate.
-        direct.put("mTheme", session.context().getTheme());
+        // still the temporary base. Replace that cache with a fresh per-Activity Guest Theme;
+        // the Guest application Theme is shared and must not be mutated by another Activity.
+        direct.put("mTheme", createGuestActivityTheme(session, componentClass));
         // ContextThemeWrapper also caches Resources independently of mBase. Full attach() has
         // initialized that cache from the temporary Stub, so project it together with mTheme;
         // otherwise Guest resource IDs (for example AppCompat vector drawables) are looked up
@@ -111,7 +115,9 @@ public final class ActivityFieldBridge {
         guestIntent.setComponent(new ComponentName(session.spec().packageName, componentClass));
         LinkedHashMap<String, Object> direct = new LinkedHashMap<>();
         direct.put("mBase", session.context());
-        direct.put("mTheme", session.context().getTheme());
+        // Each Activity needs an independent Theme. Reusing GuestContext.frameworkTheme lets a
+        // previous Activity's style leak into this one and can make AppCompat reject the theme.
+        direct.put("mTheme", createGuestActivityTheme(session, componentClass));
         direct.put("mResources", session.context().getResources());
         direct.put("mApplication", session.application());
         direct.put("mIntent", guestIntent);
@@ -879,15 +885,191 @@ public final class ActivityFieldBridge {
      */
     public static void ensureWindowPublishedAfterResume(Activity activity) {
         if (activity == null) return;
+        installInputDispatchProbe(activity);
+        installViewTouchProbe(activity);
+        // ActivityThread.makeVisible() normally changes the DecorView to VISIBLE immediately
+        // after adding it.  The Guest Activity path can arrive here with a valid, resumable
+        // ActivityClientRecord while the DecorView is still INVISIBLE; in that state
+        // addToDisplayAsUser succeeds but ViewRoot never reaches relayout/first draw.  Repair
+        // only this proven resume boundary, and only when the framework says the Activity is
+        // visible from the client and is not finishing.
+        makeDecorVisibleForFrameworkResume(activity, "call_resume_return");
         android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
         // ActivityThread.handleResumeActivity owns the normal first addView.  This is one
         // explicit post-resume observation/repair only; repeated delayed addView attempts made
         // the first failure non-deterministic and could mask a framework black-screen state.
-        handler.post(() -> {
+        boolean posted = handler.post(() -> {
+            android.util.Log.i("CS_FRAMEWORK_ACTIVITY",
+                    "WINDOW_ENSURE_RUN_BEGIN activityClass=" + activity.getClass().getName());
+            makeDecorVisibleForFrameworkResume(activity, "post_resume_begin");
             logPostResumeWindowState(activity, "before_publish");
             publishWindowIfMissing(activity);
+            makeDecorVisibleForFrameworkResume(activity, "post_resume_after_publish");
             logPostResumeWindowState(activity, "after_publish");
+            android.util.Log.i("CS_FRAMEWORK_ACTIVITY",
+                    "WINDOW_ENSURE_RUN_END activityClass=" + activity.getClass().getName());
         });
+        android.util.Log.i("CS_FRAMEWORK_ACTIVITY",
+                "WINDOW_ENSURE_POSTED posted=" + posted
+                        + " activityClass=" + activity.getClass().getName());
+    }
+
+    private static void makeDecorVisibleForFrameworkResume(Activity activity, String stage) {
+        try {
+            android.view.Window window = activity.getWindow();
+            android.view.View decor = window == null ? null : window.getDecorView();
+            boolean visibleFromClient = optionalBoolean(activity, "mVisibleFromClient", true);
+            boolean finishing = activity.isFinishing();
+            int before = decor == null ? -1 : decor.getVisibility();
+            if (decor == null || finishing || !visibleFromClient) {
+                android.util.Log.i("CS_FRAMEWORK_ACTIVITY",
+                        "WINDOW_MAKE_VISIBLE stage=" + stage
+                                + " action=SKIP"
+                                + " decor=" + (decor != null)
+                                + " before=" + before
+                                + " visibleFromClient=" + visibleFromClient
+                                + " finishing=" + finishing
+                                + " activityClass=" + activity.getClass().getName());
+                return;
+            }
+            if (before != android.view.View.VISIBLE) {
+                decor.setVisibility(android.view.View.VISIBLE);
+            }
+            android.util.Log.i("CS_FRAMEWORK_ACTIVITY",
+                    "WINDOW_MAKE_VISIBLE stage=" + stage
+                            + " action=" + (before == android.view.View.VISIBLE
+                            ? "ALREADY_VISIBLE" : "SET_VISIBLE")
+                            + " before=" + before
+                            + " after=" + decor.getVisibility()
+                            + " registered=" + windowRegistration(decor).name()
+                            + " activityClass=" + activity.getClass().getName());
+            // ActivityThread can add the DecorView while ViewRootImpl still remembers the
+            // pre-add INVISIBLE state. In that case setVisibility(VISIBLE) changes the View but
+            // does not enqueue the traversal that sends viewVisibility=VISIBLE to WMS. Request
+            // one explicit traversal at the registered-window boundary.
+            requestVisibleTraversal(decor, stage);
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            android.util.Log.w("CS_FRAMEWORK_ACTIVITY",
+                    "WINDOW_MAKE_VISIBLE_FAILED stage=" + stage, error);
+        }
+    }
+
+    private static void requestVisibleTraversal(android.view.View decor, String stage) {
+        if (decor == null || decor.getParent() == null) return;
+        try {
+            Object root = decor.getParent();
+            boolean appVisible = optionalBoolean(root, "mAppVisible", true);
+            int rootViewVisibility = optionalInt(root, "mViewVisibility", -1);
+            int windowVisibility = decor.getWindowVisibility();
+            boolean visibilityEdgeApplied = false;
+            boolean reportNextDrawRequested = false;
+            // ViewRootImpl skips the window-visibility dispatch on its first traversal when
+            // mFirst is still true.  Our ActivityThread path can add the root while mAppVisible
+            // is already true, so the normal later dispatchAppVisibility(true) never arrives;
+            // the root remains GONE internally even though WMS accepted viewVisibility=VISIBLE.
+            // Recreate the platform's false->true edge only for this proven stale state.  Use
+            // handleAppVisibility synchronously: dispatchAppVisibility only enqueues a message,
+            // and both captured failures stopped before that message was observed.  This makes
+            // performTraversals update AttachInfo.mWindowVisibility; it does not manufacture a
+            // frame or touch U4's renderer protocol.
+            if (rootViewVisibility != android.view.View.VISIBLE
+                    || windowVisibility != android.view.View.VISIBLE) {
+                Method handleAppVisibility = findMethod(root.getClass(),
+                        "handleAppVisibility", boolean.class);
+                if (handleAppVisibility != null) {
+                    handleAppVisibility.setAccessible(true);
+                    handleAppVisibility.invoke(root, false);
+                    android.util.Log.i("CS_FRAMEWORK_ACTIVITY",
+                            "WINDOW_VISIBILITY_EDGE_SYNC stage=" + stage + " value=false"
+                                    + " appVisible=" + optionalBoolean(root, "mAppVisible", true));
+                    handleAppVisibility.invoke(root, true);
+                    android.util.Log.i("CS_FRAMEWORK_ACTIVITY",
+                            "WINDOW_VISIBILITY_EDGE_SYNC stage=" + stage + " value=true"
+                                    + " appVisible=" + optionalBoolean(root, "mAppVisible", true));
+                    visibilityEdgeApplied = true;
+                }
+            }
+
+            // The first ActivityThread traversal can be entered with a visible DecorView but
+            // with ViewRootImpl/AttachInfo still carrying the pre-add GONE state.  In that
+            // state the root remains mFirst=true and never publishes the normal visible
+            // traversal boundary on this OEM build.  Project the already-observed client
+            // visibility into the same two bookkeeping fields the first traversal updates;
+            // requestLayout below still performs the real traversal and WMS relayout.
+            boolean visibilityStateRepaired = false;
+            if (decor.getVisibility() == android.view.View.VISIBLE
+                    && optionalBoolean(root, "mAppVisible", false)
+                    && (optionalInt(root, "mViewVisibility", -1)
+                    != android.view.View.VISIBLE
+                    || optionalInt(optionalObject(root, "mAttachInfo"),
+                    "mWindowVisibility", -1) != android.view.View.VISIBLE)) {
+                setOptionalInt(root, "mViewVisibility", android.view.View.VISIBLE);
+                Object attachInfo = optionalObject(root, "mAttachInfo");
+                setOptionalInt(attachInfo, "mWindowVisibility", android.view.View.VISIBLE);
+                visibilityStateRepaired = true;
+            }
+
+            // WMS can leave this window in DRAW_PENDING when the Stub ActivityRecord's transition
+            // started before the Guest ViewRoot was registered.  Ask ViewRoot to report the next
+            // real draw so WindowManagerService can finish the same BLAST sync group.  Prefer the
+            // platform's public-in-source method and retain a private-method fallback for builds
+            // that expose only reportNextDraw(String).
+            reportNextDrawRequested = requestReportNextDraw(root, stage);
+            decor.requestLayout();
+            decor.invalidate();
+            Method requestLayout = findMethod(root.getClass(), "requestLayout");
+            if (requestLayout != null) {
+                requestLayout.setAccessible(true);
+                requestLayout.invoke(root);
+            }
+            android.util.Log.i("CS_FRAMEWORK_ACTIVITY",
+                    "WINDOW_VISIBLE_TRAVERSAL_REQUESTED stage=" + stage
+                            + " appVisible=" + optionalBoolean(root, "mAppVisible", true)
+                            + " rootViewVisibility=" + optionalInt(root, "mViewVisibility", -1)
+                            + " windowVisibility=" + decor.getWindowVisibility()
+                            + " visibilityEdgeApplied=" + visibilityEdgeApplied
+                            + " visibilityStateRepaired=" + visibilityStateRepaired
+                            + " reportNextDrawRequested=" + reportNextDrawRequested
+                            + " rootState=" + viewRootState(root)
+                            + " activityClass=" + decor.getContext().getClass().getName());
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            android.util.Log.w("CS_FRAMEWORK_ACTIVITY",
+                    "WINDOW_VISIBLE_TRAVERSAL_FAILED stage=" + stage, error);
+        }
+    }
+
+    private static boolean requestReportNextDraw(Object root, String stage) {
+        if (root == null) return false;
+        try {
+            Method setReportNextDraw = findMethod(root.getClass(), "setReportNextDraw",
+                    boolean.class, String.class);
+            if (setReportNextDraw != null) {
+                setReportNextDraw.setAccessible(true);
+                setReportNextDraw.invoke(root, false, "controlled-sandbox:" + stage);
+                android.util.Log.i("CS_FRAMEWORK_ACTIVITY",
+                        "WINDOW_REPORT_NEXT_DRAW stage=" + stage
+                                + " method=setReportNextDraw syncBuffer=false");
+                return true;
+            }
+            Method reportNextDraw = findMethod(root.getClass(), "reportNextDraw", String.class);
+            if (reportNextDraw != null) {
+                reportNextDraw.setAccessible(true);
+                reportNextDraw.invoke(root, "controlled-sandbox:" + stage);
+                android.util.Log.i("CS_FRAMEWORK_ACTIVITY",
+                        "WINDOW_REPORT_NEXT_DRAW stage=" + stage
+                                + " method=reportNextDraw");
+                return true;
+            }
+            android.util.Log.w("CS_FRAMEWORK_ACTIVITY",
+                    "WINDOW_REPORT_NEXT_DRAW_UNAVAILABLE stage=" + stage);
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            android.util.Log.w("CS_FRAMEWORK_ACTIVITY",
+                    "WINDOW_REPORT_NEXT_DRAW_FAILED stage=" + stage, error);
+        }
+        return false;
     }
 
     /**
@@ -945,6 +1127,7 @@ public final class ActivityFieldBridge {
                             + " parent=" + (parent == null ? "null" : parent.getClass().getName())
                             + " viewRoot=" + (root == null ? "null" : root.getClass().getName())
                             + " viewRootState=" + viewRootState(parent)
+                            + " inputState=" + viewRootInputState(parent)
                             + " wmgViews=" + windowManagerViewCount()
                             + " layoutPackage=" + packageName
                             + " layoutType=" + type
@@ -1000,6 +1183,16 @@ public final class ActivityFieldBridge {
                     + " removed=" + optionalBoolean(parent, "mRemoved", false)
                     + " dying=" + optionalBoolean(parent, "mDying", false)
                     + " stopped=" + optionalBoolean(parent, "mStopped", false)
+                    + " first=" + optionalBoolean(parent, "mFirst", false)
+                    + " appVisible=" + optionalBoolean(parent, "mAppVisible", false)
+                    + " appVisibilityChanged=" + optionalBoolean(parent,
+                            "mAppVisibilityChanged", false)
+                    + " traversalScheduled=" + optionalBoolean(parent,
+                            "mTraversalScheduled", false)
+                    + " willDrawSoon=" + optionalBoolean(parent, "mWillDrawSoon", false)
+                    + " layoutRequested=" + optionalBoolean(parent, "mLayoutRequested", false)
+                    + " reportNextDraw=" + optionalBoolean(parent, "mReportNextDraw", false)
+                    + " viewVisibility=" + optionalInt(parent, "mViewVisibility", -1)
                     + " attachInfo=" + (optionalObject(parent, "mAttachInfo") != null)
                     + " view=" + (optionalObject(parent, "mView") != null)
                     + " window=" + (optionalObject(parent, "mWindow") != null)
@@ -1008,6 +1201,215 @@ public final class ActivityFieldBridge {
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             return "unavailable=" + error.getClass().getSimpleName();
         }
+    }
+
+    /**
+     * Records the actual ViewRoot input receiver at the same boundary as the WMS registration
+     * evidence.  A published window without a non-null receiver explains an InputDispatcher
+     * DOWN wait without involving coordinates, IME, or the Guest Binder relay.
+     */
+    private static String viewRootInputState(Object parent) {
+        if (parent == null) return "null";
+        try {
+            Object rootChannel = optionalObject(parent, "mInputChannel");
+            Object receiver = optionalObject(parent, "mInputEventReceiver");
+            Object receiverChannel = receiver == null
+                    ? null : optionalObject(receiver, "mInputChannel");
+            Object receiverQueue = receiver == null
+                    ? null : optionalObject(receiver, "mMessageQueue");
+            Object mainQueue = android.os.Looper.getMainLooper().getQueue();
+            Object channel = rootChannel != null ? rootChannel : receiverChannel;
+            Object fd = invokeOptional(channel, "getFd");
+            if (fd == null) fd = fileDescriptorNumber(invokeOptional(channel, "getFileDescriptor"));
+            if (fd == null) fd = fileDescriptorNumber(optionalObject(channel, "mFd"));
+            return "receiver=" + className(receiver)
+                    + " rootChannel=" + className(rootChannel)
+                    + " receiverChannel=" + className(receiverChannel)
+                    + " receiverPtr=" + optionalLong(receiver, "mReceiverPtr", -1L)
+                    + " channelPtr=" + optionalLong(channel, "mPtr", -1L)
+                    + " receiverQueue=" + className(receiverQueue)
+                    + " receiverQueueId=" + (receiverQueue == null
+                    ? -1 : System.identityHashCode(receiverQueue))
+                    + " mainQueueId=" + System.identityHashCode(mainQueue)
+                    + " receiverQueueIsMain=" + (receiverQueue == mainQueue)
+                    + " receiverToken=" + String.valueOf(invokeOptional(receiver, "getToken"))
+                    + " probablyHasInput=" + probablyHasInput(receiver)
+                    + " nativeDump=" + receiverDump(receiver)
+                    + " fd=" + (fd == null ? "null" : String.valueOf(fd));
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            return "unavailable=" + error.getClass().getSimpleName();
+        }
+    }
+
+    private static String className(Object value) {
+        return value == null ? "null" : value.getClass().getName();
+    }
+
+    private static boolean probablyHasInput(Object receiver) {
+        if (receiver == null) return false;
+        try {
+            Method method = findMethod(receiver.getClass(), "probablyHasInput");
+            if (method == null) return false;
+            method.setAccessible(true);
+            Object value = method.invoke(receiver);
+            return value instanceof Boolean && (Boolean) value;
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            return false;
+        }
+    }
+
+    private static String receiverDump(Object receiver) {
+        if (receiver == null) return "null";
+        try {
+            Method method = findMethod(receiver.getClass(), "dump",
+                    String.class, PrintWriter.class);
+            if (method == null) return "unavailable";
+            method.setAccessible(true);
+            StringWriter buffer = new StringWriter();
+            method.invoke(receiver, "", new PrintWriter(buffer));
+            String value = buffer.toString().replace('\r', ' ').replace('\n', '|');
+            return value.length() <= 1200 ? value : value.substring(0, 1200);
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            return "error=" + error.getClass().getSimpleName();
+        }
+    }
+
+    private static long optionalLong(Object target, String name, long fallback) throws Exception {
+        if (target == null) return fallback;
+        Field field = findField(target.getClass(), name);
+        if (field == null) return fallback;
+        field.setAccessible(true);
+        return field.getLong(target);
+    }
+
+    private static int optionalInt(Object target, String name, int fallback) throws Exception {
+        if (target == null) return fallback;
+        Field field = findField(target.getClass(), name);
+        if (field == null) return fallback;
+        field.setAccessible(true);
+        return field.getInt(target);
+    }
+
+    private static void setOptionalInt(Object target, String name, int value) throws Exception {
+        if (target == null) return;
+        Field field = findField(target.getClass(), name);
+        if (field == null) return;
+        field.setAccessible(true);
+        field.setInt(target, value);
+    }
+
+    private static Object fileDescriptorNumber(Object descriptor) {
+        if (descriptor == null) return null;
+        try {
+            Field field = findField(descriptor.getClass(), "descriptor");
+            if (field == null) field = findField(descriptor.getClass(), "fd");
+            if (field == null) return null;
+            field.setAccessible(true);
+            return field.get(descriptor);
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            return null;
+        }
+    }
+
+    /**
+     * Keeps the input boundary observable while the native/Java Guest boundary is being fixed.
+     * The proxy preserves every Window.Callback method and only records touch/key entry and
+     * return; it is removed with the Activity process and does not synthesize input.
+     */
+    private static void installInputDispatchProbe(Activity activity) {
+        try {
+            android.view.Window window = activity.getWindow();
+            android.view.Window.Callback callback = window == null ? null : window.getCallback();
+            if (callback == null || Proxy.isProxyClass(callback.getClass())) return;
+            android.view.Window.Callback probe = (android.view.Window.Callback) Proxy
+                    .newProxyInstance(ActivityFieldBridge.class.getClassLoader(),
+                            new Class<?>[]{android.view.Window.Callback.class}, (proxy, method, args) -> {
+                                boolean input = "dispatchTouchEvent".equals(method.getName())
+                                        || "dispatchKeyEvent".equals(method.getName())
+                                        || "dispatchGenericMotionEvent".equals(method.getName());
+                                long started = input ? android.os.SystemClock.uptimeMillis() : 0L;
+                                if (input) {
+                                    android.util.Log.i("CS_INPUT_JAVA",
+                                            "CALLBACK_BEGIN method=" + method.getName()
+                                                    + " event=" + inputDescription(args));
+                                }
+                                try {
+                                    return method.invoke(callback, args == null
+                                            ? new Object[0] : args);
+                                } catch (InvocationTargetException error) {
+                                    throw error.getCause();
+                                } finally {
+                                    if (input) {
+                                        android.util.Log.i("CS_INPUT_JAVA",
+                                                "CALLBACK_END method=" + method.getName()
+                                                        + " elapsedMs="
+                                                        + (android.os.SystemClock.uptimeMillis()
+                                                        - started));
+                                    }
+                                }
+                            });
+            window.setCallback(probe);
+            android.util.Log.i("CS_INPUT_JAVA", "CALLBACK_PROBE_INSTALLED callback="
+                    + callback.getClass().getName());
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            android.util.Log.w("CS_INPUT_JAVA", "CALLBACK_PROBE_FAILED", error);
+        }
+    }
+
+    /**
+     * Observes the first View dispatch boundary independently of Window.Callback.  The
+     * callback proxy above only proves that ViewRootImpl reached the Activity window; this
+     * probe also tells us whether the event made it through the DecorView hierarchy.  Preserve
+     * an existing listener if an OEM DecorView has installed one.
+     */
+    private static void installViewTouchProbe(Activity activity) {
+        try {
+            android.view.Window window = activity.getWindow();
+            android.view.View decor = window == null ? null : window.getDecorView();
+            if (decor == null) return;
+            Object listenerInfo = optionalObject(decor, "mListenerInfo");
+            android.view.View.OnTouchListener previous = listenerInfo == null
+                    ? null : (android.view.View.OnTouchListener) optionalObject(
+                    listenerInfo, "mOnTouchListener");
+            if (previous != null
+                    && previous.getClass().getName().contains("ActivityFieldBridge")) return;
+            android.view.View.OnTouchListener probe = (view, event) -> {
+                long started = android.os.SystemClock.uptimeMillis();
+                android.util.Log.i("CS_INPUT_JAVA",
+                        "VIEW_BEGIN event=" + inputDescription(new Object[]{event})
+                                + " view=" + view.getClass().getName());
+                boolean handled = previous != null && previous.onTouch(view, event);
+                android.util.Log.i("CS_INPUT_JAVA",
+                        "VIEW_END handled=" + handled + " elapsedMs="
+                                + (android.os.SystemClock.uptimeMillis() - started));
+                return handled;
+            };
+            decor.setOnTouchListener(probe);
+            android.util.Log.i("CS_INPUT_JAVA", "VIEW_PROBE_INSTALLED decor="
+                    + decor.getClass().getName() + " previous="
+                    + (previous == null ? "null" : previous.getClass().getName()));
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            android.util.Log.w("CS_INPUT_JAVA", "VIEW_PROBE_FAILED", error);
+        }
+    }
+
+    private static String inputDescription(Object[] args) {
+        if (args == null || args.length == 0 || args[0] == null) return "none";
+        Object event = args[0];
+        if (event instanceof android.view.MotionEvent motion) {
+            return "MotionEvent action=" + motion.getActionMasked()
+                    + " x=" + motion.getX() + " y=" + motion.getY();
+        }
+        if (event instanceof android.view.KeyEvent key) {
+            return "KeyEvent action=" + key.getAction() + " code=" + key.getKeyCode();
+        }
+        return event.getClass().getName();
     }
 
     private static void publishWindowIfMissing(Activity activity) {
@@ -1173,6 +1575,28 @@ public final class ActivityFieldBridge {
     private static void applyGuestTheme(Activity guest,
                                         GuestRuntimeEnvironment.Session session,
                                         String componentClass) {
+        int themeResId = resolveGuestActivityTheme(session, componentClass);
+        android.util.Log.i("CS_FRAMEWORK_ACTIVITY", "GUEST_THEME component="
+                + componentClass + " themeResId=0x" + Integer.toHexString(themeResId));
+        if (themeResId != 0) guest.setTheme(themeResId);
+    }
+
+    /**
+     * Activity.mTheme must not point at GuestContext's application-wide Theme. Android mutates
+     * the Activity Theme during setTheme()/AppCompat setup; sharing it makes a later Activity
+     * inherit the previous component's style and can fail AppCompat's parent-theme check.
+     */
+    private static android.content.res.Resources.Theme createGuestActivityTheme(
+            GuestRuntimeEnvironment.Session session, String componentClass) {
+        android.content.res.Resources.Theme theme =
+                session.context().getResources().newTheme();
+        int themeResId = resolveGuestActivityTheme(session, componentClass);
+        if (themeResId != 0) theme.applyStyle(themeResId, true);
+        return theme;
+    }
+
+    private static int resolveGuestActivityTheme(GuestRuntimeEnvironment.Session session,
+                                                  String componentClass) {
         int themeResId = 0;
         for (VirtualComponentSnapshot component : session.spec().packageState().components()) {
             if ("ACTIVITY".equals(component.type())
@@ -1185,9 +1609,7 @@ public final class ActivityFieldBridge {
             ApplicationInfo application = session.context().getApplicationInfo();
             if (application != null) themeResId = application.theme;
         }
-        android.util.Log.i("CS_FRAMEWORK_ACTIVITY", "GUEST_THEME component="
-                + componentClass + " themeResId=0x" + Integer.toHexString(themeResId));
-        if (themeResId != 0) guest.setTheme(themeResId);
+        return themeResId;
     }
 
     private static void clearStaleFrameworkWindow(Object record, Activity activity) throws Exception {

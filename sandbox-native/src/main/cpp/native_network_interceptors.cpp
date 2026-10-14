@@ -111,6 +111,27 @@ Function require_real(std::atomic<Function>& storage, const char* name) {
     return current;
 }
 
+void log_unix_receive(const char* api, const char* phase, int descriptor,
+                      ssize_t result, int error_number) noexcept {
+    GetSockNameFn name_function = require_real(real_getsockname, "getsockname");
+    GetSockOptFn option_function = require_real(real_getsockopt, "getsockopt");
+    if (name_function == nullptr || option_function == nullptr) return;
+    sockaddr_storage address{};
+    socklen_t address_length = sizeof(address);
+    int type = 0;
+    socklen_t type_length = sizeof(type);
+    if (name_function(descriptor, reinterpret_cast<sockaddr*>(&address), &address_length) != 0
+            || address.ss_family != AF_UNIX
+            || option_function(descriptor, SOL_SOCKET, SO_TYPE, &type, &type_length) != 0
+            || type <= 0) {
+        return;
+    }
+    __android_log_print(ANDROID_LOG_INFO, "CS_INPUT_NATIVE",
+            "api=%s phase=%s fd=%d type=%d tracked=%d result=%zd errno=%d",
+            api, phase, descriptor, type, native_is_tracked_socket(descriptor) ? 1 : 0,
+            result, error_number);
+}
+
 constexpr std::size_t NETWORK_RECEIVE_LOCK_COUNT = 64;
 constexpr std::size_t MAX_TEMP_NETWORK_PAYLOAD = 8U * 1024U * 1024U;
 constexpr std::size_t MAX_TEMP_NETWORK_CONTROL = 1024U * 1024U;
@@ -233,6 +254,7 @@ ssize_t checked_recvfrom(int socket_fd, void* buffer, size_t length, int flags,
                          sockaddr* source, socklen_t* source_length) {
     RecvFromFn function = require_real(real_recvfrom, "recvfrom");
     if (function == nullptr) { errno = ENOSYS; return -1; }
+    log_unix_receive("recvfrom", "BEGIN", socket_fd, -1, 0);
     if ((buffer == nullptr && length != 0) || !socket_address_arguments_valid(source, source_length)) {
         errno = EFAULT;
         return -1;
@@ -275,6 +297,8 @@ ssize_t checked_recvfrom(int socket_fd, void* buffer, size_t length, int flags,
         void* temporary_buffer = length == 0 ? nullptr : temporary_payload.data();
         const ssize_t received = function(socket_fd, temporary_buffer, length, flags,
                 reinterpret_cast<sockaddr*>(&temporary_source), &temporary_source_length);
+        const int receive_errno = received < 0 ? errno : 0;
+        log_unix_receive("recvfrom", "END", socket_fd, received, receive_errno);
         if (received < 0) return received;
         if (message_oriented && probed_source_length != 0 && !socket_addresses_equal(
                 probed_source, probed_source_length, temporary_source, temporary_source_length)) {
@@ -615,6 +639,7 @@ extern "C" ssize_t controlled_recvfrom(int socket_fd, void* buffer, size_t lengt
 extern "C" ssize_t controlled_recvmsg(int socket_fd, msghdr* message, int flags) {
     RecvMsgFn function = require_real(real_recvmsg, "recvmsg");
     if (function == nullptr) { errno = ENOSYS; return -1; }
+    log_unix_receive("recvmsg", "BEGIN", socket_fd, -1, 0);
     if (message == nullptr
             || (message->msg_name == nullptr && message->msg_namelen != 0)
             || (message->msg_control == nullptr && message->msg_controllen != 0)) {
@@ -669,6 +694,8 @@ extern "C" ssize_t controlled_recvmsg(int socket_fd, msghdr* message, int flags)
         temporary.msg_controllen = temporary_control.size();
 
         const ssize_t received = function(socket_fd, &temporary, flags);
+        const int receive_errno = received < 0 ? errno : 0;
+        log_unix_receive("recvmsg", "END", socket_fd, received, receive_errno);
         if (received < 0) return received;
         if (message_oriented && probed_source_length != 0 && !socket_addresses_equal(
                 probed_source, probed_source_length, temporary_source, temporary.msg_namelen)) {
@@ -705,7 +732,12 @@ extern "C" ssize_t controlled_recvmsg(int socket_fd, msghdr* message, int flags)
 extern "C" ssize_t controlled_read(int descriptor, void* buffer, size_t length) {
     ReadFn function = require_real(real_read, "read");
     if (function == nullptr) { errno = ENOSYS; return -1; }
-    if (!native_is_tracked_socket(descriptor)) return function(descriptor, buffer, length);
+    log_unix_receive("read", "BEGIN", descriptor, -1, 0);
+    if (!native_is_tracked_socket(descriptor)) {
+        const ssize_t result = function(descriptor, buffer, length);
+        log_unix_receive("read", "END", descriptor, result, result < 0 ? errno : 0);
+        return result;
+    }
     return checked_recvfrom(descriptor, buffer, length, 0, nullptr, nullptr);
 }
 

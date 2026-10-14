@@ -116,9 +116,22 @@ public final class FrameworkIdentityInvocationHandler implements InvocationHandl
             return binderBoundary.binder();
         }
 
+        boolean bindTrace = isActivityManagerBindTrace(method);
+        if (bindTrace) {
+            android.util.Log.i("CS_ACTIVITY_BIND_TRACE", "BEGIN method=" + methodName
+                    + " args=" + method.getParameterCount()
+                    + " intent=" + describeBindIntent(arguments)
+                    + " pid=" + android.os.Process.myPid()
+                    + " tid=" + android.os.Process.myTid());
+        }
+
         FrameworkCallInterceptor.Interception interception =
                 callInterceptor.intercept(spec.serviceName(), method, arguments);
         if (interception != null && interception.handled()) {
+            if (bindTrace) {
+                android.util.Log.i("CS_ACTIVITY_BIND_TRACE", "INTERCEPTED method=" + methodName
+                        + " result=" + String.valueOf(interception.result()));
+            }
             safeRecord(ProxyEvent.now(
                     spec.serviceName(), methodName, "runtime-interceptor", true,
                     "framework call handled by runtime bridge"));
@@ -146,40 +159,17 @@ public final class FrameworkIdentityInvocationHandler implements InvocationHandl
         }
 
         try {
-            if ("activity-manager".equals(spec.serviceName())
-                    && isProcessDiscoveryMethod(methodName)) {
-                android.util.Log.i("CS_AMS_PROCESS_DISCOVERY", "begin method=" + methodName
-                        + " argc=" + (arguments == null ? 0 : arguments.length));
-                if ("getRunningAppProcesses".equals(methodName)
-                        || "getMyMemoryState".equals(methodName)) {
-                    android.util.Log.i("CS_AMS_PROCESS_DISCOVERY", "caller="
-                            + android.util.Log.getStackTraceString(new Throwable()));
-                }
-                if ("getMyMemoryState".equals(methodName) && arguments != null
-                        && arguments.length > 0 && arguments[0] != null) {
-                    android.util.Log.i("CS_AMS_PROCESS_DISCOVERY", "memoryStateArg="
-                            + arguments[0].getClass().getName() + " value=" + arguments[0]);
-                }
-            }
             Object[] binderArguments = binderBoundary == null ? rewrittenArguments
                     : binderBoundary.wrapArguments(rewrittenArguments, method.getParameterTypes(),
                             spec.serviceName() + ".callback");
+            if (bindTrace) {
+                android.util.Log.i("CS_ACTIVITY_BIND_TRACE", "DELEGATE_BEGIN method=" + methodName
+                        + " intent=" + describeBindIntent(rewrittenArguments));
+            }
             Object result = method.invoke(delegate, binderArguments);
-            if ("activity-manager".equals(spec.serviceName())
-                    && "getMyMemoryState".equals(methodName)
-                    && arguments != null && arguments.length > 0 && arguments[0] != null) {
-                android.util.Log.i("CS_AMS_PROCESS_DISCOVERY", "memoryStateAfterDelegate="
-                        + describeProcessState(arguments[0]));
-            }
-            if ("activity-manager".equals(spec.serviceName())
-                    && isProcessDiscoveryMethod(methodName)) {
-                android.util.Log.i("CS_AMS_PROCESS_DISCOVERY", "end method=" + methodName
+            if (bindTrace) {
+                android.util.Log.i("CS_ACTIVITY_BIND_TRACE", "DELEGATE_RETURN method=" + methodName
                         + " result=" + String.valueOf(result));
-            }
-            if ("activity-manager".equals(spec.serviceName())
-                    && "getRunningAppProcesses".equals(methodName)) {
-                android.util.Log.i("CS_GUEST_PROCESS_IDENTITY", "AMS_RUNNING_PROCESSES raw="
-                        + String.valueOf(result));
             }
             if (rewrittenArguments != null) {
                 for (Object argument : rewrittenArguments) {
@@ -208,6 +198,10 @@ public final class FrameworkIdentityInvocationHandler implements InvocationHandl
             return wrapBoundaryResult(result, method.getReturnType(), methodName + ".return");
         } catch (InvocationTargetException exception) {
             Throwable cause = exception.getCause();
+            if (bindTrace) {
+                android.util.Log.e("CS_ACTIVITY_BIND_TRACE", "DELEGATE_FAIL method=" + methodName,
+                        cause == null ? exception : cause);
+            }
             safeRecord(ProxyEvent.now(
                     spec.serviceName(), methodName, "delegate-call", false,
                     cause == null ? exception.toString() : cause.toString()));
@@ -217,6 +211,25 @@ public final class FrameworkIdentityInvocationHandler implements InvocationHandl
                     spec.serviceName(), methodName, "proxy-call", false, exception.toString()));
             throw exception;
         }
+    }
+
+    private boolean isActivityManagerBindTrace(Method method) {
+        if (!"activity-manager".equals(spec.serviceName())) return false;
+        String name = method.getName();
+        return ("bindService".equals(name) || "bindServiceInstance".equals(name))
+                && (method.getParameterCount() == 8 || method.getParameterCount() == 9);
+    }
+
+    private static String describeBindIntent(Object[] arguments) {
+        if (arguments == null) return "null";
+        for (Object argument : arguments) {
+            if (argument instanceof android.content.Intent intent) {
+                return intent.getComponent() == null
+                        ? String.valueOf(intent)
+                        : intent.getComponent().flattenToShortString();
+            }
+        }
+        return "none";
     }
 
     private Object invokeObjectMethod(Object proxy, Method method, Object[] arguments) {
@@ -251,26 +264,4 @@ public final class FrameworkIdentityInvocationHandler implements InvocationHandl
                 && method.getReturnType().getName().contains(ANDROID_INTENT_SENDER_CLASS);
     }
 
-    private static boolean isProcessDiscoveryMethod(String methodName) {
-        return "getRunningAppProcesses".equals(methodName)
-                || "getRunningServices".equals(methodName)
-                || "getRunningExternalApplications".equals(methodName)
-                || "getProcessesInErrorState".equals(methodName)
-                || "getProcessLimit".equals(methodName)
-                || "getMyMemoryState".equals(methodName);
-    }
-
-    private static String describeProcessState(Object value) {
-        StringBuilder out = new StringBuilder(value.getClass().getName());
-        for (String fieldName : new String[] {"pid", "uid", "processName", "importance"}) {
-            try {
-                java.lang.reflect.Field field = value.getClass().getDeclaredField(fieldName);
-                field.setAccessible(true);
-                out.append(' ').append(fieldName).append('=').append(field.get(value));
-            } catch (Throwable ignored) {
-                out.append(' ').append(fieldName).append("=<unavailable>");
-            }
-        }
-        return out.toString();
-    }
 }

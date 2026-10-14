@@ -92,6 +92,32 @@ final class GuestNativeRuntimeProjection {
         }
     }
 
+    /**
+     * Returns the U4 core paths selected for the current Guest revision.  The defining
+     * ClassLoader and NativePolicy use the real paths returned here; callers that expose them to
+     * U4 must project them back to the Guest's logical /data paths first.
+     *
+     * <p>A raw {@code core.jar} is intentionally not returned.  It is usable only after
+     * {@link #materializeRawDexOverlay} has created a verified ZIP overlay.  Falling back to the
+     * verified base APK keeps U4's process launcher usable when a deployment is incomplete.</p>
+     */
+    static CorePaths corePaths(File dataDir, String nativeAbi, boolean isolatedProcess,
+                               String packagedNativeLibraryDir, String baseDexPath) {
+        String fallbackDex = firstPath(baseDexPath);
+        String fallbackLib = normalize(packagedNativeLibraryDir);
+        try {
+            Candidate candidate = selectedCandidate(dataDir, nativeAbi, isolatedProcess);
+            if (candidate == null || candidate.rawDex
+                    || samePath(candidate.libraryDirectory, fallbackLib)) {
+                return new CorePaths(fallbackDex, "", fallbackLib);
+            }
+            return new CorePaths(candidate.coreDex.getCanonicalPath(),
+                    candidate.revision.getCanonicalPath(), candidate.libraryDirectory);
+        } catch (IOException | RuntimeException ignored) {
+            return new CorePaths(fallbackDex, "", fallbackLib);
+        }
+    }
+
     static ByteBuffer mapCoreDex(File dataDir, String nativeAbi, boolean isolatedProcess,
                                  String packagedNativeLibraryDir) {
         String packagedNative = normalize(packagedNativeLibraryDir);
@@ -421,6 +447,25 @@ final class GuestNativeRuntimeProjection {
 
     private static String normalize(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private static String firstPath(String value) {
+        String normalized = normalize(value);
+        if (normalized.isEmpty()) return normalized;
+        int separator = normalized.indexOf(File.pathSeparatorChar);
+        return separator < 0 ? normalized : normalized.substring(0, separator);
+    }
+
+    static final class CorePaths {
+        final String dexPath;
+        final String odexPath;
+        final String libraryPath;
+
+        CorePaths(String dexPath, String odexPath, String libraryPath) {
+            this.dexPath = dexPath;
+            this.odexPath = odexPath;
+            this.libraryPath = libraryPath;
+        }
     }
 
     private static final class Candidate {

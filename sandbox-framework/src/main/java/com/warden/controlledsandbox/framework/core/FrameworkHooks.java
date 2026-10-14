@@ -65,6 +65,7 @@ import com.warden.controlledsandbox.framework.service.SystemUpdateServiceHook;
 import com.warden.controlledsandbox.framework.service.CaptioningManagerHook;
 import com.warden.controlledsandbox.framework.service.UiModeManagerHook;
 import com.warden.controlledsandbox.framework.service.LocaleServiceHook;
+import com.warden.controlledsandbox.framework.service.MiuiSecurityManagerServiceHook;
 
 
 import android.content.Context;
@@ -297,6 +298,8 @@ public final class FrameworkHooks implements AutoCloseable {
         attempt("sensorCatalog", installed, failures, hooks, bindingDetails,
                 () -> SensorServiceHook.install(guestContext, identity));
         attempt("audioCapture", installed, failures, hooks, () -> AudioCaptureServiceHook.install(hostServiceContext, identity));
+        attempt("miuiSecurity", installed, failures, hooks,
+                () -> MiuiSecurityManagerServiceHook.install(identity));
         return new FrameworkHooks(hooks,
                 new FrameworkHookReport(installed, failures, bindingDetails), identity);
     }

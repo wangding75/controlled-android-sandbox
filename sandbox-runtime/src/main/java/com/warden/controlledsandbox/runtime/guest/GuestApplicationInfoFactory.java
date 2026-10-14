@@ -31,6 +31,18 @@ public final class GuestApplicationInfoFactory {
      */
     static ApplicationInfo create(GuestPackageSpec spec, String dataDir, Bundle metaData,
                                   String appComponentFactory, ApplicationInfo parsed) {
+        return create(spec, dataDir, metaData, appComponentFactory, parsed, "");
+    }
+
+    /**
+     * Builds the identity projection and, when supplied, publishes the verified Java-visible
+     * native-library alias used by U4's File.exists() health check. The alias is deliberately an
+     * explicit bootstrap input; never infer it from a parsed ApplicationInfo, which may carry a
+     * Host path.
+     */
+    static ApplicationInfo create(GuestPackageSpec spec, String dataDir, Bundle metaData,
+                                  String appComponentFactory, ApplicationInfo parsed,
+                                  String applicationNativeLibraryDir) {
         ApplicationInfo info = parsed == null
                 ? new ApplicationInfo() : new ApplicationInfo(parsed);
         info.packageName = spec.packageName;
@@ -46,7 +58,8 @@ public final class GuestApplicationInfoFactory {
         setOptionalField(info, "splitNames", spec.splitNames.toArray(new String[0]));
         info.splitSourceDirs = spec.splitPathArray();
         info.splitPublicSourceDirs = spec.splitPathArray();
-        info.nativeLibraryDir = logicalNativeLibraryDir(spec);
+        info.nativeLibraryDir = !nonEmpty(applicationNativeLibraryDir).isEmpty()
+                ? applicationNativeLibraryDir.trim() : logicalNativeLibraryDir(spec);
         setOptionalField(info, "primaryCpuAbi", emptyToNull(spec.nativeAbi));
         setOptionalField(info, "secondaryCpuAbi", null);
         List<String> sharedLibraryFiles = GuestSharedLibraryPathResolver.resolvedSharedLibraryFiles(
@@ -96,6 +109,10 @@ public final class GuestApplicationInfoFactory {
 
     private static String emptyToNull(String value) {
         return value == null || value.trim().isEmpty() ? null : value.trim();
+    }
+
+    private static String nonEmpty(String value) {
+        return value == null ? "" : value.trim();
     }
 
     private static void setOptionalField(ApplicationInfo info, String name, Object value) {

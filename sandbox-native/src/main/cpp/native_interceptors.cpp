@@ -162,6 +162,8 @@ std::atomic<FaccessAtFn> real_faccessat{nullptr};
 std::atomic<FaccessAt2Fn> real_faccessat2{nullptr};
 std::atomic<StatFn> real_stat{nullptr};
 std::atomic<StatFn> real_lstat{nullptr};
+std::atomic<StatFn> real_stat64{nullptr};
+std::atomic<StatFn> real_lstat64{nullptr};
 std::atomic<FstatAtFn> real_fstatat{nullptr};
 std::atomic<StatxFn> real_statx{nullptr};
 std::atomic<RenameAt2Fn> real_renameat2{nullptr};
@@ -783,6 +785,44 @@ extern "C" int controlled_lstat(const char* path, struct stat* value) {
     return call_stat_resolved(resolved, function, value, AT_SYMLINK_NOFOLLOW);
 }
 
+// Android's 64-bit libopenjdk uses the explicit *64 libc symbol names even though
+// struct stat has the same ABI as stat().  Keep those entry points on the same
+// path-policy boundary; otherwise java.io/java.nio can bypass the Guest alias
+// merely by calling the 64-bit spelling.
+extern "C" int controlled_stat64(const char* path, struct stat* value) {
+    if (NativeProcFileSystem::is_proc_fd_path(path == nullptr ? std::string_view{} : path)) {
+        return NativeProcFileSystem::stat_fd_path(path, value, true);
+    }
+    if (NativeProcFileSystem::is_proc_map_file_path(path == nullptr ? std::string_view{} : path)) {
+        errno = EACCES;
+        return -1;
+    }
+    StatFn function = require_real(real_stat64, "stat64");
+    if (function == nullptr) { errno = ENOSYS; return -1; }
+    NativeResolvedPath resolved;
+    if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(path); }, true, resolved)) {
+        return -1;
+    }
+    return call_stat_resolved(resolved, function, value, 0);
+}
+
+extern "C" int controlled_lstat64(const char* path, struct stat* value) {
+    if (NativeProcFileSystem::is_proc_fd_path(path == nullptr ? std::string_view{} : path)) {
+        return NativeProcFileSystem::stat_fd_path(path, value, false);
+    }
+    if (NativeProcFileSystem::is_proc_map_file_path(path == nullptr ? std::string_view{} : path)) {
+        errno = EACCES;
+        return -1;
+    }
+    StatFn function = require_real(real_lstat64, "lstat64");
+    if (function == nullptr) { errno = ENOSYS; return -1; }
+    NativeResolvedPath resolved;
+    if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(path); }, false, resolved)) {
+        return -1;
+    }
+    return call_stat_resolved(resolved, function, value, AT_SYMLINK_NOFOLLOW);
+}
+
 extern "C" int controlled_fstatat(int directory, const char* path, struct stat* value, int flags) {
     FstatAtFn function = require_real(real_fstatat, "fstatat");
     if (function == nullptr) { errno = ENOSYS; return -1; }
@@ -1398,6 +1438,23 @@ bool guest_termination_blocked() {
     return !process_exit_allowed.load(std::memory_order_acquire) && principal_guest_process();
 }
 
+void log_process_lifetime_edge(const char* operation, const char* decision, long argument = 0,
+                               int error_number = 0, long result = 0) noexcept {
+    const NativePolicySnapshot policy = global_policy().snapshot();
+    __android_log_print(ANDROID_LOG_INFO, "CS_PROCESS_EDGE",
+            "op=%s decision=%s result=%ld errno=%d arg=0x%lx hostPid=%d hostPpid=%d hostTid=%d "
+            "principal=%d virtualPid=%d configured=%s exitAllowed=%s",
+            operation == nullptr ? "" : operation,
+            decision == nullptr ? "" : decision,
+            result, error_number, static_cast<unsigned long>(argument),
+            static_cast<int>(NativeProcessIdentity::host_pid()),
+            static_cast<int>(NativeProcessIdentity::host_ppid()),
+            static_cast<int>(NativeProcessIdentity::host_tid()),
+            policy.principal_host_pid, policy.virtual_pid,
+            policy.configured ? "true" : "false",
+            guest_process_exit_allowed() ? "true" : "false");
+}
+
 bool self_process_target(pid_t pid) {
     const NativePolicySnapshot policy = global_policy().snapshot();
     const pid_t host_pid = NativeProcessIdentity::host_pid();
@@ -1493,7 +1550,12 @@ extern "C" void controlled_abort() {
 }
 
 extern "C" void controlled_underscore_exit(int status) {
-    if (guest_termination_blocked()) {
+    const bool blocked = guest_termination_blocked();
+    if (global_policy().configured()) {
+        log_process_lifetime_edge("_exit", blocked ? "DENY_IGNORED" : "FORWARD", status,
+                0, blocked ? 0 : status);
+    }
+    if (blocked) {
         __android_log_print(ANDROID_LOG_INFO, "CS_GUEST_LIFETIME",
                 "guest _exit(%d) ignored", status);
         return;
@@ -1582,6 +1644,7 @@ extern "C" long controlled_syscall(long number, ...) {
 #endif
 #if defined(SYS_fork)
     if (number == SYS_fork && global_policy().configured()) {
+        log_process_lifetime_edge("raw_syscall(fork)", "DENY", 0, EPERM, -1);
         va_end(values);
         errno = EPERM;
         return -1;
@@ -1589,6 +1652,7 @@ extern "C" long controlled_syscall(long number, ...) {
 #endif
 #if defined(SYS_vfork)
     if (number == SYS_vfork && global_policy().configured()) {
+        log_process_lifetime_edge("raw_syscall(vfork)", "DENY", 0, EPERM, -1);
         va_end(values);
         errno = EPERM;
         return -1;
@@ -1602,6 +1666,8 @@ extern "C" long controlled_syscall(long number, ...) {
         const long child_tid = va_arg(values, long);
         const long tls = va_arg(values, long);
         if ((flags & CLONE_THREAD) == 0) {
+            log_process_lifetime_edge("raw_syscall(clone)", "DENY",
+                    static_cast<long>(flags), EPERM, -1);
             va_end(values);
             errno = EPERM;
             return -1;
@@ -1619,6 +1685,9 @@ extern "C" long controlled_syscall(long number, ...) {
         const std::size_t size = va_arg(values, std::size_t);
         if (arguments == nullptr || size < sizeof(std::uint64_t)
                 || (*reinterpret_cast<const std::uint64_t*>(arguments) & CLONE_THREAD) == 0) {
+            const long flags = arguments != nullptr && size >= sizeof(std::uint64_t)
+                    ? static_cast<long>(*reinterpret_cast<const std::uint64_t*>(arguments)) : 0;
+            log_process_lifetime_edge("raw_syscall(clone3)", "DENY", flags, EPERM, -1);
             va_end(values);
             errno = EPERM;
             return -1;
@@ -1631,6 +1700,7 @@ extern "C" long controlled_syscall(long number, ...) {
 #endif
 #if defined(SYS_execve)
     if (number == SYS_execve && global_policy().configured()) {
+        log_process_lifetime_edge("raw_syscall(execve)", "DENY", 0, EPERM, -1);
         va_end(values);
         errno = EPERM;
         return -1;
@@ -1638,6 +1708,7 @@ extern "C" long controlled_syscall(long number, ...) {
 #endif
 #if defined(SYS_execveat)
     if (number == SYS_execveat && global_policy().configured()) {
+        log_process_lifetime_edge("raw_syscall(execveat)", "DENY", 0, EPERM, -1);
         va_end(values);
         errno = EPERM;
         return -1;
@@ -2234,6 +2305,8 @@ void* replacement_for(std::string_view name) {
     if (name == "faccessat2") return reinterpret_cast<void*>(&controlled_faccessat2);
     if (name == "stat") return reinterpret_cast<void*>(&controlled_stat);
     if (name == "lstat") return reinterpret_cast<void*>(&controlled_lstat);
+    if (name == "stat64") return reinterpret_cast<void*>(&controlled_stat64);
+    if (name == "lstat64") return reinterpret_cast<void*>(&controlled_lstat64);
     if (name == "fstatat") return reinterpret_cast<void*>(&controlled_fstatat);
     if (name == "statx") return reinterpret_cast<void*>(&controlled_statx);
     if (name == "renameat2") return reinterpret_cast<void*>(&controlled_renameat2);

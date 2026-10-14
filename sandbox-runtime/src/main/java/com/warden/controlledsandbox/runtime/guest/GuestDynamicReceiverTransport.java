@@ -29,6 +29,8 @@ final class GuestDynamicReceiverTransport implements AutoCloseable {
     private final GuestRuntimeEnvironment.Session session;
     private final Object leasesLock = new Object();
     private final Map<String, DynamicReceiverLease> leases = new HashMap<>();
+    /** Receiver ids cancelled before the async Broker completion reaches register(). */
+    private final java.util.Set<String> cancelledIds = new java.util.HashSet<>();
     private volatile boolean closed;
 
     GuestDynamicReceiverTransport(GuestRuntimeEnvironment.Session session) {
@@ -47,6 +49,17 @@ final class GuestDynamicReceiverTransport implements AutoCloseable {
         }
         DynamicReceiverLease lease = new DynamicReceiverLease(receiverId, guestReceiver, filter,
                 permission, scheduler, flags);
+        synchronized (leasesLock) {
+            requireOpen();
+            if (cancelledIds.remove(receiverId)) {
+                throw new IllegalStateException(
+                        "FRAMEWORK_DYNAMIC_RECEIVER_UNREGISTERED_DURING_REGISTER");
+            }
+            if (leases.containsKey(receiverId)) {
+                throw new IllegalStateException("FRAMEWORK_DYNAMIC_RECEIVER_DUPLICATE");
+            }
+            leases.put(receiverId, lease);
+        }
         try {
             // Context.registerReceiver() is explicitly usable from a caller-owned thread; the
             // Handler argument controls where delivery runs.  Marshaling this registration to
@@ -55,12 +68,19 @@ final class GuestDynamicReceiverTransport implements AutoCloseable {
             // was already committed above, so register the Host dispatcher on this same thread
             // and keep Guest callback execution on the supplied scheduler.
             Intent sticky = registerHost(lease);
+            boolean cancelled;
             synchronized (leasesLock) {
                 requireOpen();
-                if (leases.put(receiverId, lease) != null) {
-                    unregisterHost(lease);
-                    throw new IllegalStateException("FRAMEWORK_DYNAMIC_RECEIVER_DUPLICATE");
-                }
+                lease.hostRegistered = true;
+                cancelled = lease.cancelRequested || leases.get(receiverId) != lease;
+                if (cancelled) leases.remove(receiverId, lease);
+            }
+            if (cancelled) {
+                // unregisterReceiver() may race the host registration after the Broker commit.
+                // The lease is inserted before registerHost(), so that race is observable and
+                // the just-created Host dispatcher is closed instead of being leaked.
+                unregisterHost(lease);
+                throw new IllegalStateException("FRAMEWORK_DYNAMIC_RECEIVER_UNREGISTERED_DURING_REGISTER");
             }
             Bundle event = identityResult();
             event.putString(RuntimeKeys.STATUS, "FRAMEWORK_DYNAMIC_RECEIVER_REGISTERED");
@@ -68,6 +88,7 @@ final class GuestDynamicReceiverTransport implements AutoCloseable {
             RuntimeEventLog.event("GUEST_RECEIVER_FRAMEWORK_REGISTERED", event);
             return sanitizeSticky(sticky);
         } catch (Throwable error) {
+            synchronized (leasesLock) { leases.remove(receiverId, lease); }
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             try { unregisterHost(lease); }
             catch (Throwable cleanup) {
@@ -80,13 +101,24 @@ final class GuestDynamicReceiverTransport implements AutoCloseable {
 
     void unregister(String receiverId) {
         DynamicReceiverLease lease;
-        synchronized (leasesLock) { lease = leases.remove(receiverId); }
-        if (lease == null) return;
+        boolean hostRegistered;
+        synchronized (leasesLock) {
+            lease = leases.remove(receiverId);
+            if (lease == null) {
+                // The router can complete an async unregister before the async register
+                // completion enters this transport. Remember that edge so a later register
+                // cannot create a Host dispatcher after the caller has already retired it.
+                cancelledIds.add(receiverId);
+                return;
+            }
+            lease.cancelRequested = true;
+            hostRegistered = lease.hostRegistered;
+        }
         try {
             // unregisterReceiver() has the same thread contract as registration.  Keeping it
             // direct also makes a register/unregister pair atomic with respect to the caller's
             // SDK worker instead of queueing behind Activity.onCreate().
-            unregisterHost(lease);
+            if (hostRegistered) unregisterHost(lease);
         } catch (Throwable error) {
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             android.util.Log.w("CS_RECEIVER_FRAMEWORK",
@@ -101,12 +133,12 @@ final class GuestDynamicReceiverTransport implements AutoCloseable {
     private void onReceive(DynamicReceiverLease lease, Intent hostIntent) {
         // unregisterReceiver() and Handler delivery can race.  A closed generation must not
         // invoke Guest code or retain a PendingResult after clear/delete/recovery begins.
-        if (closed) return;
+        if (closed || lease.cancelRequested) return;
         ClassLoader previous = Thread.currentThread().getContextClassLoader();
         Object hostPending = null;
         try {
             Thread.currentThread().setContextClassLoader(session.context.getClassLoader());
-            if (closed) return;
+            if (closed || lease.cancelRequested) return;
             hostPending = pendingResult(lease.hostReceiver);
             setPendingResult(lease.guestReceiver, hostPending);
             Intent guestIntent = hostIntent == null ? null : new Intent(hostIntent);
@@ -250,6 +282,8 @@ final class GuestDynamicReceiverTransport implements AutoCloseable {
         synchronized (leasesLock) {
             toClose = new ArrayList<>(leases.values());
             leases.clear();
+            cancelledIds.clear();
+            for (DynamicReceiverLease lease : toClose) lease.cancelRequested = true;
         }
         for (DynamicReceiverLease lease : toClose) {
             try {
@@ -271,6 +305,8 @@ final class GuestDynamicReceiverTransport implements AutoCloseable {
         final Handler scheduler;
         final int flags;
         final FrameworkDynamicReceiver hostReceiver;
+        volatile boolean hostRegistered;
+        volatile boolean cancelRequested;
 
         DynamicReceiverLease(String receiverId, BroadcastReceiver guestReceiver,
                              IntentFilter filter, String permission, Handler scheduler,

@@ -7,7 +7,9 @@ import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
 import com.warden.controlledsandbox.nativebridge.NativePolicy;
 import dalvik.system.InMemoryDexClassLoader;
 import dalvik.system.PathClassLoader;
+import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -24,7 +26,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * <p>Guest classes are defined by the inner {@code PathClassLoader} so Android's NativeLoader
  * can associate one stable namespace with a loader type it recognizes. This wrapper only
  * applies host-internal denial and detection policy; it does not {@code defineClass} Guest
- * types. Native library search paths are fixed on the inner loader at construction.
+ * types. Native library search paths are initialized on the inner loader at construction;
+ * ordinary Guests may project the retained path metadata after construction.
  *
  * <p>Not parallel-capable; uses {@code synchronized (this)}.
  */
@@ -242,6 +245,302 @@ public final class GuestClassLoader extends ClassLoader {
 
     /** Platform loader that actually defines Guest classes and owns the NativeLoader namespace. */
     public ClassLoader definingLoader() { return dex; }
+
+    /**
+     * Projects the paths retained by the defining loader after ART has opened the Guest DEX.
+     *
+     * <p>The loader must be constructed with the verified CAS paths: on Android the
+     * {@code PathClassLoader} constructor opens the DEX before CAS's IO hooks are installed.
+     * Once construction has completed, the bytes and native-loader namespace are already bound,
+     * while the path strings retained by {@code DexPathList} remain observable through U4's
+     * ClassLoader inspection.  Rewrite those retained path objects, including ART's
+     * {@code DexFile.mFileName}, to their Guest-visible aliases.  The dex file is already open;
+     * this changes the path metadata U4 reads, not the bytes or the NativeLoader namespace.
+     * This is deliberately best effort because ART's private field layout varies by release;
+     * failure is logged and does not turn a valid Guest class loader into a bootstrap failure.
+     *
+     * @param realApkPath verified CAS base APK path
+     * @param logicalApkPath Guest-visible base APK alias
+     * @param realNativeRoot selected or packaged CAS native root
+     * @param logicalNativeRoot Guest-visible native library alias used by the metadata facade
+     * @param realGuestDataRoot CAS Guest instance data root, used for runtime overlays
+     * @param logicalGuestDataRoot Guest-visible data root for runtime overlays
+     */
+    void projectDexPathListPaths(String realApkPath, String logicalApkPath,
+                                 String realNativeRoot, String logicalNativeRoot,
+                                 String realGuestDataRoot, String logicalGuestDataRoot) {
+        List<PathMapping> mappings = new ArrayList<>();
+        addMapping(mappings, realApkPath, logicalApkPath);
+        addMapping(mappings, realNativeRoot, logicalNativeRoot);
+        addMapping(mappings, packageRoot(realApkPath),
+                guestPackageName.isEmpty() ? "" : "/data/app/" + guestPackageName);
+        addMapping(mappings, realGuestDataRoot, logicalGuestDataRoot);
+        mappings.sort((left, right) -> Integer.compare(right.real.length(), left.real.length()));
+        if (mappings.isEmpty()) {
+            android.util.Log.i("CS_CLASSLOADER", "DEX_PATH_PROJECTION skipped reason=no-mapping");
+            return;
+        }
+
+        ProjectionStats stats = new ProjectionStats();
+        try {
+            Field pathListField = findField(dex.getClass(), "pathList");
+            Object pathList = pathListField.get(dex);
+            if (pathList == null) {
+                android.util.Log.w("CS_CLASSLOADER", "DEX_PATH_PROJECTION skipped reason=null-path-list");
+                return;
+            }
+            try {
+                projectDexElements(pathList, mappings, stats);
+            } catch (ReflectiveOperationException | RuntimeException error) {
+                stats.failures++;
+            }
+            // Keep the defining loader's native search entries physical.  Android's
+            // BaseDexClassLoader.findLibrary() resolves System.loadLibrary() by checking these
+            // entries before Runtime.nativeLoad() is called.  A logical /data/app path does not
+            // exist on the device, so projecting these fields makes a library such as sgmain
+            // fail before NativePolicy can translate an absolute load argument.  VA/NBB keep a
+            // loadable search root and virtualize file access at the native boundary; CAS does
+            // the same here.  ApplicationInfo.nativeLibraryDir and explicit absolute loads are
+            // still projected/translated independently.
+            android.util.Log.i("CS_CLASSLOADER", "DEX_PATH_PROJECTION applied=true"
+                    + " dexElements=" + stats.dexElements
+                    + " dexFileNames=" + stats.dexFileNames
+                    + " nativeDirs=0"
+                    + " nativeElements=0"
+                    + " nativeSearch=physical"
+                    + " failures=" + stats.failures);
+        } catch (ReflectiveOperationException | RuntimeException error) {
+            android.util.Log.w("CS_CLASSLOADER", "DEX_PATH_PROJECTION applied=false error="
+                    + error.getClass().getName() + ":" + safeMessage(error), error);
+        }
+    }
+
+    /** Compatibility overload for callers that do not create runtime overlays. */
+    void projectDexPathListPaths(String realApkPath, String logicalApkPath,
+                                 String realNativeRoot, String logicalNativeRoot) {
+        projectDexPathListPaths(realApkPath, logicalApkPath, realNativeRoot, logicalNativeRoot,
+                "", "");
+    }
+
+    private static void projectDexElements(Object pathList, List<PathMapping> mappings,
+                                           ProjectionStats stats)
+            throws ReflectiveOperationException {
+        Field elementsField = findOptionalField(pathList.getClass(), "dexElements");
+        if (elementsField == null) return;
+        Object value = elementsField.get(pathList);
+        if (!(value instanceof Object[] elements)) return;
+        for (Object element : elements) {
+            if (element == null) continue;
+            Field pathField = findOptionalField(element.getClass(), "path");
+            if (pathField != null) {
+                try {
+                    Object current = pathField.get(element);
+                    String projected = projectFileOrString(current, mappings);
+                    if (projected != null && !samePath(current, projected)) {
+                        setFileOrString(pathField, element, current, projected);
+                        stats.dexElements++;
+                    }
+                } catch (ReflectiveOperationException | RuntimeException error) {
+                    stats.failures++;
+                }
+            }
+
+            Field dexFileField = findOptionalField(element.getClass(), "dexFile");
+            if (dexFileField != null) {
+                try {
+                    Object dexFile = dexFileField.get(element);
+                    Field fileNameField = dexFile == null ? null
+                            : findOptionalField(dexFile.getClass(), "mFileName");
+                    if (fileNameField != null) {
+                        Object current = fileNameField.get(dexFile);
+                        String projected = projectFileOrString(current, mappings);
+                        if (projected != null && !samePath(current, projected)) {
+                            setFileOrString(fileNameField, dexFile, current, projected);
+                            stats.dexFileNames++;
+                        }
+                    }
+                } catch (ReflectiveOperationException | RuntimeException error) {
+                    stats.failures++;
+                }
+            }
+        }
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static void projectFileList(Object pathList, String fieldName,
+                                        List<PathMapping> mappings, ProjectionStats stats)
+            throws ReflectiveOperationException {
+        Field listField = findOptionalField(pathList.getClass(), fieldName);
+        if (listField == null) return;
+        Object value = listField.get(pathList);
+        if (!(value instanceof List<?> list)) return;
+        ArrayList<Object> projected = new ArrayList<>(list.size());
+        boolean changed = false;
+        for (Object current : list) {
+            String projectedPath = projectFileOrString(current, mappings);
+            if (projectedPath != null && !samePath(current, projectedPath)) {
+                projected.add(projectedFileOrString(current, projectedPath));
+                changed = true;
+                stats.nativeDirectories++;
+            } else {
+                projected.add(current);
+            }
+        }
+        if (!changed) return;
+        try {
+            List mutable = (List) list;
+            for (int index = 0; index < projected.size(); index++) {
+                mutable.set(index, projected.get(index));
+            }
+        } catch (RuntimeException unsupported) {
+            // Some ART releases expose an immutable snapshot. Replacing the field is the
+            // fallback; it may still fail for a final/hidden field and will be logged by the
+            // outer best-effort boundary.
+            listField.set(pathList, projected);
+        }
+    }
+
+    private static void projectPathElements(Object pathList, List<PathMapping> mappings,
+                                             ProjectionStats stats)
+            throws ReflectiveOperationException {
+        Field elementsField = findOptionalField(pathList.getClass(), "nativeLibraryPathElements");
+        if (elementsField == null) return;
+        Object value = elementsField.get(pathList);
+        if (value instanceof List<?> elements) {
+            for (Object element : elements) {
+                projectPathElement(element, mappings, stats);
+            }
+            return;
+        }
+        if (value instanceof Object[] elements) {
+            for (Object element : elements) {
+                projectPathElement(element, mappings, stats);
+            }
+        }
+    }
+
+    private static void projectPathElement(Object element, List<PathMapping> mappings,
+                                           ProjectionStats stats)
+            throws ReflectiveOperationException {
+        if (element == null) return;
+        Field pathField = findOptionalField(element.getClass(), "path");
+        if (pathField == null) pathField = findOptionalField(element.getClass(), "dir");
+        if (pathField == null) return;
+        try {
+            Object current = pathField.get(element);
+            String projected = projectFileOrString(current, mappings);
+            if (projected != null && !samePath(current, projected)) {
+                setFileOrString(pathField, element, current, projected);
+                stats.nativePathElements++;
+            }
+        } catch (ReflectiveOperationException | RuntimeException error) {
+            stats.failures++;
+        }
+    }
+
+    private static String projectFileOrString(Object value, List<PathMapping> mappings) {
+        if (value instanceof File file) return projectPath(file.getPath(), mappings);
+        if (value instanceof String string) return projectPath(string, mappings);
+        return null;
+    }
+
+    private static Object projectedFileOrString(Object original, String projected) {
+        return original instanceof String ? projected : new File(projected);
+    }
+
+    private static boolean samePath(Object original, String projected) {
+        if (original instanceof File file) return file.getPath().equals(projected);
+        return original == null || original.equals(projected);
+    }
+
+    private static void setFileOrString(Field field, Object owner, Object original,
+                                        String projected) throws IllegalAccessException {
+        if (original instanceof File) field.set(owner, new File(projected));
+        else if (original instanceof String) field.set(owner, projected);
+    }
+
+    private static String projectPath(String path, List<PathMapping> mappings) {
+        if (path == null || path.isEmpty()) return path;
+        String normalized = path.replace('\\', '/');
+        for (PathMapping mapping : mappings) {
+            if (normalized.equals(mapping.real)) return mapping.logical;
+            if (normalized.startsWith(mapping.real + "/")) {
+                return mapping.logical + normalized.substring(mapping.real.length());
+            }
+        }
+        return path;
+    }
+
+    private static void addMapping(List<PathMapping> mappings, String real, String logical) {
+        String normalizedReal = normalizePath(real);
+        String normalizedLogical = normalizePath(logical);
+        if (normalizedReal.isEmpty() || normalizedLogical.isEmpty()
+                || normalizedReal.equals(normalizedLogical)) return;
+        mappings.add(new PathMapping(normalizedReal, normalizedLogical));
+    }
+
+    private static String packageRoot(String realApkPath) {
+        String normalized = normalizePath(realApkPath);
+        if (normalized.isEmpty()) return "";
+        int revisions = normalized.indexOf("/revisions/");
+        if (revisions > 0) return normalized.substring(0, revisions);
+        int slash = normalized.lastIndexOf('/');
+        return slash > 0 ? normalized.substring(0, slash) : "";
+    }
+
+    private static String normalizePath(String value) {
+        if (value == null) return "";
+        String normalized = value.trim().replace('\\', '/');
+        while (normalized.length() > 1 && normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        return normalized;
+    }
+
+    private static Field findField(Class<?> type, String name) throws NoSuchFieldException {
+        Class<?> cursor = type;
+        while (cursor != null) {
+            try {
+                Field field = cursor.getDeclaredField(name);
+                field.setAccessible(true);
+                return field;
+            } catch (NoSuchFieldException missing) {
+                cursor = cursor.getSuperclass();
+            }
+        }
+        throw new NoSuchFieldException(name);
+    }
+
+    private static Field findOptionalField(Class<?> type, String name) {
+        try {
+            return findField(type, name);
+        } catch (NoSuchFieldException | RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private static String safeMessage(Throwable error) {
+        String message = error == null ? "" : String.valueOf(error.getMessage());
+        return message.replace('\n', ' ').replace('\r', ' ');
+    }
+
+    private static final class PathMapping {
+        final String real;
+        final String logical;
+
+        PathMapping(String real, String logical) {
+            this.real = real;
+            this.logical = logical;
+        }
+    }
+
+    private static final class ProjectionStats {
+        int dexElements;
+        int dexFileNames;
+        int nativeDirectories;
+        int nativePathElements;
+        int failures;
+    }
 
     /**
      * Load a Guest-defined component class from the defining dex loader only.
